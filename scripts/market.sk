@@ -1,0 +1,109 @@
+# ============================================================
+#  MARKET - /market GUI shop
+#  Items, prices and availability are set in settings.sk.
+# ============================================================
+
+function fillMarket(p: player, gui: inventory):
+    set slots (integers between 0 and 35) of {_gui} to gray stained glass pane named "&r"
+    set {_bal} to getBalance({_p})
+    loop {market::ids::*}:
+        set {_id} to loop-value
+        if {market::%{_id}%::enabled} is true:
+            set {_price} to {market::%{_id}%::price}
+            set {_amt} to {market::%{_id}%::amount}
+            if {_bal} >= {_price}:
+                set {_status} to "&a» Click to buy"
+            else:
+                set {_status} to "&c» Not enough money"
+            set {_item} to {_amt} of {market::%{_id}%::item}
+            set slot {market::%{_id}%::slot} of {_gui} to {_item} named {market::%{_id}%::name} with lore "&7Amount: &f%{_amt}%", "&7Price: &6%money({_price})%", "&r", {_status}
+    set slot 31 of {_gui} to gold nugget named "&6Your balance: &a%money({_bal})%"
+    set slot 35 of {_gui} to barrier named "&cClose"
+
+function openMarket(p: player):
+    set {_gui} to chest inventory with 4 rows named "&8&lMarket"
+    fillMarket({_p}, {_gui})
+    # "-" prefix = memory only, never saved to disk
+    set {-market::gui::%uuid of {_p}%} to {_gui}
+    open {_gui} to {_p}
+
+function buyItem(p: player, id: text):
+    set {_price} to {market::%{_id}%::price}
+    if getBalance({_p}) < {_price}:
+        send "&cYou need %money({_price})% to buy that." to {_p}
+        play sound "entity.villager.no" to {_p}
+        stop
+    set {_item} to {market::%{_id}%::amount} of {market::%{_id}%::item}
+    if {_p} can't hold {_item}:
+        send "&cYour inventory is full." to {_p}
+        stop
+    addBalance({_p}, 0 - {_price})
+    give {_item} to {_p}
+    send "&aBought %{market::%{_id}%::amount}%x %{market::%{_id}%::name}% &afor %money({_price})%." to {_p}
+    play sound "entity.experience_orb.pickup" to {_p}
+
+command /market:
+    aliases: /shop
+    trigger:
+        openMarket(player)
+
+on inventory click:
+    set {_gui} to {-market::gui::%uuid of player%}
+    {_gui} is set
+    player's current inventory is {_gui}
+    # Block every click (and shift-click / hotbar swap) while the market is open
+    cancel event
+    set {_slot} to raw index of event-slot
+    {_slot} is between 0 and 35
+    if {_slot} is 35:
+        close player's inventory
+        stop
+    loop {market::ids::*}:
+        if {market::%loop-value%::enabled} is true:
+            if {market::%loop-value%::slot} is {_slot}:
+                buyItem(player, loop-value)
+                fillMarket(player, {_gui})
+                stop
+
+on inventory drag:
+    set {_gui} to {-market::gui::%uuid of player%}
+    {_gui} is set
+    player's current inventory is {_gui}
+    cancel event
+
+on inventory close:
+    if event-inventory is {-market::gui::%uuid of player%}:
+        delete {-market::gui::%uuid of player%}
+
+on quit:
+    delete {-market::gui::%uuid of player%}
+
+# /marketadmin list
+# /marketadmin toggle <id>
+# /marketadmin price <id> <amount>
+# In-game changes last until the next reload/restart - edit settings.sk to make them permanent.
+command /marketadmin <text> [<text>] [<number>]:
+    permission: economy.admin
+    usage: &cUsage: /marketadmin <list|toggle|price> [id] [price]
+    trigger:
+        if arg-1 is "list":
+            loop {market::ids::*}:
+                send "&e%loop-value% &7- %money({market::%loop-value%::price})% - enabled: %{market::%loop-value%::enabled}%"
+            stop
+        if {market::%arg-2%::item} is not set:
+            send "&cUnknown item id. Use /marketadmin list"
+            stop
+        if arg-1 is "toggle":
+            if {market::%arg-2%::enabled} is true:
+                set {market::%arg-2%::enabled} to false
+            else:
+                set {market::%arg-2%::enabled} to true
+            send "&e%arg-2% enabled: %{market::%arg-2%::enabled}%"
+        else if arg-1 is "price":
+            if arg-3 is not set:
+                send "&cUsage: /marketadmin price <id> <amount>"
+                stop
+            set {market::%arg-2%::price} to max(0, arg-3)
+            send "&e%arg-2% price is now %money(arg-3)%"
+        else:
+            send "&cUsage: /marketadmin <list|toggle|price> [id] [price]"

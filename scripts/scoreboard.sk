@@ -1,0 +1,41 @@
+# ============================================================
+#  SCOREBOARD - sidebar with money, playtime, kills, deaths, IP
+#  Requires SkBee.
+# ============================================================
+
+# Playtime is counted in minutes in {economy::playtime::<uuid>}
+every 1 minute:
+    loop all players:
+        add 1 to {economy::playtime::%uuid of loop-player%}
+
+function fmtPlaytime(m: number) :: text:
+    set {_h} to floor({_m} / 60)
+    set {_min} to mod({_m}, 60)
+    return "%{_h}%h %{_min}%m"
+
+function updateBoard(p: player):
+    set {_u} to uuid of {_p}
+    set {_money} to money(getBalance({_p}))
+    set {_time} to fmtPlaytime({economy::playtime::%{_u}%} ? 0)
+    set {_kills} to {economy::kills::%{_u}%} ? 0
+    set {_deaths} to {economy::deaths::%{_u}%} ? 0
+    set {_ip} to {cfg::server-ip} ? "play.yourserver.net"
+
+    set title of {_p}'s scoreboard to {cfg::title} ? "&6&lWEAPONS"
+    set line 9 of {_p}'s scoreboard to "&7&m                    "
+    set line 8 of {_p}'s scoreboard to "&fMoney: &a%{_money}%"
+    set line 7 of {_p}'s scoreboard to "&fPlaytime: &e%{_time}%"
+    set line 6 of {_p}'s scoreboard to "&r"
+    set line 5 of {_p}'s scoreboard to "&fKills: &a%{_kills}%"
+    set line 4 of {_p}'s scoreboard to "&fDeaths: &c%{_deaths}%"
+    set line 3 of {_p}'s scoreboard to "&r&r"
+    set line 2 of {_p}'s scoreboard to "&7&m                    &r"
+    set line 1 of {_p}'s scoreboard to "&6%{_ip}%"
+
+on join:
+    wait 1 tick
+    updateBoard(player)
+
+every 2 seconds:
+    loop all players:
+        updateBoard(loop-player)

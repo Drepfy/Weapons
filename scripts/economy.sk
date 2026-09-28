@@ -1,272 +1,60 @@
 # ============================================================
-#  Economy + Scoreboard + Market
-#  Requires: Skript 2.7+ and SkBee (for the sidebar scoreboard)
-#  Data is stored in Skript variables, so it persists across restarts.
+#  ECONOMY - persistent balances + /balance, /pay, /eco
+#  Balances are stored in {economy::balance::<uuid>}.
 # ============================================================
 
-options:
-    server-ip: play.yourserver.net
-    title: &6&lWEAPONS
-    currency: $
-    starting-balance: 0
-    # Reward for killing another player (0 disables)
-    player-kill-reward: 50
-    # Money taken from the victim on PvP death (0 disables)
-    player-death-penalty: 0
-    scoreboard-refresh: 2 seconds
-
-# ------------------------------------------------------------
-#  CONFIG — edit these lists, then run /skript reload economy
-# ------------------------------------------------------------
-on load:
-    # --- Mob rewards: {mobreward::<entity type>} = money ---
-    delete {mobreward::*}
-    set {mobreward::zombie} to 5
-    set {mobreward::skeleton} to 5
-    set {mobreward::spider} to 4
-    set {mobreward::creeper} to 8
-    set {mobreward::enderman} to 15
-    set {mobreward::blaze} to 12
-    set {mobreward::wither skeleton} to 20
-    set {mobreward::witch} to 10
-    set {mobreward::piglin brute} to 25
-    set {mobreward::wither} to 500
-    set {mobreward::ender dragon} to 1000
-
-    # --- Market: item, amount, price, slot, enabled ---
-    delete {market::*}
-    add "golden apple" to {market::ids::*}
-    set {market::golden apple::item} to golden apple
-    set {market::golden apple::amount} to 1
-    set {market::golden apple::price} to 100
-    set {market::golden apple::slot} to 10
-    set {market::golden apple::enabled} to true
-
-    add "gold block" to {market::ids::*}
-    set {market::gold block::item} to gold block
-    set {market::gold block::amount} to 1
-    set {market::gold block::price} to 250
-    set {market::gold block::slot} to 11
-    set {market::gold block::enabled} to true
-
-    add "obsidian" to {market::ids::*}
-    set {market::obsidian::item} to obsidian
-    set {market::obsidian::amount} to 8
-    set {market::obsidian::price} to 80
-    set {market::obsidian::slot} to 12
-    set {market::obsidian::enabled} to true
-
-    add "golden carrot" to {market::ids::*}
-    set {market::golden carrot::item} to golden carrot
-    set {market::golden carrot::amount} to 16
-    set {market::golden carrot::price} to 60
-    set {market::golden carrot::slot} to 13
-    set {market::golden carrot::enabled} to true
-
-    add "iron block" to {market::ids::*}
-    set {market::iron block::item} to iron block
-    set {market::iron block::amount} to 1
-    set {market::iron block::price} to 120
-    set {market::iron block::slot} to 14
-    set {market::iron block::enabled} to true
-
-    add "nether wart" to {market::ids::*}
-    set {market::nether wart::item} to nether wart
-    set {market::nether wart::amount} to 16
-    set {market::nether wart::price} to 40
-    set {market::nether wart::slot} to 15
-    set {market::nether wart::enabled} to true
-
-    add "netherite ingot" to {market::ids::*}
-    set {market::netherite ingot::item} to netherite ingot
-    set {market::netherite ingot::amount} to 1
-    set {market::netherite ingot::price} to 2000
-    set {market::netherite ingot::slot} to 16
-    set {market::netherite ingot::enabled} to true
-
-    add "upgrade template" to {market::ids::*}
-    set {market::upgrade template::item} to netherite upgrade smithing template
-    set {market::upgrade template::amount} to 1
-    set {market::upgrade template::price} to 1500
-    set {market::upgrade template::slot} to 22
-    set {market::upgrade template::enabled} to true
-
-# ------------------------------------------------------------
-#  Helpers
-# ------------------------------------------------------------
-function fmtMoney(n: number) :: text:
-    return "{@currency}%rounded down {_n}%"
-
-function fmtTime(t: timespan) :: text:
-    set {_s} to rounded down ({_t} / 1 second)
-    set {_h} to rounded down ({_s} / 3600)
-    set {_m} to rounded down (mod({_s}, 3600) / 60)
-    return "%{_h}%h %{_m}%m"
+function money(n: number) :: text:
+    set {_c} to {cfg::currency} ? "$"
+    return "%{_c}%%rounded down {_n}%"
 
 function getBalance(p: offline player) :: number:
     return {economy::balance::%uuid of {_p}%} ? 0
 
-function addBalance(p: offline player, n: number):
-    set {economy::balance::%uuid of {_p}%} to getBalance({_p}) + {_n}
-    if {economy::balance::%uuid of {_p}%} < 0:
-        set {economy::balance::%uuid of {_p}%} to 0
+function setBalance(p: offline player, n: number):
+    set {economy::balance::%uuid of {_p}%} to max(0, rounded down {_n})
 
-# ------------------------------------------------------------
-#  Scoreboard
-# ------------------------------------------------------------
-function updateBoard(p: player):
-    set {_u} to uuid of {_p}
-    set title of scoreboard of {_p} to "{@title}"
-    set line 9 of scoreboard of {_p} to "&7&m                  "
-    set line 8 of scoreboard of {_p} to "&fMoney: &a%fmtMoney(getBalance({_p}))%"
-    set line 7 of scoreboard of {_p} to "&fPlaytime: &e%fmtTime(time played of {_p})%"
-    set line 6 of scoreboard of {_p} to "&r"
-    set line 5 of scoreboard of {_p} to "&fKills: &a%{economy::kills::%{_u}%} ? 0%"
-    set line 4 of scoreboard of {_p} to "&fDeaths: &c%{economy::deaths::%{_u}%} ? 0%"
-    set line 3 of scoreboard of {_p} to "&r&r"
-    set line 2 of scoreboard of {_p} to "&7&m                  &r"
-    set line 1 of scoreboard of {_p} to "&6{@server-ip}"
+function addBalance(p: offline player, n: number):
+    setBalance({_p}, getBalance({_p}) + {_n})
 
 on join:
     if {economy::balance::%uuid of player%} is not set:
-        set {economy::balance::%uuid of player%} to {@starting-balance}
-    updateBoard(player)
+        setBalance(player, {cfg::starting-balance} ? 0)
 
-every {@scoreboard-refresh}:
-    loop all players:
-        updateBoard(loop-player)
-
-# ------------------------------------------------------------
-#  Kill rewards
-# ------------------------------------------------------------
-on death:
-    if victim is a player:
-        add 1 to {economy::deaths::%uuid of victim%}
-        attacker is a player
-        attacker is not victim
-        add 1 to {economy::kills::%uuid of attacker%}
-        if {@player-kill-reward} > 0:
-            addBalance(attacker, {@player-kill-reward})
-            send action bar "&a+%fmtMoney({@player-kill-reward})% &7for killing &f%victim%" to attacker
-        if {@player-death-penalty} > 0:
-            set {_loss} to min({@player-death-penalty}, getBalance(victim))
-            addBalance(victim, -1 * {_loss})
-            send "&cYou lost %fmtMoney({_loss})% to %attacker%." to victim
-    else:
-        attacker is a player
-        set {_r} to {mobreward::%type of victim%}
-        {_r} is set
-        {_r} > 0
-        addBalance(attacker, {_r})
-        send action bar "&a+%fmtMoney({_r})% &7for killing a &f%type of victim%" to attacker
-
-# ------------------------------------------------------------
-#  Commands
-# ------------------------------------------------------------
 command /balance [<offline player>]:
     aliases: /bal, /money
     trigger:
         set {_t} to arg-1 ? player
-        send "&6%{_t}%'s balance: &a%fmtMoney(getBalance({_t}))%"
+        send "&6%{_t}%'s balance: &a%money(getBalance({_t}))%"
 
-command /pay <offline player> <number>:
+command /pay <player> <number>:
+    usage: &cUsage: /pay <player> <amount>
     trigger:
-        arg-2 > 0
+        set {_amt} to rounded down arg-2
+        if {_amt} <= 0:
+            send "&cAmount must be at least 1."
+            stop
         if arg-1 is player:
             send "&cYou can't pay yourself."
             stop
-        if getBalance(player) < arg-2:
-            send "&cInsufficient funds."
+        if getBalance(player) < {_amt}:
+            send "&cYou only have %money(getBalance(player))%."
             stop
-        addBalance(player, -1 * arg-2)
-        addBalance(arg-1, arg-2)
-        send "&aPaid %fmtMoney(arg-2)% to %arg-1%."
-        send "&aYou received %fmtMoney(arg-2)% from %player%." to arg-1
+        addBalance(player, 0 - {_amt})
+        addBalance(arg-1, {_amt})
+        send "&aYou paid %money({_amt})% to %arg-1%."
+        send "&aYou received %money({_amt})% from %player%." to arg-1
 
 command /eco <text> <offline player> <number>:
     permission: economy.admin
-    usage: /eco <give|take|set> <player> <amount>
+    usage: &cUsage: /eco <give|take|set> <player> <amount>
     trigger:
         if arg-1 is "give":
             addBalance(arg-2, arg-3)
         else if arg-1 is "take":
-            addBalance(arg-2, -1 * arg-3)
+            addBalance(arg-2, 0 - arg-3)
         else if arg-1 is "set":
-            set {economy::balance::%uuid of arg-2%} to max(0, arg-3)
+            setBalance(arg-2, arg-3)
         else:
             send "&cUsage: /eco <give|take|set> <player> <amount>"
             stop
-        send "&a%arg-2%'s balance is now %fmtMoney(getBalance(arg-2))%."
-
-# Toggle a market item on/off in-game: /marketadmin toggle <id>
-# Change a price in-game:               /marketadmin price <id> <amount>
-# (In-game changes last until the next reload; edit "on load" to make them permanent.)
-command /marketadmin <text> <text> [<number>]:
-    permission: economy.admin
-    trigger:
-        {market::%arg-2%::item} is set
-        if arg-1 is "toggle":
-            if {market::%arg-2%::enabled} is true:
-                set {market::%arg-2%::enabled} to false
-            else:
-                set {market::%arg-2%::enabled} to true
-            send "&e%arg-2% enabled: %{market::%arg-2%::enabled}%"
-        else if arg-1 is "price":
-            arg-3 is set
-            set {market::%arg-2%::price} to arg-3
-            send "&e%arg-2% price: %fmtMoney(arg-3)%"
-
-# ------------------------------------------------------------
-#  Market GUI
-# ------------------------------------------------------------
-command /market:
-    aliases: /shop
-    trigger:
-        openMarket(player)
-
-function openMarket(p: player):
-    set {_gui} to chest inventory with 4 rows named "&8&lMarket"
-    set slots (integers between 0 and 35) of {_gui} to gray stained glass pane named "&r"
-    loop {market::ids::*}:
-        set {_id} to loop-value
-        {market::%{_id}%::enabled} is true
-        set {_i} to {market::%{_id}%::amount} of {market::%{_id}%::item}
-        if getBalance({_p}) >= {market::%{_id}%::price}:
-            set {_c} to "&aClick to buy"
-        else:
-            set {_c} to "&cNot enough money"
-        set slot {market::%{_id}%::slot} of {_gui} to {_i} with lore "&7Amount: &f%{market::%{_id}%::amount}%", "&7Price: &6%fmtMoney({market::%{_id}%::price})%", "", {_c}
-    set slot 31 of {_gui} to gold nugget named "&6Balance: &a%fmtMoney(getBalance({_p}))%"
-    set slot 35 of {_gui} to barrier named "&cClose"
-    set {market-open::%uuid of {_p}%} to true
-    open {_gui} to {_p}
-
-on inventory close:
-    delete {market-open::%uuid of player%}
-
-on inventory click:
-    {market-open::%uuid of player%} is true
-    cancel event
-    event-inventory is not player's inventory
-    if index of event-slot is 35:
-        close player's inventory
-        stop
-    loop {market::ids::*}:
-        set {_id} to loop-value
-        {market::%{_id}%::enabled} is true
-        {market::%{_id}%::slot} = index of event-slot
-        set {_price} to {market::%{_id}%::price}
-        if getBalance(player) < {_price}:
-            send "&cYou need %fmtMoney({_price})% to buy that."
-            play sound "entity.villager.no" to player
-            stop
-        set {_i} to {market::%{_id}%::amount} of {market::%{_id}%::item}
-        if player can't hold {_i}:
-            send "&cYour inventory is full."
-            stop
-        addBalance(player, -1 * {_price})
-        give {_i} to player
-        send "&aBought %{market::%{_id}%::amount}%x %{_id}% for %fmtMoney({_price})%."
-        play sound "entity.experience_orb.pickup" to player
-        openMarket(player)
-        stop
+        send "&a%arg-2%'s balance is now %money(getBalance(arg-2))%."

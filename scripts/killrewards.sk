@@ -1,0 +1,27 @@
+# ============================================================
+#  KILL REWARDS - money for mob/player kills, kill & death stats
+#  Rewards are set in settings.sk.
+# ============================================================
+
+on death:
+    if victim is a player:
+        add 1 to {economy::deaths::%uuid of victim%}
+        attacker is a player
+        attacker is not victim
+        add 1 to {economy::kills::%uuid of attacker%}
+
+        set {_reward} to {cfg::player-kill-reward} ? 0
+        if {_reward} > 0:
+            addBalance(attacker, {_reward})
+            send action bar "&a+%money({_reward})% &7for killing &f%victim%" to attacker
+
+        set {_penalty} to min({cfg::player-death-penalty} ? 0, getBalance(victim))
+        if {_penalty} > 0:
+            addBalance(victim, 0 - {_penalty})
+            send "&cYou lost %money({_penalty})% to %attacker%." to victim
+    else:
+        attacker is a player
+        set {_reward} to {mobreward::%type of victim%} ? 0
+        if {_reward} > 0:
+            addBalance(attacker, {_reward})
+            send action bar "&a+%money({_reward})% &7for killing a &f%type of victim%" to attacker

@@ -1,0 +1,56 @@
+# ============================================================
+#  SETTINGS - every option for the Weapons scripts lives here.
+#  After editing, run: /sk reload settings
+# ============================================================
+
+on load:
+    delete {cfg::*}
+
+    # --- General ---
+    set {cfg::server-ip} to "play.yourserver.net"
+    set {cfg::title} to "&6&lWEAPONS"
+    set {cfg::currency} to "$"
+    set {cfg::starting-balance} to 0
+
+    # --- PvP ---
+    # Money for killing another player (0 = off)
+    set {cfg::player-kill-reward} to 50
+    # Money taken from the player who died in PvP (0 = off)
+    set {cfg::player-death-penalty} to 0
+
+    # --- Mob rewards: {mobreward::<mob type>} = money per kill ---
+    # Mobs not listed here pay nothing.
+    delete {mobreward::*}
+    set {mobreward::zombie} to 5
+    set {mobreward::skeleton} to 5
+    set {mobreward::spider} to 4
+    set {mobreward::creeper} to 8
+    set {mobreward::enderman} to 15
+    set {mobreward::blaze} to 12
+    set {mobreward::wither skeleton} to 20
+    set {mobreward::witch} to 10
+    set {mobreward::piglin brute} to 25
+    set {mobreward::wither} to 500
+    set {mobreward::ender dragon} to 1000
+
+    # --- Market items ---
+    # marketItem(id, item, display name, amount, price, GUI slot 0-35, enabled)
+    # Slots 31 and 35 are used by the balance and close buttons.
+    delete {market::*}
+    marketItem("golden_apple", golden apple, "&6Golden Apple", 1, 100, 10, true)
+    marketItem("gold_block", gold block, "&eGold Block", 1, 250, 11, true)
+    marketItem("obsidian", obsidian, "&5Obsidian", 8, 80, 12, true)
+    marketItem("golden_carrot", golden carrot, "&6Golden Carrot", 16, 60, 13, true)
+    marketItem("iron_block", iron block, "&fIron Block", 1, 120, 14, true)
+    marketItem("nether_wart", nether wart, "&cNether Wart", 16, 40, 15, true)
+    marketItem("netherite_ingot", netherite ingot, "&8Netherite Ingot", 1, 2000, 16, true)
+    marketItem("upgrade_template", netherite upgrade smithing template, "&dNetherite Upgrade Template", 1, 1500, 22, true)
+
+function marketItem(id: text, item: itemtype, name: text, amount: integer, price: number, slot: integer, enabled: boolean):
+    add {_id} to {market::ids::*}
+    set {market::%{_id}%::item} to {_item}
+    set {market::%{_id}%::name} to {_name}
+    set {market::%{_id}%::amount} to {_amount}
+    set {market::%{_id}%::price} to {_price}
+    set {market::%{_id}%::slot} to {_slot}
+    set {market::%{_id}%::enabled} to {_enabled}
