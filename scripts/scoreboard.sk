@@ -19,7 +19,7 @@ function updateBoard(p: player):
     set {_time} to fmtPlaytime({economy::playtime::%{_u}%} ? 0)
     set {_kills} to {economy::kills::%{_u}%} ? 0
     set {_deaths} to {economy::deaths::%{_u}%} ? 0
-    set {_ip} to {cfg::server-ip} ? "play.yourserver.net"
+    set {_ip} to {cfg::server-ip} ? "85.10.193.117:25427"
 
     set title of {_p}'s scoreboard to {cfg::title} ? "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ"
     set line 9 of {_p}'s scoreboard to "&7&m                    "

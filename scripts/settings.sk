@@ -9,10 +9,12 @@ on load:
     delete {cfg::*}
 
     # --- General ---
-    set {cfg::server-ip} to "play.yourserver.net"
+    set {cfg::server-ip} to "85.10.193.117:25427"
     # Scoreboard title (VANILLA SMP gradient)
     set {cfg::title} to "<##00D6FF>&lᴠ<##14D5FF>&lᴀ<##28D5FF>&lɴ<##3DD4FF>&lɪ<##51D3FF>&lʟ<##65D3FF>&lʟ<##79D2FF>&lᴀ <##A2D0FF>&ls<##B6D0FF>&lᴍ<##CACFFF>&lᴘ"
     set {cfg::currency} to "$"
+    # Prefix in front of every chat message
+    set {cfg::prefix} to "<##00D6FF>&lꜱᴍᴘ &8» &7"
     set {cfg::starting-balance} to 0
 
     # --- PvP ---
@@ -56,13 +58,18 @@ on load:
     marketItem("ghast_tear", ghast tear, "&fGhast Tear", 1, 75, 16, 11, true)
     marketItem("golden_carrot", golden carrot, "&6Golden Carrot", 16, 60, 20, 12, true)
     marketItem("xp_bottle", experience bottle, "&aBottle o' Enchanting", 16, 200, 10, 13, true)
+    marketItem("diamond", diamond, "&bDiamond", 1, 300, 32, 14, true)
+    marketItem("emerald_block", emerald block, "&aEmerald Block", 1, 450, 16, 15, true)
     marketItem("slime_ball", slime ball, "&aSlime Ball", 16, 40, 20, 16, true)
     marketItem("totem", totem of undying, "&eTotem of Undying", 1, 1500, 3, 19, true)
+    marketItem("blaze_rod", blaze rod, "&6Blaze Rod", 8, 120, 20, 20, true)
+    marketItem("ender_pearl", ender pearl, "&3Ender Pearl", 16, 250, 20, 21, true)
     marketItem("gold_block", gold block, "&eGold Block", 1, 250, 16, 22, true)
     marketItem("nether_star", nether star, "&fNether Star", 1, 5000, 1, 23, true)
     marketItem("iron_block", iron block, "&fIron Block", 1, 120, 32, 24, true)
     marketItem("nether_wart", nether wart, "&cNether Wart", 16, 40, 20, 25, true)
     marketItem("upgrade_template", netherite upgrade smithing template, "&dNetherite Upgrade Template", 1, 1500, 3, 28, true)
+    marketItem("shulker_shell", shulker shell, "&dShulker Shell", 2, 900, 8, 29, true)
     marketItem("obsidian", obsidian, "&5Obsidian", 8, 80, 20, 30, true)
     marketItem("enchanted_golden_apple", enchanted golden apple, "&dEnchanted Golden Apple", 1, 3000, 2, 31, true)
     marketItem("ancient_debris", ancient debris, "&6Ancient Debris", 1, 800, 8, 32, true)
