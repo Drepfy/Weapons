@@ -102,11 +102,16 @@ function fillMarket(p: player, gui: inventory):
         set {-market::slot::%{_u}%::%{_slot}%} to {_id}
     updateClock({_p}, {_gui})
 
+on load:
+    delete {-market::cd::*}
+    delete {-market::buying::*}
+
 function openMarket(p: player):
     set {_gui} to chest inventory with 6 rows named ({cfg::market-title} ? "&2&lᴍᴀʀᴋᴇᴛ")
     fillMarket({_p}, {_gui})
     # "-" prefix = memory only, never saved to disk
     set {-market::gui::%uuid of {_p}%} to {_gui}
+    delete {-market::buying::%uuid of {_p}%}
     # Flag is set BEFORE opening so clicks are blocked from the very first tick
     set {-market::opening::%uuid of {_p}%} to true
     set {-market::open::%uuid of {_p}%} to true
@@ -175,12 +180,12 @@ on inventory click:
     set {_id} to {-market::slot::%uuid of player%::%{_slot}%}
     {_id} is set
     # One purchase per click: ignore the duplicate click events a double-click sends (2 ticks)
-    {-market::cd::%uuid of player%} is not set
-    set {-market::cd::%uuid of player%} to true
+    {-market::buying::%uuid of player%} is not set
+    set {-market::buying::%uuid of player%} to true
     buyItem(player, {_id})
     refreshAllMarkets()
     wait 2 ticks
-    delete {-market::cd::%uuid of player%}
+    delete {-market::buying::%uuid of player%}
 
 on inventory drag:
     set {_gui} to {-market::gui::%uuid of player%}
@@ -197,6 +202,7 @@ on inventory close:
     delete {-market::slot::%uuid of player%::*}
 
 on quit:
+    delete {-market::buying::%uuid of player%}
     delete {-market::open::%uuid of player%}
     delete {-market::gui::%uuid of player%}
     delete {-market::slot::%uuid of player%::*}
