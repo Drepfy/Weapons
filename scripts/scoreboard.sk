@@ -21,16 +21,16 @@ function updateBoard(p: player):
     set {_deaths} to {economy::deaths::%{_u}%} ? 0
     set {_ip} to {cfg::server-ip} ? "85.10.193.117:25427"
 
-    set title of {_p}'s scoreboard to {cfg::title} ? "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ"
-    set line 9 of {_p}'s scoreboard to "&7&m                    "
-    set line 8 of {_p}'s scoreboard to "&fMoney: &a%{_money}%"
-    set line 7 of {_p}'s scoreboard to "&fPlaytime: &e%{_time}%"
-    set line 6 of {_p}'s scoreboard to "&r"
-    set line 5 of {_p}'s scoreboard to "&fKills: &a%{_kills}%"
-    set line 4 of {_p}'s scoreboard to "&fDeaths: &c%{_deaths}%"
-    set line 3 of {_p}'s scoreboard to "&r&r"
-    set line 2 of {_p}'s scoreboard to "&7&m                    &r"
-    set line 1 of {_p}'s scoreboard to "&6%{_ip}%"
+    set title of {_p}'s fastboard to {cfg::title} ? "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ"
+    set line 9 of {_p}'s fastboard to "&7&m                    "
+    set line 8 of {_p}'s fastboard to "&fMoney: &a%{_money}%"
+    set line 7 of {_p}'s fastboard to "&fPlaytime: &e%{_time}%"
+    set line 6 of {_p}'s fastboard to "&r"
+    set line 5 of {_p}'s fastboard to "&fKills: &a%{_kills}%"
+    set line 4 of {_p}'s fastboard to "&fDeaths: &c%{_deaths}%"
+    set line 3 of {_p}'s fastboard to "&r&r"
+    set line 2 of {_p}'s fastboard to "&7&m                    &r"
+    set line 1 of {_p}'s fastboard to "&6%{_ip}%"
 
 on join:
     wait 1 tick
