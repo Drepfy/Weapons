@@ -50,37 +50,43 @@ on load:
     # How many random items to show when rotation is on (max 21)
     set {cfg::market-rotate-count} to 12
 
+    # Every item sells at least 3 per purchase, except these:
+    set {cfg::market-min-amount} to 3
+    set {cfg::market-min-exempt::*} to "enchanted_golden_apple" and "netherite_ingot"
+
     # marketItem(id, item, display name, amount, price, stock, slot, enabled)
     #   stock = how many times it can be bought per reset (-1 = unlimited)
     #   slot  = where it shows (rows 2-4: 10-16, 19-25, 28-34). Ignored when rotation is on.
     delete {market::*}
-    marketItem("echo_shard", echo shard, "&3Echo Shard", 1, 150, 16, 10, true)
-    marketItem("ghast_tear", ghast tear, "&fGhast Tear", 1, 75, 16, 11, true)
+    marketItem("echo_shard", echo shard, "&3Echo Shard", 3, 450, 16, 10, true)
+    marketItem("ghast_tear", ghast tear, "&fGhast Tear", 3, 225, 16, 11, true)
     marketItem("golden_carrot", golden carrot, "&6Golden Carrot", 16, 60, 20, 12, true)
     marketItem("xp_bottle", experience bottle, "&aBottle o' Enchanting", 16, 200, 10, 13, true)
-    marketItem("diamond", diamond, "&bDiamond", 1, 300, 32, 14, true)
-    marketItem("emerald_block", emerald block, "&aEmerald Block", 1, 450, 16, 15, true)
+    marketItem("diamond", diamond, "&bDiamond", 3, 900, 32, 14, true)
+    marketItem("emerald_block", emerald block, "&aEmerald Block", 3, 1350, 16, 15, true)
     marketItem("slime_ball", slime ball, "&aSlime Ball", 16, 40, 20, 16, true)
-    marketItem("totem", totem of undying, "&eTotem of Undying", 1, 1500, 3, 19, true)
+    marketItem("totem", totem of undying, "&eTotem of Undying", 3, 4500, 3, 19, true)
     marketItem("blaze_rod", blaze rod, "&6Blaze Rod", 8, 120, 20, 20, true)
     marketItem("ender_pearl", ender pearl, "&3Ender Pearl", 16, 250, 20, 21, true)
-    marketItem("gold_block", gold block, "&eGold Block", 1, 250, 16, 22, true)
-    marketItem("nether_star", nether star, "&fNether Star", 1, 5000, 1, 23, true)
-    marketItem("iron_block", iron block, "&fIron Block", 1, 120, 32, 24, true)
+    marketItem("gold_block", gold block, "&eGold Block", 3, 750, 16, 22, true)
+    marketItem("nether_star", nether star, "&fNether Star", 3, 15000, 1, 23, true)
+    marketItem("iron_block", iron block, "&fIron Block", 3, 360, 32, 24, true)
     marketItem("nether_wart", nether wart, "&cNether Wart", 16, 40, 20, 25, true)
-    marketItem("upgrade_template", netherite upgrade smithing template, "&dNetherite Upgrade Template", 1, 1500, 3, 28, true)
-    marketItem("shulker_shell", shulker shell, "&dShulker Shell", 2, 900, 8, 29, true)
+    marketItem("upgrade_template", netherite upgrade smithing template, "&dNetherite Upgrade Template", 3, 4500, 3, 28, true)
+    marketItem("shulker_shell", shulker shell, "&dShulker Shell", 4, 1800, 8, 29, true)
     marketItem("obsidian", obsidian, "&5Obsidian", 8, 80, 20, 30, true)
     marketItem("enchanted_golden_apple", enchanted golden apple, "&dEnchanted Golden Apple", 1, 3000, 2, 31, true)
-    marketItem("ancient_debris", ancient debris, "&6Ancient Debris", 1, 800, 8, 32, true)
+    marketItem("ancient_debris", ancient debris, "&6Ancient Debris", 3, 2400, 8, 32, true)
     marketItem("netherite_ingot", netherite ingot, "&8Netherite Ingot", 1, 2000, 4, 33, true)
-    marketItem("golden_apple", golden apple, "&6Golden Apple", 1, 100, 32, 34, true)
+    marketItem("golden_apple", golden apple, "&6Golden Apple", 3, 300, 32, 34, true)
 
 function marketItem(id: text, item: itemtype, name: text, amount: integer, price: number, stock: integer, slot: integer, enabled: boolean):
     add {_id} to {market::ids::*}
     set {market::%{_id}%::item} to {_item}
     set {market::%{_id}%::name} to {_name}
     set {market::%{_id}%::amount} to {_amount}
+    if {cfg::market-min-exempt::*} does not contain {_id}:
+        set {market::%{_id}%::amount} to max({_amount}, {cfg::market-min-amount} ? 3)
     set {market::%{_id}%::price} to {_price}
     set {market::%{_id}%::stock} to {_stock}
     set {market::%{_id}%::slot} to {_slot}
