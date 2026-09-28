@@ -1,0 +1,63 @@
+name: Vigil
+version: '${project.version}'
+main: io.github.drepfy.vigil.VigilPlugin
+api-version: '1.20'
+description: Server-side anti-cheat focused on extremely low false positives, staff alerts and manual review.
+authors: [Drepfy]
+load: POSTWORLD
+
+commands:
+  vigil:
+    description: Vigil anti-cheat staff command.
+    usage: /<command> help
+    aliases: [vgl]
+    permission: vigil.command
+
+permissions:
+  vigil.*:
+    description: All Vigil staff permissions (does NOT include bypass).
+    default: op
+    children:
+      vigil.command: true
+      vigil.alerts: true
+      vigil.info: true
+      vigil.history: true
+      vigil.review: true
+      vigil.exempt: true
+      vigil.reset: true
+      vigil.status: true
+      vigil.reload: true
+      vigil.debug: true
+  vigil.command:
+    description: Use the /vigil command (sub-commands have their own nodes).
+    default: op
+  vigil.alerts:
+    description: Receive staff alerts and toggle them with /vigil alerts.
+    default: op
+  vigil.info:
+    description: View a player's current violation levels with /vigil info.
+    default: op
+  vigil.history:
+    description: View a player's stored flag history with /vigil history.
+    default: op
+  vigil.review:
+    description: View and resolve review cases with /vigil review.
+    default: op
+  vigil.exempt:
+    description: Temporarily exempt players from checks with /vigil exempt.
+    default: op
+  vigil.reset:
+    description: Reset a player's violation levels with /vigil reset.
+    default: op
+  vigil.status:
+    description: View plugin status, lag state and config warnings with /vigil status.
+    default: op
+  vigil.reload:
+    description: Reload the configuration with /vigil reload.
+    default: op
+  vigil.debug:
+    description: Stream live check diagnostics with /vigil debug.
+    default: op
+  vigil.bypass:
+    description: Exempt from ALL checks. Not granted to operators automatically.
+    default: false
