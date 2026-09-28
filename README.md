@@ -8,6 +8,7 @@ Skript add-ons for the server, one file per feature:
 | `scripts/economy.sk` | Persistent balances, `/balance`, `/pay`, `/eco` |
 | `scripts/scoreboard.sk` | Sidebar: money, playtime, kills, deaths, server IP |
 | `scripts/killrewards.sk` | Money for mob / player kills, kill & death tracking |
+| `scripts/baltop.sk` | `/baltop` GUI with player heads, ranks and pages |
 | `scripts/market.sk` | `/market` 6-row GUI shop with stock that resets every hour (countdown on the clock), `/marketadmin` |
 
 **Requires:** Paper/Spigot 1.20+, [Skript](https://github.com/SkriptLang/Skript) 2.7+, [SkBee](https://github.com/ShaneBeee/SkBee) (for the sidebar).
@@ -24,7 +25,8 @@ After changing `settings.sk`, run `/sk reload settings`.
 |---|---|
 | `/market` (`/shop`) | Open the market GUI |
 | `/balance [player]` (`/bal`, `/money`) | Show balance |
-| `/pay <player> <amount>` | Send money to an online player |
+| `/pay <player> <amount>` | Give money to an online player (`500`, `2.5k`, `1m` all work) |
+| `/baltop [page]` | Richest players GUI |
 | `/eco give\|take\|set <player> <amount>` | Admin (`economy.admin`) |
 | `/marketadmin list` | Show item ids, prices, stock, enabled state and time to next reset (`economy.admin`) |
 | `/marketadmin reset` | Force a market reset now (`economy.admin`) |

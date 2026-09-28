@@ -3,9 +3,42 @@
 #  Balances are stored in {economy::balance::<uuid>}.
 # ============================================================
 
+# 504363 -> "$504,363"
 function money(n: number) :: text:
     set {_c} to {cfg::currency} ? "$"
-    return "%{_c}%%rounded down {_n}%"
+    return "%{_c}%%commas({_n})%"
+
+function commas(n: number) :: text:
+    set {_s} to "%rounded down abs({_n})%"
+    set {_len} to length of {_s}
+    set {_out} to ""
+    loop {_len} times:
+        set {_i} to {_len} - loop-number + 1
+        set {_out} to "%subtext of {_s} from characters {_i} to {_i}%%{_out}%"
+        if mod(loop-number, 3) = 0:
+            if loop-number < {_len}:
+                set {_out} to ",%{_out}%"
+    if {_n} < 0:
+        return "-%{_out}%"
+    return {_out}
+
+# "2500", "2.5k", "1m", "3b" -> number (none if invalid)
+function parseAmount(t: text) :: number:
+    set {_t} to lowercase {_t}
+    replace all "," in {_t} with ""
+    replace all "$" in {_t} with ""
+    set {_mult} to 1
+    if {_t} ends with "k":
+        set {_mult} to 1000
+    else if {_t} ends with "m":
+        set {_mult} to 1000000
+    else if {_t} ends with "b":
+        set {_mult} to 1000000000
+    if {_mult} > 1:
+        set {_t} to first (length of {_t} - 1) characters of {_t}
+    set {_n} to {_t} parsed as number
+    {_n} is set
+    return rounded down ({_n} * {_mult})
 
 function getBalance(p: offline player) :: number:
     return {economy::balance::%uuid of {_p}%} ? 0
@@ -26,10 +59,13 @@ command /balance [<offline player>]:
         set {_t} to arg-1 ? player
         send "&6%{_t}%'s balance: &a%money(getBalance({_t}))%"
 
-command /pay <player> <number>:
-    usage: &cUsage: /pay <player> <amount>
+command /pay <player> <text>:
+    usage: &cUsage: /pay <player> <amount>  &7(e.g. 500, 2.5k, 1m)
     trigger:
-        set {_amt} to rounded down arg-2
+        set {_amt} to parseAmount(arg-2)
+        if {_amt} is not set:
+            send "&cInvalid amount. Examples: &f500&c, &f2.5k&c, &f1m"
+            stop
         if {_amt} <= 0:
             send "&cAmount must be at least 1."
             stop
@@ -37,23 +73,30 @@ command /pay <player> <number>:
             send "&cYou can't pay yourself."
             stop
         if getBalance(player) < {_amt}:
-            send "&cYou only have %money(getBalance(player))%."
+            send "&cYou only have &f%money(getBalance(player))%&c."
             stop
         addBalance(player, 0 - {_amt})
         addBalance(arg-1, {_amt})
-        send "&aYou paid %money({_amt})% to %arg-1%."
-        send "&aYou received %money({_amt})% from %player%." to arg-1
+        send "&a&l$ &7You sent &a%money({_amt})% &7to &f%arg-1%&7."
+        play sound "entity.experience_orb.pickup" to player
+        send "&a&l$ &7You received &a%money({_amt})% &7from &f%player%&7."
+        send title "&a+%money({_amt})%" with subtitle "&7from &f%player%" to arg-1 for 2 seconds
+        play sound "entity.player.levelup" to arg-1
 
-command /eco <text> <offline player> <number>:
+command /eco <text> <offline player> <text>:
     permission: economy.admin
     usage: &cUsage: /eco <give|take|set> <player> <amount>
     trigger:
+        set {_amt} to parseAmount(arg-3)
+        if {_amt} is not set:
+            send "&cInvalid amount."
+            stop
         if arg-1 is "give":
-            addBalance(arg-2, arg-3)
+            addBalance(arg-2, {_amt})
         else if arg-1 is "take":
-            addBalance(arg-2, 0 - arg-3)
+            addBalance(arg-2, 0 - {_amt})
         else if arg-1 is "set":
-            setBalance(arg-2, arg-3)
+            setBalance(arg-2, {_amt})
         else:
             send "&cUsage: /eco <give|take|set> <player> <amount>"
             stop

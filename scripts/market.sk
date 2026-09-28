@@ -82,17 +82,17 @@ function fillMarket(p: player, gui: inventory):
         set {_amt} to {market::%{_id}%::amount}
         set {_left} to stockLeft({_id})
         if {_left} is -1:
-            set {_stock} to "&7Stock: &fUnlimited"
+            set {_stock} to "&8▪ &fStock: &f∞"
         else:
-            set {_stock} to "&7Stock: &f%{_left}%&7/&f%{market::%{_id}%::stock}%"
+            set {_stock} to "&8▪ &fStock: &f%commas({_left})%"
         if {_left} is 0:
             set {_status} to "&c» Sold out"
         else if {_bal} >= {_price}:
-            set {_status} to "&a» Click to buy"
+            set {_status} to "&e» Click to buy"
         else:
             set {_status} to "&c» Not enough money"
         set {_item} to {_amt} of {market::%{_id}%::item}
-        set slot {_slot} of {_gui} to {_item} named {market::%{_id}%::name} with lore "&7Amount: &f%{_amt}%", "&7Price: &6%money({_price})%", {_stock}, "&r", {_status}
+        set slot {_slot} of {_gui} to {_item} named {market::%{_id}%::name} with lore "&8▪ &fPrice: &a%money({_price})%", "&8▪ &fAmount: &f%{_amt}%x", {_stock}, "&r", {_status}
         set {-market::slot::%{_u}%::%{_slot}%} to {_id}
     updateClock({_p}, {_gui})
 
