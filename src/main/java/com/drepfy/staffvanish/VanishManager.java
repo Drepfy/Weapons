@@ -9,7 +9,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
@@ -26,7 +25,8 @@ import org.jspecify.annotations.Nullable;
  * Owns vanish state: who is vanished, who can see them, and everything that changes while a player is vanished.
  * <p>
  * Visibility uses Bukkit's per-viewer {@link Player#hidePlayer(Plugin, Player)}, which also takes vanished players
- * out of the tab list, entity tracking, sounds and command suggestions of players who can't see them.
+ * out of the tab list, entity tracking, sounds and command suggestions of players who can't see them. Staff who can
+ * see them (and the vanished player) don't get them in their tab list either, via {@link Player#unlistPlayer}.
  */
 public final class VanishManager {
 
@@ -131,10 +131,7 @@ public final class VanishManager {
         }
         storage.put(player.getUniqueId(), new VanishStorage.Entry(player.getName(), hasOwnFlight(player)));
         apply(player);
-        if (module.settings().fakeJoinLeaveMessages()) {
-            sendToUnprivileged(player,
-                    Component.translatable("multiplayer.player.left", NamedTextColor.YELLOW, player.displayName()));
-        }
+        announce("fake-leave", player);
         notifyStaff("staff-vanished", player, actor);
         return true;
     }
@@ -150,10 +147,7 @@ public final class VanishManager {
         VanishStorage.Entry entry = storage.remove(player.getUniqueId());
         reveal(player);
         restoreFlight(player, entry != null && entry.restoreFlight());
-        if (module.settings().fakeJoinLeaveMessages()) {
-            sendToUnprivileged(player,
-                    Component.translatable("multiplayer.player.joined", NamedTextColor.YELLOW, player.displayName()));
-        }
+        announce("fake-join", player);
         notifyStaff("staff-unvanished", player, actor);
         return true;
     }
@@ -185,14 +179,10 @@ public final class VanishManager {
             return JoinOutcome.VANISHED;
         }
 
-        // Visible: clear anything left from an earlier session. Viewers remember hidden players by UUID, so players
-        // who stayed online may still hide this one, and a crash can leave a selector in the inventory.
+        // Visible: clear anything left from an earlier session. Viewers remember hidden and unlisted players by UUID,
+        // so players who stayed online may still hide this one, and a crash can leave a selector in the inventory.
         setVanishedMetadata(player, false);
-        for (Player other : Bukkit.getOnlinePlayers()) {
-            if (!other.equals(player)) {
-                other.showPlayer(plugin, player);
-            }
-        }
+        showToEveryone(player);
         module.selectorItem().strip(player);
         if (entry == null) {
             return JoinOutcome.VISIBLE;
@@ -230,10 +220,8 @@ public final class VanishManager {
             if (actionBar != null) {
                 vanished.sendActionBar(actionBar);
             }
-            for (Player other : Bukkit.getOnlinePlayers()) {
-                if (!other.equals(vanished)) {
-                    updateVisibility(other, vanished);
-                }
+            for (Player viewer : Bukkit.getOnlinePlayers()) {
+                updateVisibility(viewer, vanished);
             }
         }
     }
@@ -244,6 +232,9 @@ public final class VanishManager {
             Session session = sessions.get(player.getUniqueId());
             if (session != null) {
                 applyListName(player, session);
+            }
+            for (Player viewer : Bukkit.getOnlinePlayers()) {
+                updateVisibility(viewer, player);
             }
             // Turning flight off only affects players who vanish from now on; nobody drops out of the sky.
             if (module.settings().flight()) {
@@ -292,12 +283,20 @@ public final class VanishManager {
         return true;
     }
 
+    /**
+     * Shows or hides {@code target} for {@code viewer}, and puts them in or leaves them out of the viewer's tab list.
+     * Vanished players are left out of every tab list, even their own and those of staff who can see them, unless
+     * {@code show-in-tab-for-staff} is on.
+     */
     public void updateVisibility(Player viewer, Player target) {
-        if (canSee(viewer, target)) {
-            viewer.showPlayer(plugin, target);
-        } else {
+        if (!canSee(viewer, target)) {
             viewer.hidePlayer(plugin, target);
+            return;
         }
+        if (!viewer.getUniqueId().equals(target.getUniqueId())) {
+            viewer.showPlayer(plugin, target);
+        }
+        setListed(viewer, target, !isVanished(target) || module.settings().showInTabForStaff());
     }
 
     /**
@@ -335,10 +334,8 @@ public final class VanishManager {
             player.setAllowFlight(true);
         }
 
-        for (Player other : Bukkit.getOnlinePlayers()) {
-            if (!other.equals(player)) {
-                updateVisibility(other, player);
-            }
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            updateVisibility(viewer, player);
         }
         if (module.settings().protection().noMobTargeting()) {
             forgetAsTarget(player);
@@ -362,16 +359,32 @@ public final class VanishManager {
             }
         }
 
-        for (Player other : Bukkit.getOnlinePlayers()) {
-            if (!other.equals(player)) {
-                other.showPlayer(plugin, player);
-            }
-        }
+        showToEveryone(player);
         module.selectorItem().strip(player);
     }
 
+    /** Shows the player to everyone and puts them back in every tab list, their own included. */
+    private void showToEveryone(Player player) {
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            if (!viewer.equals(player)) {
+                viewer.showPlayer(plugin, player);
+            }
+            setListed(viewer, player, true);
+        }
+    }
+
+    private static void setListed(Player viewer, Player target, boolean listed) {
+        if (!listed) {
+            viewer.unlistPlayer(target);
+        } else if (viewer.canSee(target) && !viewer.isListed(target)) {
+            // Only possible while the viewer can see them; another plugin may still be hiding them.
+            viewer.listPlayer(target);
+        }
+    }
+
     private void applyListName(Player player, Session session) {
-        String format = module.settings().tabListFormat();
+        // The name is only seen by staff, and only when vanished players stay in their tab list.
+        String format = module.settings().showInTabForStaff() ? module.settings().tabListFormat() : "";
         if (format.isEmpty()) {
             if (session.listNameChanged) {
                 player.playerListName(session.originalListName(player));
@@ -403,11 +416,17 @@ public final class VanishManager {
         player.setAllowFlight(false);
     }
 
-    private void sendToUnprivileged(Player subject, Component message) {
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            if (!player.equals(subject) && !player.hasPermission(VanishPermissions.SEE)) {
-                player.sendMessage(message);
-            }
+    /** Tells everyone, the player included, that they left or joined, so it looks like they really did. */
+    private void announce(String key, Player player) {
+        if (!module.settings().fakeJoinLeaveMessages()) {
+            return;
+        }
+        Component message = module.messages().get(key, Placeholder.component("player", player.displayName()));
+        if (message == null) {
+            return;
+        }
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            online.sendMessage(message);
         }
     }
 

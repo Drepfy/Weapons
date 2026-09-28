@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
@@ -143,8 +144,13 @@ public abstract class VanishTestBase {
         }
     }
 
-    /** MockBukkit doesn't implement asynchronous teleports; this one teleports straight away. */
+    /**
+     * Fills in what MockBukkit doesn't implement: asynchronous teleports (done straight away here) and tab list
+     * listing, which behaves like Paper's.
+     */
     protected static final class TestPlayer extends PlayerMock {
+
+        private final Set<UUID> unlisted = new HashSet<>();
 
         TestPlayer(ServerMock server, String name) {
             super(server, name);
@@ -154,6 +160,24 @@ public abstract class VanishTestBase {
         public CompletableFuture<Boolean> teleportAsync(Location location, PlayerTeleportEvent.TeleportCause cause,
                 TeleportFlag... flags) {
             return CompletableFuture.completedFuture(teleport(location, cause));
+        }
+
+        @Override
+        public boolean isListed(Player other) {
+            return !unlisted.contains(other.getUniqueId());
+        }
+
+        @Override
+        public boolean unlistPlayer(Player other) {
+            return canSee(other) && unlisted.add(other.getUniqueId());
+        }
+
+        @Override
+        public boolean listPlayer(Player other) {
+            if (!canSee(other)) {
+                throw new IllegalStateException("Player cannot see other player");
+            }
+            return unlisted.remove(other.getUniqueId());
         }
     }
 }

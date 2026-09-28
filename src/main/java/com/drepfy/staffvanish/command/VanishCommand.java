@@ -23,7 +23,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * {@code /vanish [player]}, {@code /vanish on|off [player]}, {@code /vanish list}, {@code /vanish tp <player>},
- * {@code /vanish selector} and {@code /vanish reload}.
+ * {@code /vanish stick} and {@code /vanish reload}.
  */
 public final class VanishCommand implements TabExecutor {
 
@@ -54,7 +54,7 @@ public final class VanishCommand implements TabExecutor {
             }
             case "list" -> list(sender);
             case "tp", "teleport" -> teleport(sender, args);
-            case "selector", "rod" -> giveSelector(sender);
+            case "stick", "selector", "rod" -> giveSelector(sender);
             case "reload" -> reload(sender);
             case "help" -> messages().send(sender, "usage");
             default -> {
@@ -75,7 +75,7 @@ public final class VanishCommand implements TabExecutor {
             options.add("off");
             addIfPermitted(sender, options, VanishPermissions.LIST, "list");
             addIfPermitted(sender, options, VanishPermissions.TELEPORT, "tp");
-            addIfPermitted(sender, options, VanishPermissions.TELEPORT, "selector");
+            addIfPermitted(sender, options, VanishPermissions.TELEPORT, "stick");
             addIfPermitted(sender, options, VanishPermissions.RELOAD, "reload");
             if (sender.hasPermission(VanishPermissions.OTHERS)) {
                 options.addAll(visiblePlayerNames(sender));

@@ -7,6 +7,8 @@ import java.util.Locale;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
@@ -26,6 +28,7 @@ import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerPickupArrowEvent;
 import org.bukkit.event.world.GenericGameEvent;
+import org.bukkit.util.Vector;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -40,14 +43,28 @@ public final class ProtectionListener implements Listener {
         this.module = module;
     }
 
+    /** Vanished players can't be hurt at all, not even by /kill or the void. */
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onDamage(EntityDamageEvent event) {
-        EntityDamageEvent.DamageCause cause = event.getCause();
-        // Let /kill and the void through, so nobody gets stuck.
-        if (protection().invulnerable() && isVanished(event.getEntity())
-                && cause != EntityDamageEvent.DamageCause.KILL && cause != EntityDamageEvent.DamageCause.VOID) {
-            event.setCancelled(true);
+        if (!protection().invulnerable() || !(event.getEntity() instanceof Player player) || !isVanished(player)) {
+            return;
         }
+        event.setCancelled(true);
+        if (event.getCause() == EntityDamageEvent.DamageCause.VOID) {
+            catchFromVoid(player);
+        }
+    }
+
+    /** Undoes anything that still kills a vanished player, such as another plugin setting their health to 0. */
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onDying(PlayerDeathEvent event) {
+        Player player = event.getPlayer();
+        if (!protection().invulnerable() || !isVanished(player)) {
+            return;
+        }
+        AttributeInstance maxHealth = player.getAttribute(Attribute.MAX_HEALTH);
+        event.setReviveHealth(maxHealth != null ? maxHealth.getValue() : 1);
+        event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
@@ -161,6 +178,17 @@ public final class ProtectionListener implements Listener {
     public void onAdvancement(PlayerAdvancementDoneEvent event) {
         if (isVanished(event.getPlayer())) {
             event.message(null);
+        }
+    }
+
+    /** Stops a vanished player falling through the void: they fly, or go to spawn if they can't. */
+    private static void catchFromVoid(Player player) {
+        player.setFallDistance(0);
+        if (player.getAllowFlight()) {
+            player.setVelocity(new Vector());
+            player.setFlying(true);
+        } else {
+            player.teleportAsync(player.getWorld().getSpawnLocation());
         }
     }
 

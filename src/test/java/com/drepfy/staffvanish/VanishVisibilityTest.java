@@ -2,14 +2,11 @@ package com.drepfy.staffvanish;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.TranslatableComponent;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -64,11 +61,37 @@ class VanishVisibilityTest extends VanishTestBase {
     }
 
     @Test
-    void tabListMarksVanishedPlayersForStaff() {
+    void vanishedPlayersAreLeftOutOfEveryTabList() {
         TestPlayer mod = staff("Mod");
-        vanish.vanish(mod, mod);
+        TestPlayer admin = staff("Admin");
+        TestPlayer alice = regular("Alice");
 
-        assertEquals("Mod [V]", PlainTextComponentSerializer.plainText().serialize(mod.playerListName()));
+        vanish.vanish(mod, mod);
+        assertTrue(admin.canSee(mod), "staff still see them in the world");
+        assertFalse(admin.isListed(mod));
+        assertFalse(mod.isListed(mod), "not even in their own tab list");
+        assertFalse(alice.canSee(mod));
+        assertEquals(Component.text("Mod"), mod.playerListName());
+
+        vanish.unvanish(mod, mod);
+        assertTrue(admin.isListed(mod));
+        assertTrue(mod.isListed(mod));
+        assertTrue(alice.canSee(mod));
+        assertTrue(alice.isListed(mod));
+    }
+
+    @Test
+    void staffCanBeAllowedToSeeVanishedPlayersInTab() {
+        TestPlayer mod = staff("Mod");
+        TestPlayer admin = staff("Admin");
+        vanish.vanish(mod, mod);
+        plugin.getConfig().set("vanish.show-in-tab-for-staff", true);
+        plugin.saveConfig();
+        module.reload();
+
+        assertTrue(admin.isListed(mod));
+        assertTrue(mod.isListed(mod));
+        assertEquals("Mod ᴠᴀɴɪsʜᴇᴅ", PlainTextComponentSerializer.plainText().serialize(mod.playerListName()));
     }
 
     @Test
@@ -81,24 +104,27 @@ class VanishVisibilityTest extends VanishTestBase {
 
         assertFalse(bob.canSee(mod));
         assertTrue(helper.canSee(mod));
+        assertFalse(helper.isListed(mod));
     }
 
     @Test
-    void playersWhoCannotSeeGetFakeLeaveAndJoinMessages() {
+    void everyoneIsToldTheVanishedPlayerLeftAndCameBack() {
         TestPlayer mod = staff("Mod");
         TestPlayer admin = staff("Admin");
         TestPlayer alice = regular("Alice");
-        messages(alice);
+        messages(mod);
         messages(admin);
+        messages(alice);
 
         vanish.vanish(mod, mod);
-        assertTranslatable("multiplayer.player.left", alice.nextComponentMessage());
-        assertNull(alice.nextComponentMessage());
-        assertEquals(List.of("[Vanish] Mod vanished."), messages(admin));
+        assertEquals(List.of("Mod left the game"), messages(alice));
+        assertEquals(List.of("Mod left the game"), messages(mod));
+        assertEquals(List.of("Mod left the game", "ᴠᴀɴɪsʜ » Mod vanished."), messages(admin));
 
         vanish.unvanish(mod, mod);
-        assertTranslatable("multiplayer.player.joined", alice.nextComponentMessage());
-        assertEquals(List.of("[Vanish] Mod reappeared."), messages(admin));
+        assertEquals(List.of("Mod joined the game"), messages(alice));
+        assertEquals(List.of("Mod joined the game"), messages(mod));
+        assertEquals(List.of("Mod joined the game", "ᴠᴀɴɪsʜ » Mod reappeared."), messages(admin));
     }
 
     @Test
@@ -114,14 +140,16 @@ class VanishVisibilityTest extends VanishTestBase {
         mod.disconnect();
         assertFalse(vanish.isVanished(mod));
         assertTrue(vanish.isMarkedVanished(mod.getUniqueId()));
-        assertEquals(List.of("[Vanish] Mod left silently."), messages(admin));
+        assertEquals(List.of("ᴠᴀɴɪsʜ » Mod left silently."), messages(admin));
 
         mod.reconnect();
         assertTrue(vanish.isVanished(mod));
         assertFalse(alice.canSee(mod));
         assertTrue(admin.canSee(mod));
+        assertFalse(admin.isListed(mod));
+        assertFalse(mod.isListed(mod));
         assertTrue(mod.getAllowFlight());
-        assertEquals(List.of("[Vanish] Mod joined silently."), messages(admin));
+        assertEquals(List.of("ᴠᴀɴɪsʜ » Mod joined silently."), messages(admin));
 
         List<Component> expected = new ArrayList<>();
         expected.add(null);
@@ -144,7 +172,7 @@ class VanishVisibilityTest extends VanishTestBase {
         assertTrue(alice.canSee(mod));
         assertFalse(mod.getAllowFlight());
         assertTrue(messages(mod).contains(
-                "[Vanish] You're visible again because you no longer have permission to vanish."));
+                "ᴠᴀɴɪsʜ » You're visible again because you no longer have permission to vanish."));
     }
 
     @Test
@@ -180,7 +208,7 @@ class VanishVisibilityTest extends VanishTestBase {
 
         server.getScheduler().performTicks(module.settings().refreshIntervalTicks());
 
-        assertEquals("You are vanished | Only staff can see you",
+        assertEquals("ᴠᴀɴɪsʜᴇᴅ | Only staff can see you",
                 PlainTextComponentSerializer.plainText().serialize(mod.nextActionBar()));
     }
 
@@ -198,11 +226,6 @@ class VanishVisibilityTest extends VanishTestBase {
         VanishManager reloaded = plugin.vanish().manager();
         assertTrue(reloaded.isVanished(mod));
         assertFalse(alice.canSee(mod));
-    }
-
-    private static void assertTranslatable(String key, Component message) {
-        TranslatableComponent translatable = assertInstanceOf(TranslatableComponent.class, message);
-        assertEquals(key, translatable.key());
     }
 
     /** Records the final join and quit messages, after every other listener has run. */

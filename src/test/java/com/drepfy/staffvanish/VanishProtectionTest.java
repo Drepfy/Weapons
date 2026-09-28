@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.destroystokyo.paper.event.server.PaperServerListPingEvent;
 import com.destroystokyo.paper.network.StatusClient;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import net.kyori.adventure.text.Component;
@@ -24,6 +25,7 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityTargetEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerAttemptPickupItemEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -99,6 +101,26 @@ class VanishProtectionTest extends VanishTestBase {
         FoodLevelChangeEvent hunger = new FoodLevelChangeEvent(mod, 15, null);
         server.getPluginManager().callEvent(hunger);
         assertTrue(hunger.isCancelled());
+    }
+
+    @Test
+    void vanishedPlayersCannotDie() {
+        TestPlayer mod = staff("Mod");
+        TestPlayer alice = regular("Alice");
+        vanish.vanish(mod, mod);
+
+        assertTrue(damage(mod, EntityDamageEvent.DamageCause.KILL, DamageType.GENERIC_KILL).isCancelled(), "/kill");
+        assertFalse(damage(alice, EntityDamageEvent.DamageCause.KILL, DamageType.GENERIC_KILL).isCancelled());
+
+        mod.setFlying(false);
+        assertTrue(damage(mod, EntityDamageEvent.DamageCause.VOID, DamageType.OUT_OF_WORLD).isCancelled(), "void");
+        assertTrue(mod.isFlying(), "caught from the void");
+
+        PlayerDeathEvent death = new PlayerDeathEvent(mod, DamageSource.builder(DamageType.GENERIC_KILL).build(),
+                new ArrayList<>(), 0, null, true);
+        server.getPluginManager().callEvent(death);
+        assertTrue(death.isCancelled(), "any death that slips through is undone");
+        assertTrue(death.getReviveHealth() > 0);
     }
 
     @Test
@@ -187,8 +209,11 @@ class VanishProtectionTest extends VanishTestBase {
     }
 
     private EntityDamageEvent fall(Player player) {
-        EntityDamageEvent event = new EntityDamageEvent(player, EntityDamageEvent.DamageCause.FALL,
-                DamageSource.builder(DamageType.FALL).build(), 10);
+        return damage(player, EntityDamageEvent.DamageCause.FALL, DamageType.FALL);
+    }
+
+    private EntityDamageEvent damage(Player player, EntityDamageEvent.DamageCause cause, DamageType type) {
+        EntityDamageEvent event = new EntityDamageEvent(player, cause, DamageSource.builder(type).build(), 10);
         server.getPluginManager().callEvent(event);
         return event;
     }

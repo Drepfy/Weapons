@@ -16,6 +16,7 @@ import org.jspecify.annotations.Nullable;
 public record VanishSettings(
         boolean flight,
         boolean fakeJoinLeaveMessages,
+        boolean showInTabForStaff,
         String tabListFormat,
         boolean hideFromServerList,
         boolean actionBarReminder,
@@ -82,6 +83,7 @@ public record VanishSettings(
         return new VanishSettings(
                 config.getBoolean("vanish.flight"),
                 config.getBoolean("vanish.fake-join-leave-messages"),
+                config.getBoolean("vanish.show-in-tab-for-staff"),
                 string(config, "vanish.tab-list-format"),
                 config.getBoolean("vanish.hide-from-server-list"),
                 config.getBoolean("vanish.action-bar-reminder"),
@@ -119,9 +121,9 @@ public record VanishSettings(
                 itemModel(string(config, "selector.item.item-model"), logger),
                 new Actions(
                         action(config, "selector.actions.right-click", SelectorAction.OPEN_MENU, logger),
-                        action(config, "selector.actions.sneak-right-click", SelectorAction.INSPECT, logger),
+                        action(config, "selector.actions.sneak-right-click", SelectorAction.OPEN_MENU, logger),
                         action(config, "selector.actions.left-click", SelectorAction.NEXT_PLAYER, logger),
-                        action(config, "selector.actions.sneak-left-click", SelectorAction.PREVIOUS_PLAYER, logger),
+                        action(config, "selector.actions.sneak-left-click", SelectorAction.RANDOM_PLAYER, logger),
                         action(config, "selector.actions.click-player", SelectorAction.INSPECT, logger)
                 ),
                 Math.max(1, config.getInt("selector.inspect-range")),

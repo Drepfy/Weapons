@@ -10,6 +10,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.drepfy.staffvanish.VanishTestBase;
 import java.util.Arrays;
 import java.util.List;
+import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.BlockFace;
@@ -42,6 +44,9 @@ class SelectorTest extends VanishTestBase {
         ItemStack selector = mod.getInventory().getItem(8);
         assertTrue(selectors().isSelector(selector));
         assertEquals(Material.BREEZE_ROD, selector.getType());
+        assertEquals(MiniMessage.miniMessage().deserialize("<aqua><bold>ᴠᴀɴɪsʜ sᴛɪᴄᴋ")
+                        .decoration(TextDecoration.ITALIC, TextDecoration.State.FALSE),
+                selector.getItemMeta().customName());
 
         vanish.unvanish(mod, mod);
         assertFalse(hasSelector(mod));
@@ -95,6 +100,32 @@ class SelectorTest extends VanishTestBase {
         ItemStack head = menu.getInventory().getItem(0);
         assertNotNull(head);
         assertEquals(Material.PLAYER_HEAD, head.getType());
+    }
+
+    @Test
+    void sneakRightClickOpensTheHeadMenu() {
+        TestPlayer mod = vanishedHolding("Mod");
+        regular("Alice");
+        mod.setSneaking(true);
+
+        interact(mod, Action.RIGHT_CLICK_AIR);
+
+        assertInstanceOf(SelectorMenu.class, mod.getOpenInventory().getTopInventory().getHolder(false));
+    }
+
+    @Test
+    void sneakLeftClickTeleportsToARandomPlayer() {
+        TestPlayer mod = vanishedHolding("Mod");
+        TestPlayer alice = regular("Alice");
+        TestPlayer bob = regular("Bob");
+        alice.teleport(new Location(world, 10, 70, 10));
+        bob.teleport(new Location(world, -10, 70, -10));
+        mod.setSneaking(true);
+
+        interact(mod, Action.LEFT_CLICK_AIR);
+
+        assertTrue(mod.getLocation().equals(alice.getLocation()) || mod.getLocation().equals(bob.getLocation()),
+                "teleported to one of the other players");
     }
 
     @Test
@@ -158,7 +189,7 @@ class SelectorTest extends VanishTestBase {
         server.getPluginManager().callEvent(event);
 
         assertTrue(event.isCancelled());
-        assertTrue(messages(mod).getFirst().startsWith("[Vanish] Inspecting Alice"));
+        assertTrue(messages(mod).getFirst().startsWith("ᴠᴀɴɪsʜ » Inspecting Alice"));
     }
 
     @Test
@@ -171,7 +202,7 @@ class SelectorTest extends VanishTestBase {
         PlayerInteractEvent event = interact(mod, Action.RIGHT_CLICK_AIR);
 
         assertEquals(Event.Result.DENY, event.useItemInHand());
-        assertEquals(List.of("[Vanish] You need to be vanished to do that."), messages(mod));
+        assertEquals(List.of("ᴠᴀɴɪsʜ » You need to be vanished to do that."), messages(mod));
     }
 
     @Test

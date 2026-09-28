@@ -7,8 +7,9 @@ description: Staff vanish with flight, staff-only teleports and a Breeze Rod pla
 commands:
   vanish:
     description: Toggle vanish and use the vanished staff tools.
-    usage: /<command> [on|off|list|tp|selector|reload] [player]
-    aliases: [v]
+    usage: /<command> on|off|list|tp|stick|reload <player>
+    aliases:
+      - v
     permission: staffvanish.use
 
 permissions:
