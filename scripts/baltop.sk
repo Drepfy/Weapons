@@ -42,8 +42,11 @@ function openBaltop(p: player, page: integer):
 
     set {-baltop::gui::%{_me}%} to {_gui}
     set {-baltop::page::%{_me}%} to {_page}
+    set {-baltop::opening::%{_me}%} to true
+    set {-baltop::open::%{_me}%} to true
     open {_gui} to {_p}
-    set {-baltop::open::%{_me}%} to unix timestamp of now
+    wait 2 ticks
+    delete {-baltop::opening::%{_me}%}
 
 command /baltop [<integer>]:
     aliases: /balancetop, /moneytop
@@ -72,7 +75,7 @@ on inventory drag:
 
 on inventory close:
     {-baltop::open::%uuid of player%} is set
-    (unix timestamp of now) - {-baltop::open::%uuid of player%} > 0.1
+    {-baltop::opening::%uuid of player%} is not set
     delete {-baltop::open::%uuid of player%}
     delete {-baltop::gui::%uuid of player%}
 

@@ -107,8 +107,12 @@ function openMarket(p: player):
     fillMarket({_p}, {_gui})
     # "-" prefix = memory only, never saved to disk
     set {-market::gui::%uuid of {_p}%} to {_gui}
+    # Flag is set BEFORE opening so clicks are blocked from the very first tick
+    set {-market::opening::%uuid of {_p}%} to true
+    set {-market::open::%uuid of {_p}%} to true
     open {_gui} to {_p}
-    set {-market::open::%uuid of {_p}%} to unix timestamp of now
+    wait 2 ticks
+    delete {-market::opening::%uuid of {_p}%}
 
 function refreshAllMarkets():
     loop all players:
@@ -187,7 +191,7 @@ on inventory drag:
 on inventory close:
     {-market::open::%uuid of player%} is set
     # ignore the close of the previous menu that fires while the market opens
-    (unix timestamp of now) - {-market::open::%uuid of player%} > 0.1
+    {-market::opening::%uuid of player%} is not set
     delete {-market::open::%uuid of player%}
     delete {-market::gui::%uuid of player%}
     delete {-market::slot::%uuid of player%::*}
