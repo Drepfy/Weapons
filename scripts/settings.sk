@@ -59,7 +59,7 @@ on load:
     # marketItem(id, item, display name, amount, price, stock, slot, enabled)
     #   amount = items given per click (1)
     #   stock  = how many can be bought per reset (-1 = unlimited)
-    #   slot   = where it shows (inside columns of rows 2-5, plus 47 and 51 beside the clock). Ignored when rotation is on.
+    #   slot   = where it shows (inner slots only: 10-16, 19-25, 28-34, 37-43 = 28 items max). Ignored when rotation is on.
     delete {market::*}
     marketItem("golden_carrot", golden carrot, "&6Golden Carrot", 1, 5, 64, 10, true)
     marketItem("xp_bottle", experience bottle, "&aBottle o' Enchanting", 1, 15, 64, 11, true)
@@ -82,15 +82,15 @@ on load:
     marketItem("golden_apple", golden apple, "&6Golden Apple", 1, 100, 32, 32, true)
     marketItem("breeze_rod", breeze rod, "&bBreeze Rod", 1, 60, 16, 33, true)
     marketItem("wither_skull", wither skeleton skull, "&8Wither Skeleton Skull", 1, 1000, 3, 34, true)
-    marketItem("oak_log", oak log, "&6Oak Log", 1, 2, 64, 37, true)
-    marketItem("netherite_scrap", netherite scrap, "&8Netherite Scrap", 1, 500, 8, 38, true)
-    marketItem("gunpowder", gunpowder, "&7Gunpowder", 1, 5, 64, 39, true)
-    marketItem("leather", leather, "&6Leather", 1, 8, 64, 40, true)
-    marketItem("glowstone", glowstone, "&eGlowstone", 1, 10, 64, 41, true)
-    marketItem("cobweb", cobweb, "&fCobweb", 1, 25, 32, 42, true)
-    marketItem("piston", piston, "&7Piston", 1, 30, 16, 43, true)
-    marketItem("dragon_breath", dragon breath, "&dDragon's Breath", 1, 400, 8, 47, true)
-    marketItem("ominous_key", ominous trial key, "&5Ominous Trial Key", 1, 2500, 2, 51, true)
+    marketItem("oak_log", oak log, "&6Oak Log", 1, 2, 64, 0, false)
+    marketItem("netherite_scrap", netherite scrap, "&8Netherite Scrap", 1, 500, 8, 37, true)
+    marketItem("gunpowder", gunpowder, "&7Gunpowder", 1, 5, 64, 38, true)
+    marketItem("leather", leather, "&6Leather", 1, 8, 64, 0, false)
+    marketItem("glowstone", glowstone, "&eGlowstone", 1, 10, 64, 39, true)
+    marketItem("cobweb", cobweb, "&fCobweb", 1, 25, 32, 40, true)
+    marketItem("piston", piston, "&7Piston", 1, 30, 16, 41, true)
+    marketItem("dragon_breath", dragon breath, "&dDragon's Breath", 1, 400, 8, 42, true)
+    marketItem("ominous_key", ominous trial key, "&5Ominous Trial Key", 1, 2500, 2, 43, true)
 
 function marketItem(id: text, item: itemtype, name: text, amount: integer, price: number, stock: integer, slot: integer, enabled: boolean):
     add {_id} to {market::ids::*}
