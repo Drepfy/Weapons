@@ -1,0 +1,44 @@
+name: StaffVanish
+version: '${version}'
+main: com.drepfy.staffvanish.StaffVanishPlugin
+api-version: '1.21.4'
+description: Staff vanish with flight, staff-only teleports and a Breeze Rod player selector.
+
+commands:
+  vanish:
+    description: Toggle vanish and use the vanished staff tools.
+    usage: /<command> [on|off|list|tp|selector|reload] [player]
+    aliases: [v]
+    permission: staffvanish.use
+
+permissions:
+  staffvanish.*:
+    description: Grants every vanish permission.
+    default: op
+    children:
+      staffvanish.use: true
+      staffvanish.see: true
+      staffvanish.others: true
+      staffvanish.list: true
+      staffvanish.teleport: true
+      staffvanish.reload: true
+  staffvanish.use:
+    description: Allows vanishing yourself with /vanish.
+    default: op
+    children:
+      staffvanish.see: true
+  staffvanish.see:
+    description: Allows seeing vanished players and receiving vanish notifications.
+    default: op
+  staffvanish.others:
+    description: Allows toggling vanish for other staff members.
+    default: op
+  staffvanish.list:
+    description: Allows listing vanished players with /vanish list.
+    default: op
+  staffvanish.teleport:
+    description: Allows vanished staff to teleport to players with /vanish tp and the staff selector.
+    default: op
+  staffvanish.reload:
+    description: Allows reloading the configuration with /vanish reload.
+    default: op

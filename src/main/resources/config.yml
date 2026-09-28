@@ -1,0 +1,174 @@
+# -----------------------------------------------------------------------------
+#  StaffVanish
+#
+#  All text uses MiniMessage: https://docs.papermc.io/adventure/minimessage/format
+#  Set any message to "" to disable it.
+# -----------------------------------------------------------------------------
+
+vanish:
+  # Let vanished staff fly. Flight is taken away again when they reappear,
+  # unless they could already fly beforehand (creative mode, another plugin, ...).
+  flight: true
+
+  # When someone vanishes or reappears, show a fake "left the game" /
+  # "joined the game" message to the players who can't see vanished staff.
+  fake-join-leave-messages: true
+
+  # How a vanished player is shown in the tab list of staff who can see them.
+  # <name> is their normal tab-list name. Use "" to leave tab-list names alone.
+  # (Players without staffvanish.see never get a tab-list entry at all.)
+  tab-list-format: "<name> <dark_gray>[<aqua>V</aqua>]</dark_gray>"
+
+  # Leave vanished players out of the player count and the hover list in the
+  # multiplayer server browser.
+  hide-from-server-list: true
+
+  # Remind vanished players with an action bar message.
+  action-bar-reminder: true
+
+  # How often, in ticks (20 ticks = 1 second), visibility is re-checked so it
+  # follows permission changes made while players are online. This also
+  # refreshes the action bar reminder. 0 turns the periodic check off.
+  refresh-interval-ticks: 40
+
+  # Stops vanished players from giving themselves away.
+  protection:
+    # Take no damage (except from /kill and the void).
+    invulnerable: true
+    # Hunger doesn't go down.
+    no-hunger: true
+    # Don't pick up items, arrows or tridents.
+    no-item-pickup: true
+    # Don't trigger pressure plates or tripwires, or trample farmland and turtle eggs.
+    no-physical-interaction: true
+    # Mobs don't target vanished players and experience orbs don't fly towards them.
+    no-mob-targeting: true
+    # Sculk sensors, sculk shriekers and wardens don't notice vanished players.
+    no-sculk-detection: true
+    # Projectiles fly through vanished players instead of hitting an invisible wall.
+    projectiles-pass-through: true
+    # Stop vanished players' messages from reaching public chat.
+    block-chat: true
+    # Commands that take a player name first and could reveal that someone is
+    # online. Players who can't see vanished staff get the usual "No player was
+    # found" error when using them on vanished staff. Namespaced versions such
+    # as minecraft:msg are covered too.
+    private-message-commands: [msg, tell, w, whisper, m, pm, dm]
+
+# The staff selector: a Breeze Rod handed to vanished staff who have
+# staffvanish.teleport. It's removed when they reappear and can't be
+# dropped, stored in containers or crafted with.
+selector:
+  enabled: true
+  # Preferred hotbar slot (0-8). If it's taken, the first free slot is used.
+  # -1 means no preference.
+  slot: 8
+  item:
+    material: BREEZE_ROD
+    name: "<gradient:#7dd3fc:#c4b5fd><bold>Staff Selector</bold></gradient>"
+    lore:
+      - "<gray>Right-click: <white>pick a player to teleport to"
+      - "<gray>Left-click: <white>teleport to the next player"
+      - "<gray>Sneak + left-click: <white>teleport to the previous player"
+      - "<gray>Sneak + right-click: <white>inspect the player you're looking at"
+      - "<gray>Right-click a player: <white>inspect them"
+    glint: true
+    # Optional item model from a resource pack, e.g. "myserver:staff_selector".
+    # Leave empty to use the material's normal look.
+    item-model: ""
+
+  # What each kind of click does. Options:
+  #   NONE            - do nothing
+  #   OPEN_MENU       - open the player selector menu
+  #   NEXT_PLAYER     - teleport to the next player (alphabetical, wraps around)
+  #   PREVIOUS_PLAYER - teleport to the previous player
+  #   RANDOM_PLAYER   - teleport to a random player
+  #   INSPECT         - show details about the clicked player, or the player
+  #                     you're looking at (within inspect-range blocks)
+  actions:
+    right-click: OPEN_MENU
+    sneak-right-click: INSPECT
+    left-click: NEXT_PLAYER
+    sneak-left-click: PREVIOUS_PLAYER
+    click-player: INSPECT
+  inspect-range: 64
+
+  menu:
+    title: "<dark_gray>Teleport to a player"
+    # Number of rows, including the bottom navigation row (2-6).
+    rows: 6
+    # Also list other vanished staff.
+    show-vanished: true
+    head:
+      name: "<yellow><player></yellow><vanished>"
+      # Replaces <vanished> above for vanished players.
+      vanished-tag: " <dark_gray>[<aqua>V</aqua>]</dark_gray>"
+      lore:
+        - "<gray>World: <white><world>"
+        - "<gray>Location: <white><x>, <y>, <z>"
+        - "<gray>Health: <white><health></white> <dark_gray>|</dark_gray> Food: <white><food>"
+        - "<gray>Game mode: <white><gamemode>"
+        - "<gray>Ping: <white><ping>ms"
+        - ""
+        - "<yellow>Click to teleport"
+    previous-page: "<yellow>« Previous page"
+    next-page: "<yellow>Next page »"
+    close: "<red>Close"
+    page-info: "<gray>Page <white><page></white> of <white><pages></white>"
+
+messages:
+  prefix: "<dark_gray>[<aqua>Vanish</aqua>]</dark_gray> "
+
+  vanished: "<prefix><gray>You are now <aqua>vanished</aqua>. Only staff can see you."
+  unvanished: "<prefix><gray>You are now <yellow>visible</yellow> to everyone."
+  vanished-other: "<prefix><gray>Vanished <white><target></white>."
+  unvanished-other: "<prefix><gray>Made <white><target></white> visible."
+  vanished-by: "<prefix><white><player></white> <gray>vanished you."
+  unvanished-by: "<prefix><white><player></white> <gray>made you visible."
+  already-vanished: "<prefix><gray><target> is already vanished."
+  already-visible: "<prefix><gray><target> is already visible."
+  target-not-staff: "<prefix><red><target> doesn't have permission to vanish."
+  rejoined-vanished: "<prefix><gray>You joined <aqua>vanished</aqua>. Use <white>/vanish</white> to reappear."
+  permission-revoked: "<prefix><gray>You're visible again because you no longer have permission to vanish."
+  action-bar: "<aqua>You are vanished</aqua> <dark_gray>|</dark_gray> <gray>Only staff can see you"
+  chat-blocked: "<prefix><red>Your message wasn't sent because you're vanished. Use <white>/vanish</white> to reappear first."
+
+  # Sent to staff who can see vanished players.
+  staff-vanished: "<prefix><white><player></white> <gray>vanished."
+  staff-unvanished: "<prefix><white><player></white> <gray>reappeared."
+  staff-joined: "<prefix><white><player></white> <gray>joined silently."
+  staff-left: "<prefix><white><player></white> <gray>left silently."
+
+  teleported: "<prefix><gray>Teleported to <white><target></white>."
+  teleport-failed: "<prefix><red>Couldn't teleport to <white><target></white>."
+  must-be-vanished: "<prefix><red>You need to be vanished to do that."
+  no-players: "<prefix><gray>There's nobody else online to teleport to."
+  no-target: "<prefix><gray>Look at a player, or right-click one, to inspect them."
+  player-not-found: "<prefix><red>No online player called <white><input></white>."
+  players-only: "<prefix><red>Only players can do that."
+  no-permission: "<prefix><red>You don't have permission to do that."
+
+  list: "<prefix><gray>Vanished (<white><count></white>): <players>"
+  list-empty: "<prefix><gray>Nobody is vanished."
+  list-offline-tag: " <dark_gray>(offline)</dark_gray>"
+
+  selector-given: "<prefix><gray>You received the <white>Staff Selector</white>."
+  selector-disabled: "<prefix><red>The staff selector is turned off."
+  inventory-full: "<prefix><red>Your inventory is full. Make some room and use <white>/vanish selector</white>."
+
+  inspect:
+    - "<prefix><gray>Inspecting <white><target></white><vanished>"
+    - "<gray>  World: <white><world></white> <dark_gray>@</dark_gray> <white><x>, <y>, <z>"
+    - "<gray>  Health: <white><health></white> <dark_gray>|</dark_gray> Food: <white><food></white> <dark_gray>|</dark_gray> Game mode: <white><gamemode>"
+    - "<gray>  Ping: <white><ping>ms</white>  <teleport>"
+  inspect-teleport-button: "<yellow><hover:show_text:'<gray>Click to teleport'>[Teleport]</hover>"
+
+  reloaded: "<prefix><green>Configuration reloaded."
+  usage:
+    - "<prefix><gray>Commands:"
+    - "<gray>  /vanish <dark_gray>[player]</dark_gray> <dark_gray>-</dark_gray> toggle vanish"
+    - "<gray>  /vanish on|off <dark_gray>[player]</dark_gray>"
+    - "<gray>  /vanish list"
+    - "<gray>  /vanish tp \\<player>"
+    - "<gray>  /vanish selector"
+    - "<gray>  /vanish reload"
