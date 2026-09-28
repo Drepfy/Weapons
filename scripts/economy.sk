@@ -90,7 +90,7 @@ command /pay <player> <text>:
         addBalance(arg-1, {_amt})
         send "%{cfg::prefix} ? ""» ""%&a&l$ &7You sent &a%money({_amt})% &7to &f%arg-1%&7."
         play sound "entity.experience_orb.pickup" to player
-        send "%{cfg::prefix} ? ""» ""%&a&l$ &7You received &a%money({_amt})% &7from &f%player%&7."
+        send "%{cfg::prefix} ? ""» ""%&a&l$ &7You received &a%money({_amt})% &7from &f%player%&7." to arg-1
         send title "&a+%money({_amt})%" with subtitle "&7from &f%player%" to arg-1 for 2 seconds
         play sound "entity.player.levelup" to arg-1
 
