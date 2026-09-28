@@ -1,14 +1,14 @@
-# Weapons server scripts
+# Vanilla SMP server scripts
 
 Skript add-ons for the server, one file per feature:
 
 | File | What it does |
 |---|---|
-| `scripts/settings.sk` | **All settings**: server IP, title, currency, PvP rewards, mob rewards, market items |
+| `scripts/settings.sk` | **All settings**: server IP, scoreboard title, currency, PvP rewards, mob rewards, market items, reset timer |
 | `scripts/economy.sk` | Persistent balances, `/balance`, `/pay`, `/eco` |
 | `scripts/scoreboard.sk` | Sidebar: money, playtime, kills, deaths, server IP |
 | `scripts/killrewards.sk` | Money for mob / player kills, kill & death tracking |
-| `scripts/market.sk` | `/market` GUI shop, `/marketadmin` |
+| `scripts/market.sk` | `/market` 6-row GUI shop with stock that resets every hour (countdown on the clock), `/marketadmin` |
 
 **Requires:** Paper/Spigot 1.20+, [Skript](https://github.com/SkriptLang/Skript) 2.7+, [SkBee](https://github.com/ShaneBeee/SkBee) (for the sidebar).
 
@@ -26,5 +26,6 @@ After changing `settings.sk`, run `/sk reload settings`.
 | `/balance [player]` (`/bal`, `/money`) | Show balance |
 | `/pay <player> <amount>` | Send money to an online player |
 | `/eco give\|take\|set <player> <amount>` | Admin (`economy.admin`) |
-| `/marketadmin list` | Show market item ids, prices, enabled state (`economy.admin`) |
-| `/marketadmin toggle <id>` / `price <id> <amount>` | Live market edits until next reload (`economy.admin`) |
+| `/marketadmin list` | Show item ids, prices, stock, enabled state and time to next reset (`economy.admin`) |
+| `/marketadmin reset` | Force a market reset now (`economy.admin`) |
+| `/marketadmin toggle <id>` / `price <id> <amount>` / `stock <id> <amount>` | Live market edits until next reload (`economy.admin`) |

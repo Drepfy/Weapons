@@ -21,7 +21,7 @@ function updateBoard(p: player):
     set {_deaths} to {economy::deaths::%{_u}%} ? 0
     set {_ip} to {cfg::server-ip} ? "play.yourserver.net"
 
-    set title of {_p}'s scoreboard to {cfg::title} ? "&6&lWEAPONS"
+    set title of {_p}'s scoreboard to {cfg::title} ? "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ"
     set line 9 of {_p}'s scoreboard to "&7&m                    "
     set line 8 of {_p}'s scoreboard to "&fMoney: &a%{_money}%"
     set line 7 of {_p}'s scoreboard to "&fPlaytime: &e%{_time}%"
