@@ -1,0 +1,180 @@
+# ---------------------------------------------------------------------------
+#  StaffModeration configuration
+#  Durations accept: 30s, 15m, 12h, 7d, 2w, 3mo, 1y (combinable: 1d12h)
+#  or "permanent". Run /moderation reload after editing (storage changes need
+#  a restart).
+# ---------------------------------------------------------------------------
+
+# Name recorded with every punishment. Useful when several servers share one
+# MySQL database.
+server-name: "server"
+
+storage:
+  # sqlite (single server, zero setup) or mysql (also works with MariaDB).
+  type: sqlite
+  # Prefix for table names. Letters, digits and underscores only.
+  table-prefix: "sm_"
+  sqlite:
+    file: "punishments.db"
+  mysql:
+    host: "localhost"
+    port: 3306
+    database: "minecraft"
+    username: "minecraft"
+    password: ""
+    pool-size: 4
+    # Extra JDBC connection properties.
+    properties:
+      useSSL: "false"
+      characterEncoding: "utf8"
+
+security:
+  # If the database can't be reached while someone logs in, refuse the login
+  # rather than risk letting a banned player in. Server operators are still
+  # allowed in so they can fix the problem.
+  deny-login-on-database-error: true
+  # How long a login may wait for the database before it counts as an error.
+  login-timeout-seconds: 10
+  # How often (in seconds) online players' punishments are re-read from the
+  # database. This picks up punishments issued on other servers sharing the
+  # same database, and manual database edits. 0 disables it.
+  sync-interval-seconds: 30
+
+# Per-type defaults. "default-duration" is used when staff don't give one.
+punishments:
+  ban:
+    default-duration: permanent
+    require-reason: false
+    # Announce to non-staff players. Staff with moderation.notify always see it.
+    broadcast: true
+  mute:
+    default-duration: 1h
+    require-reason: false
+    broadcast: false
+  voicemute:
+    default-duration: 1h
+    require-reason: false
+    broadcast: false
+  warn:
+    # How long a warning counts towards escalation below. It stays in the history
+    # forever either way.
+    default-duration: 30d
+    require-reason: true
+    broadcast: false
+  kick:
+    require-reason: false
+    broadcast: false
+
+# Shortcuts for common offences: "/mute Steve spam" uses the preset duration and
+# reason. A duration typed explicitly still wins ("/mute Steve 2h spam"). Extra
+# words after the preset name are added to the reason.
+presets:
+  ban:
+    hacking:
+      duration: 30d
+      reason: "Unfair advantage (hacked client)"
+    xray:
+      duration: 14d
+      reason: "X-ray"
+    griefing:
+      duration: 7d
+      reason: "Griefing"
+  mute:
+    spam:
+      duration: 30m
+      reason: "Spamming"
+    toxicity:
+      duration: 2h
+      reason: "Toxic behaviour"
+    advertising:
+      duration: 1d
+      reason: "Advertising"
+  voicemute:
+    mic-spam:
+      duration: 1h
+      reason: "Mic spam / soundboard"
+    toxicity:
+      duration: 2h
+      reason: "Toxic behaviour in voice chat"
+
+# Automatic punishment when a player reaches exactly this many active warnings.
+# Format: "<ban|mute|voicemute|kick> [duration]".
+warnings:
+  escalation:
+    3: "mute 1h"
+    5: "ban 1d"
+    7: "ban 7d"
+
+# Caps on how long staff may punish for. Staff get the most generous limit of
+# every tier whose permission they have. Staff without any tier permission are
+# not capped, and neither are the console or anyone with
+# moderation.limits.unlimited. Leaving a type out of a tier means that tier
+# doesn't cap it.
+duration-limits:
+  helper:
+    permission: "moderation.limits.helper"
+    ban: 1d
+    mute: 6h
+    voicemute: 6h
+  moderator:
+    permission: "moderation.limits.moderator"
+    ban: 30d
+    mute: 7d
+    voicemute: 7d
+
+mute:
+  # Commands muted players can't use. Namespaced forms (/minecraft:msg,
+  # /essentials:msg), aliases that resolve to these commands and
+  # "/execute ... run <command>" are blocked too.
+  blocked-commands:
+    - msg
+    - tell
+    - w
+    - whisper
+    - m
+    - t
+    - pm
+    - dm
+    - r
+    - reply
+    - me
+    - say
+    - teammsg
+    - tm
+    - mail
+    - tellraw
+  # Stop muted players from writing on signs or in books.
+  block-signs: true
+  block-books: true
+  # Also cancel the legacy AsyncPlayerChatEvent. Keep this on: chat relays and
+  # older chat plugins (Discord bridges and so on) often only listen to the
+  # legacy event and would otherwise forward muted players' messages.
+  block-legacy-chat-event: true
+
+voice-chat:
+  # Minimum seconds between "you are voice muted" reminders while a muted
+  # player keeps trying to talk.
+  notify-cooldown-seconds: 5
+
+lookup:
+  # Allow punishing players who never joined this server by looking up their
+  # UUID from their name (uses Paper's profile cache, then Mojang).
+  allow-unknown-players: true
+
+history:
+  page-size: 8
+  # java.time pattern and time zone (e.g. "Europe/London"). Empty uses the
+  # server's time zone.
+  date-format: "yyyy-MM-dd HH:mm"
+  time-zone: ""
+
+logging:
+  # Write every moderation action to plugins/StaffModeration/logs/moderation-<date>.log
+  file: true
+  # Delete log files older than this many days. 0 keeps them forever.
+  retention-days: 90
+  # Also print moderation actions to the server console.
+  console: true
+  # Log blocked chat, commands, sign/book edits, voice attempts and banned
+  # logins.
+  blocked-attempts: true

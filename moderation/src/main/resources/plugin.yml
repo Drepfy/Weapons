@@ -1,0 +1,151 @@
+name: StaffModeration
+version: '${version}'
+main: dev.drepfy.moderation.ModerationPlugin
+api-version: '1.21'
+description: Staff moderation with bans, mutes, voice-chat mutes, warnings and kicks backed by a persistent punishment history.
+authors: [Drepfy]
+# Load after Simple Voice Chat so voice mutes can hook into it when it is installed.
+softdepend: [voicechat]
+libraries:
+  - com.zaxxer:HikariCP:${hikariVersion}
+
+commands:
+  ban:
+    description: Ban a player, permanently or for a duration.
+    usage: /<command> <player> [duration] [reason] [-s]
+    permission: moderation.ban
+    aliases: [tempban]
+  unban:
+    description: Lift a player's ban.
+    usage: /<command> <player> [reason] [-s]
+    permission: moderation.unban
+  mute:
+    description: Stop a player from chatting.
+    usage: /<command> <player> [duration] [reason] [-s]
+    permission: moderation.mute
+    aliases: [tempmute]
+  unmute:
+    description: Lift a player's chat mute.
+    usage: /<command> <player> [reason] [-s]
+    permission: moderation.unmute
+  voicemute:
+    description: Stop a player from speaking in voice chat.
+    usage: /<command> <player> [duration] [reason] [-s]
+    permission: moderation.voicemute
+    aliases: [vmute, vcmute]
+  unvoicemute:
+    description: Lift a player's voice-chat mute.
+    usage: /<command> <player> [reason] [-s]
+    permission: moderation.unvoicemute
+    aliases: [unvmute, vcunmute]
+  warn:
+    description: Warn a player.
+    usage: /<command> <player> [duration] [reason] [-s]
+    permission: moderation.warn
+  unwarn:
+    description: Remove a warning by its ID.
+    usage: /<command> <id> [reason] [-s]
+    permission: moderation.unwarn
+    aliases: [delwarn]
+  kick:
+    description: Kick a player from the server.
+    usage: /<command> <player> [reason] [-s]
+    permission: moderation.kick
+  history:
+    description: Show a player's punishment history.
+    usage: /<command> [player] [page]
+    aliases: [punishments]
+  warnings:
+    description: Show a player's active warnings.
+    usage: /<command> [player]
+    aliases: [warns]
+  check:
+    description: Show a player's current moderation status.
+    usage: /<command> <player>
+    permission: moderation.check
+    aliases: [modcheck]
+  moderation:
+    description: StaffModeration administration.
+    usage: /<command> <reload|info>
+    permission: moderation.admin
+    aliases: [staffmod]
+
+permissions:
+  moderation.*:
+    description: Every StaffModeration permission except the exemption nodes.
+    default: op
+    children:
+      moderation.staff: true
+      moderation.admin: true
+      moderation.limits.unlimited: true
+  moderation.staff:
+    description: Everything a moderator needs.
+    default: false
+    children:
+      moderation.ban: true
+      moderation.unban: true
+      moderation.mute: true
+      moderation.unmute: true
+      moderation.voicemute: true
+      moderation.unvoicemute: true
+      moderation.warn: true
+      moderation.unwarn: true
+      moderation.kick: true
+      moderation.history: true
+      moderation.check: true
+      moderation.notify: true
+      moderation.silent: true
+  moderation.ban:
+    description: Use /ban.
+    default: op
+  moderation.unban:
+    description: Use /unban.
+    default: op
+  moderation.mute:
+    description: Use /mute.
+    default: op
+  moderation.unmute:
+    description: Use /unmute.
+    default: op
+  moderation.voicemute:
+    description: Use /voicemute.
+    default: op
+  moderation.unvoicemute:
+    description: Use /unvoicemute.
+    default: op
+  moderation.warn:
+    description: Use /warn.
+    default: op
+  moderation.unwarn:
+    description: Use /unwarn.
+    default: op
+  moderation.kick:
+    description: Use /kick.
+    default: op
+  moderation.history:
+    description: View other players' history and warnings.
+    default: op
+  moderation.history.self:
+    description: View your own history and warnings.
+    default: true
+  moderation.check:
+    description: Use /check.
+    default: op
+  moderation.notify:
+    description: Receive staff notifications about punishments and blocked attempts.
+    default: op
+  moderation.silent:
+    description: Issue punishments silently with -s (no public broadcast).
+    default: op
+  moderation.admin:
+    description: Use /moderation reload and info.
+    default: op
+  moderation.limits.unlimited:
+    description: Ignore the duration limits configured in config.yml.
+    default: op
+  moderation.exempt:
+    description: Cannot be punished by staff (the console can still punish). Grant explicitly.
+    default: false
+  moderation.exempt.override:
+    description: May punish players who have moderation.exempt. Grant explicitly.
+    default: false
