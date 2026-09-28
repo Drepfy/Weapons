@@ -23,12 +23,14 @@ on load:
     # Money taken from the player who died in PvP (0 = off)
     set {cfg::player-death-penalty} to 0
 
-    # --- Ranks (buy with /ranks) ---
+    # --- Ranks (shown in /ranks, NOT buyable with in-game money) ---
+    # Give a rank with /setrank <player> <id> or the permission smp.rank.<id>.
     # Multiply the money you get from mob and player kills.
-    # rank(id, display name, multiplier, price, icon)
+    set {cfg::store-url} to "store.yourserver.net"
+    # rank(id, display name, multiplier, price shown in /ranks (real money, text), icon)
     delete {cfg::rank::*}
-    rank("vip", "&a&lVIP", 1.5, 25000, emerald)
-    rank("elite", "&6&lELITE", 3, 100000, nether star)
+    rank("vip", "&a&lVIP", 1.5, "$5", emerald)
+    rank("elite", "&6&lELITE", 3, "$15", nether star)
 
     # --- Mob rewards: money per kill (1 min - 7 max) ---
     # Mobs not listed here pay nothing.
@@ -125,7 +127,7 @@ on load:
     marketItem("dragon_breath", dragon breath, "&dDragon's Breath", 1, 400, 8, 42, true)
     marketItem("ominous_key", ominous trial key, "&5Ominous Trial Key", 1, 2500, 2, 43, true)
 
-function rank(id: text, name: text, mult: number, price: number, icon: itemtype):
+function rank(id: text, name: text, mult: number, price: text, icon: itemtype):
     add {_id} to {cfg::rank::ids::*}
     set {cfg::rank::%{_id}%::name} to {_name}
     set {cfg::rank::%{_id}%::mult} to {_mult}
