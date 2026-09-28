@@ -2,7 +2,7 @@
 #  MARKET - /market GUI shop with an hourly reset
 #  Items, prices, stock and reset time are set in settings.sk.
 #
-#  Layout (6 rows): items in rows 2-4, clock with the reset
+#  Layout (6 rows): items in rows 2-5, clock with the reset
 #  countdown in the bottom middle, lime glass either side.
 # ============================================================
 
@@ -32,7 +32,7 @@ function pickRotation():
         if {market::%loop-value%::enabled} is true:
             add loop-value to {_pool::*}
     set {_pool::*} to shuffled {_pool::*}
-    set {_n} to min(21, {cfg::market-rotate-count} ? 21)
+    set {_n} to min(28, {cfg::market-rotate-count} ? 28)
     set {_i} to 0
     loop {_pool::*}:
         add 1 to {_i}
@@ -61,13 +61,13 @@ function fillMarket(p: player, gui: inventory):
     set slot 50 of {_gui} to lime stained glass pane named "&r"
 
     # Which items to show, and where
-    set {_grid::*} to 10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34
+    set {_grid::*} to 10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34, 37, 38, 39, 40, 41, 42, 43
     set {_i} to 0
     if {cfg::market-rotate} is true:
         loop {marketstate::shown::*}:
             if {market::%loop-value%::enabled} is true:
                 add 1 to {_i}
-                if {_i} <= 21:
+                if {_i} <= 28:
                     set {_show::%{_grid::%{_i}%}%} to loop-value
     else:
         loop {market::ids::*}:
@@ -118,7 +118,7 @@ function buyItem(p: player, id: text):
         stop
     set {_price} to {market::%{_id}%::price}
     if getBalance({_p}) < {_price}:
-        send "%{cfg::prefix} ? ""» ""%&cYou need %money({_price})% to buy that." to {_p}
+        send "%{cfg::prefix} ? ""» ""%&cYou need &f%money({_price} - getBalance({_p}))% &cmore to buy that item." to {_p}
         play sound "entity.villager.no" to {_p}
         stop
     set {_item} to {market::%{_id}%::amount} of {market::%{_id}%::item}
@@ -162,6 +162,12 @@ on inventory click:
     cancel event
     set {_id} to {-market::slot::%uuid of player%::%raw index of event-slot%}
     {_id} is set
+    # One purchase per click: ignore double-clicks and clicks faster than 0.4s apart
+    click type is not double click
+    set {_now} to unix timestamp of now
+    if {_now} - ({-market::cd::%uuid of player%} ? 0) < 0.4:
+        stop
+    set {-market::cd::%uuid of player%} to {_now}
     buyItem(player, {_id})
     refreshAllMarkets()
 

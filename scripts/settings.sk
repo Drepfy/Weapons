@@ -47,7 +47,7 @@ on load:
     # Rotation: true = every reset shows random items from the list below
     #           false = always show every enabled item in its slot
     set {cfg::market-rotate} to false
-    # How many random items to show when rotation is on (max 21)
+    # How many random items to show when rotation is on (max 28)
     set {cfg::market-rotate-count} to 12
 
     # Every item sells at least 3 per purchase, except these:
@@ -56,7 +56,7 @@ on load:
 
     # marketItem(id, item, display name, amount, price, stock, slot, enabled)
     #   stock = how many times it can be bought per reset (-1 = unlimited)
-    #   slot  = where it shows (rows 2-4: 10-16, 19-25, 28-34). Ignored when rotation is on.
+    #   slot  = where it shows (rows 2-5: 10-16, 19-25, 28-34, 37-43). Ignored when rotation is on.
     delete {market::*}
     marketItem("echo_shard", echo shard, "&3Echo Shard", 3, 450, 16, 10, true)
     marketItem("ghast_tear", ghast tear, "&fGhast Tear", 3, 225, 16, 11, true)
@@ -78,6 +78,13 @@ on load:
     marketItem("enchanted_golden_apple", enchanted golden apple, "&dEnchanted Golden Apple", 1, 3000, 2, 31, true)
     marketItem("ancient_debris", ancient debris, "&6Ancient Debris", 3, 2400, 8, 32, true)
     marketItem("netherite_ingot", netherite ingot, "&8Netherite Ingot", 1, 2000, 4, 33, true)
+    marketItem("arrow", arrow, "&fArrow", 32, 100, 20, 37, true)
+    marketItem("cooked_beef", cooked beef, "&6Steak", 32, 80, 32, 38, true)
+    marketItem("end_crystal", end crystal, "&dEnd Crystal", 3, 900, 8, 39, true)
+    marketItem("firework_rocket", firework rocket, "&cFirework Rocket", 32, 300, 16, 40, true)
+    marketItem("diamond_block", diamond block, "&bDiamond Block", 3, 2700, 8, 41, true)
+    marketItem("lapis_block", lapis lazuli block, "&9Lapis Block", 8, 400, 16, 42, true)
+    marketItem("redstone_block", redstone block, "&cRedstone Block", 16, 320, 16, 43, true)
     marketItem("golden_apple", golden apple, "&6Golden Apple", 3, 300, 32, 34, true)
 
 function marketItem(id: text, item: itemtype, name: text, amount: integer, price: number, stock: integer, slot: integer, enabled: boolean):
