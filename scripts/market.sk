@@ -174,13 +174,13 @@ on inventory click:
     set {_slot} to index of event-slot
     set {_id} to {-market::slot::%uuid of player%::%{_slot}%}
     {_id} is set
-    # One purchase per click (stops double-click / spam buying)
-    set {_now} to unix timestamp of now
-    if {_now} - ({-market::cd::%uuid of player%} ? 0) < 0.4:
-        stop
-    set {-market::cd::%uuid of player%} to {_now}
+    # One purchase per click: ignore the duplicate click events a double-click sends (2 ticks)
+    {-market::cd::%uuid of player%} is not set
+    set {-market::cd::%uuid of player%} to true
     buyItem(player, {_id})
     refreshAllMarkets()
+    wait 2 ticks
+    delete {-market::cd::%uuid of player%}
 
 on inventory drag:
     set {_gui} to {-market::gui::%uuid of player%}
