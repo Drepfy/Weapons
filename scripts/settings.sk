@@ -23,26 +23,59 @@ on load:
     # Money taken from the player who died in PvP (0 = off)
     set {cfg::player-death-penalty} to 0
 
-    # --- Rank multipliers (kill rewards) ---
-    # Give a player the permission smp.multiplier.<name> to use it. Highest wins.
-    set {cfg::multiplier::vip} to 1.5
-    set {cfg::multiplier::mvp} to 2
-    set {cfg::multiplier::elite} to 3
+    # --- Ranks (buy with /ranks) ---
+    # Multiply the money you get from mob and player kills.
+    # rank(id, display name, multiplier, price, icon)
+    delete {cfg::rank::*}
+    rank("vip", "&a&lVIP", 1.5, 25000, emerald)
+    rank("elite", "&6&lELITE", 3, 100000, nether star)
 
-    # --- Mob rewards: {mobreward::<mob type>} = money per kill ---
+    # --- Mob rewards: money per kill (1 min - 7 max) ---
     # Mobs not listed here pay nothing.
     delete {mobreward::*}
-    set {mobreward::zombie} to 5
-    set {mobreward::skeleton} to 5
-    set {mobreward::spider} to 4
-    set {mobreward::creeper} to 8
-    set {mobreward::enderman} to 15
-    set {mobreward::blaze} to 12
-    set {mobreward::wither skeleton} to 20
-    set {mobreward::witch} to 10
-    set {mobreward::piglin brute} to 25
-    set {mobreward::wither} to 500
-    set {mobreward::ender dragon} to 1000
+    set {mobreward::chicken} to 1
+    set {mobreward::cow} to 1
+    set {mobreward::pig} to 1
+    set {mobreward::sheep} to 1
+    set {mobreward::rabbit} to 1
+    set {mobreward::cod} to 1
+    set {mobreward::salmon} to 1
+    set {mobreward::squid} to 1
+    set {mobreward::zombie} to 2
+    set {mobreward::husk} to 2
+    set {mobreward::drowned} to 2
+    set {mobreward::skeleton} to 2
+    set {mobreward::stray} to 2
+    set {mobreward::spider} to 2
+    set {mobreward::silverfish} to 2
+    set {mobreward::slime} to 2
+    set {mobreward::magma cube} to 2
+    set {mobreward::zombified piglin} to 2
+    set {mobreward::creeper} to 3
+    set {mobreward::cave spider} to 3
+    set {mobreward::zombie villager} to 3
+    set {mobreward::phantom} to 3
+    set {mobreward::pillager} to 3
+    set {mobreward::bogged} to 3
+    set {mobreward::endermite} to 3
+    set {mobreward::witch} to 4
+    set {mobreward::enderman} to 4
+    set {mobreward::blaze} to 4
+    set {mobreward::guardian} to 4
+    set {mobreward::vindicator} to 4
+    set {mobreward::hoglin} to 4
+    set {mobreward::piglin} to 4
+    set {mobreward::wither skeleton} to 5
+    set {mobreward::ghast} to 5
+    set {mobreward::shulker} to 5
+    set {mobreward::breeze} to 5
+    set {mobreward::evoker} to 5
+    set {mobreward::piglin brute} to 6
+    set {mobreward::ravager} to 6
+    set {mobreward::warden} to 7
+    set {mobreward::elder guardian} to 7
+    set {mobreward::wither} to 7
+    set {mobreward::ender dragon} to 7
 
     # --- Market ---
     set {cfg::market-title} to "&2&lᴍᴀʀᴋᴇᴛ"
@@ -91,6 +124,13 @@ on load:
     marketItem("piston", piston, "&7Piston", 1, 30, 16, 41, true)
     marketItem("dragon_breath", dragon breath, "&dDragon's Breath", 1, 400, 8, 42, true)
     marketItem("ominous_key", ominous trial key, "&5Ominous Trial Key", 1, 2500, 2, 43, true)
+
+function rank(id: text, name: text, mult: number, price: number, icon: itemtype):
+    add {_id} to {cfg::rank::ids::*}
+    set {cfg::rank::%{_id}%::name} to {_name}
+    set {cfg::rank::%{_id}%::mult} to {_mult}
+    set {cfg::rank::%{_id}%::price} to {_price}
+    set {cfg::rank::%{_id}%::icon} to {_icon}
 
 function marketItem(id: text, item: itemtype, name: text, amount: integer, price: number, stock: integer, slot: integer, enabled: boolean):
     add {_id} to {market::ids::*}

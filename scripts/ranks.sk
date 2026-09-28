@@ -1,0 +1,88 @@
+# ============================================================
+#  RANKS - /ranks GUI to buy a kill-money multiplier
+#  Ranks are set in settings.sk. Bought ranks are permanent.
+# ============================================================
+
+function openRanks(p: player):
+    set {_gui} to chest inventory with 3 rows named "&8&lʀᴀɴᴋѕ"
+    set slots (integers between 0 and 26) of {_gui} to gray stained glass pane named "&r"
+    set {_u} to uuid of {_p}
+    delete {-ranks::slot::%{_u}%::*}
+    set {_slots::*} to 11, 15 and 13
+    set {_i} to 0
+    loop {cfg::rank::ids::*}:
+        add 1 to {_i}
+        set {_id} to loop-value
+        set {_slot} to {_slots::%{_i}%}
+        set {_price} to {cfg::rank::%{_id}%::price}
+        if {economy::rank::%{_u}%} is {_id}:
+            set {_status} to "&a✔ You own this rank"
+        else if multiplier({_p}) >= {cfg::rank::%{_id}%::mult}:
+            set {_status} to "&7You already have an equal or better rank"
+        else if getBalance({_p}) >= {_price}:
+            set {_status} to "&e» Click to buy"
+        else:
+            set {_status} to "&cYou need %money({_price} - getBalance({_p}))% more"
+        set slot {_slot} of {_gui} to {cfg::rank::%{_id}%::icon} named {cfg::rank::%{_id}%::name} with lore "&8▪ &fKill money: &a%{cfg::rank::%{_id}%::mult}%x", "&8▪ &fPrice: &a%money({_price})%", "&8▪ &fLasts: &aForever", "&r" and {_status}
+        set {-ranks::slot::%{_u}%::%{_slot}%} to {_id}
+    set slot 22 of {_gui} to clock named "&a&lYour Multiplier" with lore "&8▪ &fCurrent: &a%multiplier({_p})%x" and "&8▪ &fBalance: &a%money(getBalance({_p}))%"
+    set {-ranks::opening::%{_u}%} to true
+    set {-ranks::open::%{_u}%} to true
+    open {_gui} to {_p}
+    wait 2 ticks
+    delete {-ranks::opening::%{_u}%}
+
+function buyRank(p: player, id: text):
+    set {_u} to uuid of {_p}
+    set {_price} to {cfg::rank::%{_id}%::price}
+    if multiplier({_p}) >= {cfg::rank::%{_id}%::mult}:
+        send "%pre()%&cYou already have this rank or a better one." to {_p}
+        stop
+    if getBalance({_p}) < {_price}:
+        send "%pre()%&cYou need &f%money({_price} - getBalance({_p}))% &cmore to buy that rank." to {_p}
+        play sound "entity.villager.no" to {_p}
+        stop
+    addBalance({_p}, 0 - {_price})
+    set {economy::rank::%{_u}%} to {_id}
+    send title {cfg::rank::%{_id}%::name} with subtitle "&7You now earn &a%{cfg::rank::%{_id}%::mult}%x &7kill money!" to {_p} for 3 seconds
+    play sound "ui.toast.challenge_complete" to {_p}
+    broadcast "%pre()%&f%{_p}% &7bought the %{cfg::rank::%{_id}%::name}% &7rank!"
+
+command /ranks:
+    aliases: /rank, /buyrank
+    trigger:
+        openRanks(player)
+
+on inventory click:
+    {-ranks::open::%uuid of player%} is set
+    cancel event
+    event-inventory is not player's inventory
+    set {_id} to {-ranks::slot::%uuid of player%::%index of event-slot%}
+    {_id} is set
+    close player's inventory
+    buyRank(player, {_id})
+
+on inventory drag:
+    {-ranks::open::%uuid of player%} is set
+    cancel event
+
+on inventory close:
+    {-ranks::open::%uuid of player%} is set
+    {-ranks::opening::%uuid of player%} is not set
+    delete {-ranks::open::%uuid of player%}
+
+on quit:
+    delete {-ranks::open::%uuid of player%}
+
+# Admin: /setrank <player> <id|none>
+command /setrank <offline player> <text>:
+    permission: economy.admin
+    trigger:
+        if arg-2 is "none":
+            delete {economy::rank::%uuid of arg-1%}
+        else if {cfg::rank::%arg-2%::mult} is set:
+            set {economy::rank::%uuid of arg-1%} to arg-2
+        else:
+            send "%pre()%&cUnknown rank. Ranks: %{cfg::rank::ids::*}%, none"
+            stop
+        send "%pre()%&aSet %arg-1%'s rank to %arg-2%."
