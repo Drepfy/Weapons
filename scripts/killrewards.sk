@@ -3,6 +3,14 @@
 #  Rewards are set in settings.sk.
 # ============================================================
 
+# Highest smp.multiplier.<name> permission the player has (1 if none)
+function multiplier(p: player) :: number:
+    set {_best} to 1
+    loop {cfg::multiplier::*}:
+        if {_p} has permission "smp.multiplier.%loop-index%":
+            set {_best} to max({_best}, loop-value)
+    return {_best}
+
 on death:
     if victim is a player:
         add 1 to {economy::deaths::%uuid of victim%}
@@ -10,7 +18,7 @@ on death:
         attacker is not victim
         add 1 to {economy::kills::%uuid of attacker%}
 
-        set {_reward} to {cfg::player-kill-reward} ? 0
+        set {_reward} to ({cfg::player-kill-reward} ? 0) * multiplier(attacker)
         if {_reward} > 0:
             addBalance(attacker, {_reward})
             send action bar "&a+%money({_reward})% &7for killing &f%victim%" to attacker
@@ -21,7 +29,7 @@ on death:
             send "%{cfg::prefix} ? ""» ""%&cYou lost %money({_penalty})% to %attacker%." to victim
     else:
         attacker is a player
-        set {_reward} to {mobreward::%type of victim%} ? 0
+        set {_reward} to ({mobreward::%type of victim%} ? 0) * multiplier(attacker)
         if {_reward} > 0:
             addBalance(attacker, {_reward})
             send action bar "&a+%money({_reward})% &7for killing a &f%type of victim%" to attacker

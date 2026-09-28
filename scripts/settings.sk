@@ -23,6 +23,12 @@ on load:
     # Money taken from the player who died in PvP (0 = off)
     set {cfg::player-death-penalty} to 0
 
+    # --- Rank multipliers (kill rewards) ---
+    # Give a player the permission smp.multiplier.<name> to use it. Highest wins.
+    set {cfg::multiplier::vip} to 1.5
+    set {cfg::multiplier::mvp} to 2
+    set {cfg::multiplier::elite} to 3
+
     # --- Mob rewards: {mobreward::<mob type>} = money per kill ---
     # Mobs not listed here pay nothing.
     delete {mobreward::*}
@@ -47,53 +53,50 @@ on load:
     # Rotation: true = every reset shows random items from the list below
     #           false = always show every enabled item in its slot
     set {cfg::market-rotate} to false
-    # How many random items to show when rotation is on (max 28)
+    # How many random items to show when rotation is on (max 30)
     set {cfg::market-rotate-count} to 12
 
-    # Every item sells at least 3 per purchase, except these:
-    set {cfg::market-min-amount} to 3
-    set {cfg::market-min-exempt::*} to "enchanted_golden_apple" and "netherite_ingot"
-
     # marketItem(id, item, display name, amount, price, stock, slot, enabled)
-    #   stock = how many times it can be bought per reset (-1 = unlimited)
-    #   slot  = where it shows (rows 2-5: 10-16, 19-25, 28-34, 37-43). Ignored when rotation is on.
+    #   amount = items given per click (1)
+    #   stock  = how many can be bought per reset (-1 = unlimited)
+    #   slot   = where it shows (rows 2-5 = slots 9-44). Ignored when rotation is on.
     delete {market::*}
-    marketItem("echo_shard", echo shard, "&3Echo Shard", 3, 450, 16, 10, true)
-    marketItem("ghast_tear", ghast tear, "&fGhast Tear", 3, 225, 16, 11, true)
-    marketItem("golden_carrot", golden carrot, "&6Golden Carrot", 16, 60, 20, 12, true)
-    marketItem("xp_bottle", experience bottle, "&aBottle o' Enchanting", 16, 200, 10, 13, true)
-    marketItem("diamond", diamond, "&bDiamond", 3, 900, 32, 14, true)
-    marketItem("emerald_block", emerald block, "&aEmerald Block", 3, 1350, 16, 15, true)
-    marketItem("slime_ball", slime ball, "&aSlime Ball", 16, 40, 20, 16, true)
-    marketItem("totem", totem of undying, "&eTotem of Undying", 3, 4500, 3, 19, true)
-    marketItem("blaze_rod", blaze rod, "&6Blaze Rod", 8, 120, 20, 20, true)
-    marketItem("ender_pearl", ender pearl, "&3Ender Pearl", 16, 250, 20, 21, true)
-    marketItem("gold_block", gold block, "&eGold Block", 3, 750, 16, 22, true)
-    marketItem("nether_star", nether star, "&fNether Star", 3, 15000, 1, 23, true)
-    marketItem("iron_block", iron block, "&fIron Block", 3, 360, 32, 24, true)
-    marketItem("nether_wart", nether wart, "&cNether Wart", 16, 40, 20, 25, true)
-    marketItem("upgrade_template", netherite upgrade smithing template, "&dNetherite Upgrade Template", 3, 4500, 3, 28, true)
-    marketItem("shulker_shell", shulker shell, "&dShulker Shell", 4, 1800, 8, 29, true)
-    marketItem("obsidian", obsidian, "&5Obsidian", 8, 80, 20, 30, true)
-    marketItem("enchanted_golden_apple", enchanted golden apple, "&dEnchanted Golden Apple", 1, 3000, 2, 31, true)
-    marketItem("ancient_debris", ancient debris, "&6Ancient Debris", 3, 2400, 8, 32, true)
-    marketItem("netherite_ingot", netherite ingot, "&8Netherite Ingot", 1, 2000, 4, 33, true)
-    marketItem("arrow", arrow, "&fArrow", 32, 100, 20, 37, true)
-    marketItem("cooked_beef", cooked beef, "&6Steak", 32, 80, 32, 38, true)
-    marketItem("end_crystal", end crystal, "&dEnd Crystal", 3, 900, 8, 39, true)
-    marketItem("firework_rocket", firework rocket, "&cFirework Rocket", 32, 300, 16, 40, true)
-    marketItem("diamond_block", diamond block, "&bDiamond Block", 3, 2700, 8, 41, true)
-    marketItem("lapis_block", lapis lazuli block, "&9Lapis Block", 8, 400, 16, 42, true)
-    marketItem("redstone_block", redstone block, "&cRedstone Block", 16, 320, 16, 43, true)
-    marketItem("golden_apple", golden apple, "&6Golden Apple", 3, 300, 32, 34, true)
+    marketItem("golden_carrot", golden carrot, "&6Golden Carrot", 1, 5, 64, 9, true)
+    marketItem("xp_bottle", experience bottle, "&aBottle o' Enchanting", 1, 15, 64, 10, true)
+    marketItem("diamond", diamond, "&bDiamond", 1, 300, 32, 11, true)
+    marketItem("slime_ball", slime ball, "&aSlime Ball", 1, 5, 64, 12, true)
+    marketItem("totem", totem of undying, "&eTotem of Undying", 1, 1500, 3, 13, true)
+    marketItem("blaze_rod", blaze rod, "&6Blaze Rod", 1, 20, 32, 14, true)
+    marketItem("gold_block", gold block, "&eGold Block", 1, 250, 16, 15, true)
+    marketItem("nether_star", nether star, "&fNether Star", 1, 5000, 1, 16, true)
+    marketItem("iron_block", iron block, "&fIron Block", 1, 120, 32, 17, true)
+    marketItem("nether_wart", nether wart, "&cNether Wart", 1, 3, 64, 18, true)
+    marketItem("upgrade_template", netherite upgrade smithing template, "&dNetherite Upgrade Template", 1, 1500, 3, 19, true)
+    marketItem("netherite_ingot", netherite ingot, "&8Netherite Ingot", 1, 2000, 4, 20, true)
+    marketItem("ancient_debris", ancient debris, "&6Ancient Debris", 1, 800, 8, 21, true)
+    marketItem("enchanted_golden_apple", enchanted golden apple, "&dEnchanted Golden Apple", 1, 3000, 2, 22, true)
+    marketItem("obsidian", obsidian, "&5Obsidian", 1, 10, 64, 23, true)
+    marketItem("shulker_shell", shulker shell, "&dShulker Shell", 1, 450, 8, 24, true)
+    marketItem("steak", cooked beef, "&6Steak", 1, 3, 64, 25, true)
+    marketItem("diamond_block", diamond block, "&bDiamond Block", 1, 2700, 8, 26, true)
+    marketItem("golden_apple", golden apple, "&6Golden Apple", 1, 100, 32, 27, true)
+    marketItem("breeze_rod", breeze rod, "&bBreeze Rod", 1, 60, 16, 28, true)
+    marketItem("wither_skull", wither skeleton skull, "&8Wither Skeleton Skull", 1, 1000, 3, 29, true)
+    marketItem("oak_log", oak log, "&6Oak Log", 1, 2, 64, 30, true)
+    marketItem("netherite_scrap", netherite scrap, "&8Netherite Scrap", 1, 500, 8, 31, true)
+    marketItem("gunpowder", gunpowder, "&7Gunpowder", 1, 5, 64, 32, true)
+    marketItem("leather", leather, "&6Leather", 1, 8, 64, 33, true)
+    marketItem("glowstone", glowstone, "&eGlowstone", 1, 10, 64, 34, true)
+    marketItem("cobweb", cobweb, "&fCobweb", 1, 25, 32, 35, true)
+    marketItem("piston", piston, "&7Piston", 1, 30, 16, 39, true)
+    marketItem("dragon_breath", dragon's breath, "&dDragon's Breath", 1, 400, 8, 40, true)
+    marketItem("ominous_key", ominous trial key, "&5Ominous Trial Key", 1, 2500, 2, 41, true)
 
 function marketItem(id: text, item: itemtype, name: text, amount: integer, price: number, stock: integer, slot: integer, enabled: boolean):
     add {_id} to {market::ids::*}
     set {market::%{_id}%::item} to {_item}
     set {market::%{_id}%::name} to {_name}
     set {market::%{_id}%::amount} to {_amount}
-    if {cfg::market-min-exempt::*} does not contain {_id}:
-        set {market::%{_id}%::amount} to max({_amount}, {cfg::market-min-amount} ? 3)
     set {market::%{_id}%::price} to {_price}
     set {market::%{_id}%::stock} to {_stock}
     set {market::%{_id}%::slot} to {_slot}

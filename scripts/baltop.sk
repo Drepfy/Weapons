@@ -43,6 +43,7 @@ function openBaltop(p: player, page: integer):
     set {-baltop::gui::%{_me}%} to {_gui}
     set {-baltop::page::%{_me}%} to {_page}
     open {_gui} to {_p}
+    set {-baltop::open::%{_me}%} to unix timestamp of now
 
 command /baltop [<integer>]:
     aliases: /balancetop, /moneytop
@@ -52,7 +53,7 @@ command /baltop [<integer>]:
 on inventory click:
     set {_gui} to {-baltop::gui::%uuid of player%}
     {_gui} is set
-    player's current inventory is {_gui}
+    {-baltop::open::%uuid of player%} is set
     cancel event
     set {_slot} to raw index of event-slot
     set {_page} to {-baltop::page::%uuid of player%}
@@ -66,9 +67,16 @@ on inventory click:
 on inventory drag:
     set {_gui} to {-baltop::gui::%uuid of player%}
     {_gui} is set
-    player's current inventory is {_gui}
+    {-baltop::open::%uuid of player%} is set
     cancel event
 
+on inventory close:
+    {-baltop::open::%uuid of player%} is set
+    (unix timestamp of now) - {-baltop::open::%uuid of player%} > 0.1
+    delete {-baltop::open::%uuid of player%}
+    delete {-baltop::gui::%uuid of player%}
+
 on quit:
+    delete {-baltop::open::%uuid of player%}
     delete {-baltop::gui::%uuid of player%}
     delete {-baltop::page::%uuid of player%}
