@@ -26,7 +26,7 @@ on death:
         set {_penalty} to min({cfg::player-death-penalty} ? 0, getBalance(victim))
         if {_penalty} > 0:
             addBalance(victim, 0 - {_penalty})
-            send "%{cfg::prefix} ? ""» ""%&cYou lost %money({_penalty})% to %attacker%." to victim
+            send "%pre()%&cYou lost %money({_penalty})% to %attacker%." to victim
     else:
         attacker is a player
         set {_reward} to ({mobreward::%type of victim%} ? 0) * multiplier(attacker)

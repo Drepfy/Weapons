@@ -33,7 +33,9 @@ function openBaltop(p: player, page: integer):
     loop {_all::*}:
         if loop-value is {_me}:
             set {_myrank} to loop-index
-    set slot 49 of {_gui} to {_p}'s skull named "&e&lYou &7- &f#%{_myrank} ? ""?""%" with lore "&8▪ &fBalance: &a%money(getBalance({_p}))%", "&8▪ &fPage: &f%{_page}%/%{_pages}%"
+    if {_myrank} is not set:
+        set {_myrank} to "?"
+    set slot 49 of {_gui} to {_p}'s skull named "&e&lYou &7- &f#%{_myrank}%" with lore "&8▪ &fBalance: &a%money(getBalance({_p}))%", "&8▪ &fPage: &f%{_page}%/%{_pages}%"
     if {_page} > 1:
         set slot 48 of {_gui} to arrow named "&e« Previous page"
     if {_page} < {_pages}:

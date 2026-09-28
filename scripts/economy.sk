@@ -3,6 +3,12 @@
 #  Balances are stored in {economy::balance::<uuid>}.
 # ============================================================
 
+# Chat prefix from settings.sk
+function pre() :: text:
+    if {cfg::prefix} is set:
+        return {cfg::prefix}
+    return "» "
+
 # 504363 -> "$504,363"
 function money(n: number) :: text:
     set {_c} to {cfg::currency} ? "$"
@@ -58,7 +64,7 @@ command /balance [<offline player>]:
     trigger:
         set {_t} to arg-1 ? player
         if {_t} is not set:
-            send "%{cfg::prefix} ? ""» ""%&cUsage: /balance <player>"
+            send "%pre()%&cUsage: /balance <player>"
             stop
         set {_all::*} to sorted indices of {economy::balance::*} in descending order
         loop {_all::*}:
@@ -67,7 +73,9 @@ command /balance [<offline player>]:
         send "&8&m                              "
         send " <##00D6FF>&l%{_t}%'s Balance"
         send " &8▪ &fMoney: &a%money(getBalance({_t}))%"
-        send " &8▪ &fRank: &e#%{_rank} ? ""-""%  &7(/baltop)"
+        if {_rank} is not set:
+            set {_rank} to "-"
+        send " &8▪ &fRank: &e#%{_rank}%  &7(/baltop)"
         send "&8&m                              "
 
 command /pay <player> <text>:
@@ -75,22 +83,22 @@ command /pay <player> <text>:
     trigger:
         set {_amt} to parseAmount(arg-2)
         if {_amt} is not set:
-            send "%{cfg::prefix} ? ""» ""%&cInvalid amount. Examples: &f500&c, &f2.5k&c, &f1m"
+            send "%pre()%&cInvalid amount. Examples: &f500&c, &f2.5k&c, &f1m"
             stop
         if {_amt} <= 0:
-            send "%{cfg::prefix} ? ""» ""%&cAmount must be at least 1."
+            send "%pre()%&cAmount must be at least 1."
             stop
         if arg-1 is player:
-            send "%{cfg::prefix} ? ""» ""%&cYou can't pay yourself."
+            send "%pre()%&cYou can't pay yourself."
             stop
         if getBalance(player) < {_amt}:
-            send "%{cfg::prefix} ? ""» ""%&cYou only have &f%money(getBalance(player))%&c."
+            send "%pre()%&cYou only have &f%money(getBalance(player))%&c."
             stop
         addBalance(player, 0 - {_amt})
         addBalance(arg-1, {_amt})
-        send "%{cfg::prefix} ? ""» ""%&a&l$ &7You sent &a%money({_amt})% &7to &f%arg-1%&7."
+        send "%pre()%&a&l$ &7You sent &a%money({_amt})% &7to &f%arg-1%&7."
         play sound "entity.experience_orb.pickup" to player
-        send "%{cfg::prefix} ? ""» ""%&a&l$ &7You received &a%money({_amt})% &7from &f%player%&7." to arg-1
+        send "%pre()%&a&l$ &7You received &a%money({_amt})% &7from &f%player%&7." to arg-1
         send title "&a+%money({_amt})%" with subtitle "&7from &f%player%" to arg-1 for 2 seconds
         play sound "entity.player.levelup" to arg-1
 
@@ -100,7 +108,7 @@ command /eco <text> <offline player> <text>:
     trigger:
         set {_amt} to parseAmount(arg-3)
         if {_amt} is not set:
-            send "%{cfg::prefix} ? ""» ""%&cInvalid amount."
+            send "%pre()%&cInvalid amount."
             stop
         if arg-1 is "give":
             addBalance(arg-2, {_amt})
@@ -109,9 +117,9 @@ command /eco <text> <offline player> <text>:
         else if arg-1 is "set":
             setBalance(arg-2, {_amt})
         else:
-            send "%{cfg::prefix} ? ""» ""%&cUsage: /eco <give|take|set> <player> <amount>"
+            send "%pre()%&cUsage: /eco <give|take|set> <player> <amount>"
             stop
         loop all players:
             if loop-player is arg-2:
-                send "%{cfg::prefix} ? ""» ""%&7An admin updated your balance: &a%money(getBalance(arg-2))%" to loop-player
-        send "%{cfg::prefix} ? ""» ""%&a%arg-2%'s balance is now %money(getBalance(arg-2))%."
+                send "%pre()%&7An admin updated your balance: &a%money(getBalance(arg-2))%" to loop-player
+        send "%pre()%&a%arg-2%'s balance is now %money(getBalance(arg-2))%."
