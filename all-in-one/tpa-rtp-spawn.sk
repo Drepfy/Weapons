@@ -1,8 +1,33 @@
 # ============================================================
-#  TELEPORTS - /tpa /tpahere /tpaccept /tpdeny /tpacancel /tptoggle
-#              /rtp  /spawn  /setspawn
-#  Settings are in settings.sk.
+#  TPA / RTP / SPAWN - standalone script (Skript 2.7+)
+#  Use this ONLY if you don't use VanillaSMP.sk (it already has these commands).
 # ============================================================
+
+options:
+    prefix: &b&lᴠᴀɴɪʟʟᴀ sᴍᴘ &8» &7
+
+on load:
+    # Seconds to stand still before teleporting. Staff with smp.tp.bypass skip it.
+    set {cfg::tp-warmup} to 5
+    set {cfg::tpa-expire} to 60
+    set {cfg::tpa-cooldown} to 10
+    set {cfg::rtp-cooldown} to 300
+    set {cfg::spawn-cooldown} to 5
+    set {cfg::rtp-min} to 500
+    set {cfg::rtp-max} to 5000
+    set {cfg::rtp-world} to "world"
+
+function tpPre() :: text:
+    return "{@prefix}"
+
+function tpDuration(s: number) :: text:
+    set {_t} to max(0, floor({_s}))
+    set {_h} to floor({_t} / 3600)
+    set {_m} to floor(mod({_t}, 3600) / 60)
+    set {_sec} to mod({_t}, 60)
+    if {_h} > 0:
+        return "%{_h}%h %{_m}%m %{_sec}%s"
+    return "%{_m}%m %{_sec}%s"
 
 # ---------- helpers ----------
 
@@ -43,7 +68,7 @@ function warmupTeleport(p: player, dest: location, what: text):
             stop
         if distance between location of {_p} and {_start} > 0.6:
             send action bar "&cTeleport cancelled - you moved." to {_p}
-            send "%pre()%&cTeleport cancelled because you moved." to {_p}
+            send "%tpPre()%&cTeleport cancelled because you moved." to {_p}
             play sound "entity.villager.no" to {_p}
             stop
     teleport {_p} to {_dest}
@@ -54,17 +79,17 @@ function warmupTeleport(p: player, dest: location, what: text):
 
 function sendTpa(from: player, to: player, here: boolean):
     if {_from} can't see {_to}:
-        send "%pre()%&cNo player was found." to {_from}
+        send "%tpPre()%&cNo player was found." to {_from}
         stop
     if {_from} is {_to}:
-        send "%pre()%&cYou can't teleport to yourself." to {_from}
+        send "%tpPre()%&cYou can't teleport to yourself." to {_from}
         stop
     if {tp::toggle::%uuid of {_to}%} is true:
-        send "%pre()%&f%{_to}% &cisn't accepting teleport requests." to {_from}
+        send "%tpPre()%&f%{_to}% &cisn't accepting teleport requests." to {_from}
         stop
     set {_cd} to cooldownLeft({_from}, "tpa")
     if {_cd} > 0:
-        send "%pre()%&cWait &f%{_cd}%s &cbefore sending another request." to {_from}
+        send "%tpPre()%&cWait &f%{_cd}%s &cbefore sending another request." to {_from}
         stop
     set {_t} to uuid of {_to}
     set {-tp::req::%{_t}%::from} to uuid of {_from}
@@ -74,12 +99,12 @@ function sendTpa(from: player, to: player, here: boolean):
         set {_exp} to 60
     set {-tp::req::%{_t}%::expires} to nowSec() + {_exp}
     setCooldown({_from}, "tpa", {cfg::tpa-cooldown} ? 10)
-    send "%pre()%&7You have sent a tpa to &b%{_to}%&7." to {_from}
+    send "%tpPre()%&7You have sent a tpa to &b%{_to}%&7." to {_from}
     if {_here} is true:
-        send "%pre()%&f%{_from}% &7wants &eyou &7to teleport &eto them&7." to {_to}
+        send "%tpPre()%&f%{_from}% &7wants &eyou &7to teleport &eto them&7." to {_to}
     else:
-        send "%pre()%&f%{_from}% &7wants to teleport &eto you&7." to {_to}
-    send "%pre()%&a/tpaccept &7to accept, &c/tpdeny &7to deny." to {_to}
+        send "%tpPre()%&f%{_from}% &7wants to teleport &eto you&7." to {_to}
+    send "%tpPre()%&a/tpaccept &7to accept, &c/tpdeny &7to deny." to {_to}
     play sound "entity.experience_orb.pickup" to {_to}
 
 command /tpa <player>:
@@ -97,23 +122,23 @@ command /tpaccept:
         set {_t} to uuid of player
         set {_fromU} to {-tp::req::%{_t}%::from}
         if {_fromU} is not set:
-            send "%pre()%&cYou have no teleport requests."
+            send "%tpPre()%&cYou have no teleport requests."
             stop
         if nowSec() > {-tp::req::%{_t}%::expires}:
             delete {-tp::req::%{_t}%::*}
-            send "%pre()%&cThat request expired."
+            send "%tpPre()%&cThat request expired."
             stop
         loop all players:
             if uuid of loop-player is {_fromU}:
                 set {_from} to loop-player
         if {_from} is not set:
             delete {-tp::req::%{_t}%::*}
-            send "%pre()%&cThat player is no longer online."
+            send "%tpPre()%&cThat player is no longer online."
             stop
         set {_here} to {-tp::req::%{_t}%::here}
         delete {-tp::req::%{_t}%::*}
-        send "%pre()%&7You accepted &b%{_from}%&7's tpa request."
-        send "%pre()%&b%player% &7has accepted your tpa request." to {_from}
+        send "%tpPre()%&7You accepted &b%{_from}%&7's tpa request."
+        send "%tpPre()%&b%player% &7has accepted your tpa request." to {_from}
         if {_here} is true:
             warmupTeleport(player, location of {_from}, "%{_from}%")
         else:
@@ -125,13 +150,13 @@ command /tpdeny:
         set {_t} to uuid of player
         set {_fromU} to {-tp::req::%{_t}%::from}
         if {_fromU} is not set:
-            send "%pre()%&cYou have no teleport requests."
+            send "%tpPre()%&cYou have no teleport requests."
             stop
         delete {-tp::req::%{_t}%::*}
-        send "%pre()%&7Request denied."
+        send "%tpPre()%&7Request denied."
         loop all players:
             if uuid of loop-player is {_fromU}:
-                send "%pre()%&f%player% &cdenied your teleport request." to loop-player
+                send "%tpPre()%&f%player% &cdenied your teleport request." to loop-player
 
 command /tpacancel:
     trigger:
@@ -141,18 +166,18 @@ command /tpacancel:
                 delete {-tp::req::%uuid of loop-player%::*}
                 set {_done} to true
         if {_done} is true:
-            send "%pre()%&7Your teleport request was cancelled."
+            send "%tpPre()%&7Your teleport request was cancelled."
         else:
-            send "%pre()%&cYou have no outgoing requests."
+            send "%tpPre()%&cYou have no outgoing requests."
 
 command /tptoggle:
     trigger:
         if {tp::toggle::%uuid of player%} is true:
             delete {tp::toggle::%uuid of player%}
-            send "%pre()%&aYou now accept teleport requests."
+            send "%tpPre()%&aYou now accept teleport requests."
         else:
             set {tp::toggle::%uuid of player%} to true
-            send "%pre()%&cYou no longer accept teleport requests."
+            send "%tpPre()%&cYou no longer accept teleport requests."
 
 on quit:
     delete {-tp::req::%uuid of player%::*}
@@ -164,11 +189,11 @@ command /rtp:
     trigger:
         set {_cd} to cooldownLeft(player, "rtp")
         if {_cd} > 0:
-            send "%pre()%&cYou can /rtp again in &f%fmtDuration({_cd})%&c."
+            send "%tpPre()%&cYou can /rtp again in &f%tpDuration({_cd})%&c."
             stop
         set {_w} to world({cfg::rtp-world} ? "world")
         if {_w} is not set:
-            send "%pre()%&cThe RTP world isn't set up correctly. Tell an admin."
+            send "%tpPre()%&cThe RTP world isn't set up correctly. Tell an admin."
             stop
         set {_min} to {cfg::rtp-min} ? 500
         set {_max} to {cfg::rtp-max} ? 5000
@@ -187,22 +212,22 @@ command /rtp:
                     set {_dest} to location({_x} + 0.5, y-coordinate of {_b} + 1, {_z} + 0.5, {_w})
                     exit loop
         if {_dest} is not set:
-            send "%pre()%&cCouldn't find a safe spot. Try again."
+            send "%tpPre()%&cCouldn't find a safe spot. Try again."
             stop
         setCooldown(player, "rtp", {cfg::rtp-cooldown} ? 300)
         warmupTeleport(player, {_dest}, "a random location")
-        send "%pre()%&7Heading to &f%rounded {_x}%, %rounded {_z}%&7."
+        send "%tpPre()%&7Heading to &f%rounded {_x}%, %rounded {_z}%&7."
 
 # ---------- /spawn ----------
 
 command /spawn:
     trigger:
         if {tp::spawn} is not set:
-            send "%pre()%&cSpawn hasn't been set yet. Admins: stand there and use /setspawn."
+            send "%tpPre()%&cSpawn hasn't been set yet. Admins: stand there and use /setspawn."
             stop
         set {_cd} to cooldownLeft(player, "spawn")
         if {_cd} > 0:
-            send "%pre()%&cWait &f%{_cd}%s &cbefore using /spawn again."
+            send "%tpPre()%&cWait &f%{_cd}%s &cbefore using /spawn again."
             stop
         setCooldown(player, "spawn", {cfg::spawn-cooldown} ? 5)
         warmupTeleport(player, {tp::spawn}, "spawn")
@@ -211,7 +236,7 @@ command /setspawn:
     permission: smp.admin.setspawn
     trigger:
         set {tp::spawn} to location of player
-        send "%pre()%&aSpawn set to your location."
+        send "%tpPre()%&aSpawn set to your location."
 
 # New players and respawns without a bed go to spawn
 on first join:

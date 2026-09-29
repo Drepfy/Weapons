@@ -15,7 +15,7 @@ on load:
     set {cfg::title} to "<##00D6FF>&lᴠ<##14D5FF>&lᴀ<##28D5FF>&lɴ<##3DD4FF>&lɪ<##51D3FF>&lʟ<##65D3FF>&lʟ<##79D2FF>&lᴀ <##A2D0FF>&ls<##B6D0FF>&lᴍ<##CACFFF>&lᴘ"
     set {cfg::currency} to "$"
     # Prefix in front of every chat message
-    set {cfg::prefix} to "<##00D6FF>&lꜱᴍᴘ &8» &7"
+    set {cfg::prefix} to "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ &8» &7"
     set {cfg::starting-balance} to 0
 
     # --- PvP ---
@@ -26,7 +26,7 @@ on load:
 
     # --- Teleports (/tpa /rtp /spawn) ---
     # Seconds to stand still before teleporting (0 = instant). Staff with smp.tp.bypass skip it.
-    set {cfg::tp-warmup} to 3
+    set {cfg::tp-warmup} to 5
     # Seconds a /tpa request stays valid
     set {cfg::tpa-expire} to 60
     # Cooldowns in seconds

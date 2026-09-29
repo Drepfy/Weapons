@@ -22,7 +22,7 @@ on load:
     set {cfg::title} to "<##00D6FF>&lᴠ<##14D5FF>&lᴀ<##28D5FF>&lɴ<##3DD4FF>&lɪ<##51D3FF>&lʟ<##65D3FF>&lʟ<##79D2FF>&lᴀ <##A2D0FF>&ls<##B6D0FF>&lᴍ<##CACFFF>&lᴘ"
     set {cfg::currency} to "$"
     # Prefix in front of every chat message
-    set {cfg::prefix} to "<##00D6FF>&lꜱᴍᴘ &8» &7"
+    set {cfg::prefix} to "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ &8» &7"
     set {cfg::starting-balance} to 0
 
     # --- PvP ---
@@ -33,7 +33,7 @@ on load:
 
     # --- Teleports (/tpa /rtp /spawn) ---
     # Seconds to stand still before teleporting (0 = instant). Staff with smp.tp.bypass skip it.
-    set {cfg::tp-warmup} to 3
+    set {cfg::tp-warmup} to 5
     # Seconds a /tpa request stays valid
     set {cfg::tpa-expire} to 60
     # Cooldowns in seconds
@@ -854,7 +854,7 @@ function warmupTeleport(p: player, dest: location, what: text):
     set {_id} to {-tp::warmup::%{_u}%}
     set {_start} to location of {_p}
     loop {_secs} times:
-        send action bar "&eTeleporting to %{_what}% in &f%{_secs} - loop-number + 1%s &7- don't move!" to {_p}
+        send action bar "&7Teleporting to &b%{_what}% &7in &f%{_secs} - loop-number + 1%s" to {_p}
         play sound "block.note_block.hat" to {_p}
         wait 1 second
         if {_p} is not online:
@@ -864,10 +864,11 @@ function warmupTeleport(p: player, dest: location, what: text):
             stop
         if distance between location of {_p} and {_start} > 0.6:
             send action bar "&cTeleport cancelled - you moved." to {_p}
+            send "%pre()%&cTeleport cancelled because you moved." to {_p}
             play sound "entity.villager.no" to {_p}
             stop
     teleport {_p} to {_dest}
-    send action bar "&aTeleported to %{_what}%!" to {_p}
+    send action bar "&aTeleported to &b%{_what}%" to {_p}
     play sound "entity.enderman.teleport" to {_p}
 
 # ---------- /tpa ----------
@@ -894,7 +895,7 @@ function sendTpa(from: player, to: player, here: boolean):
         set {_exp} to 60
     set {-tp::req::%{_t}%::expires} to nowSec() + {_exp}
     setCooldown({_from}, "tpa", {cfg::tpa-cooldown} ? 10)
-    send "%pre()%&7Request sent to &f%{_to}%&7. It expires in &f%{_exp}%s&7. &8(/tpacancel)" to {_from}
+    send "%pre()%&7You have sent a tpa to &b%{_to}%&7." to {_from}
     if {_here} is true:
         send "%pre()%&f%{_from}% &7wants &eyou &7to teleport &eto them&7." to {_to}
     else:
@@ -932,8 +933,8 @@ command /tpaccept:
             stop
         set {_here} to {-tp::req::%{_t}%::here}
         delete {-tp::req::%{_t}%::*}
-        send "%pre()%&aRequest accepted."
-        send "%pre()%&f%player% &aaccepted your request." to {_from}
+        send "%pre()%&7You accepted &b%{_from}%&7's tpa request."
+        send "%pre()%&b%player% &7has accepted your tpa request." to {_from}
         if {_here} is true:
             warmupTeleport(player, location of {_from}, "%{_from}%")
         else:
