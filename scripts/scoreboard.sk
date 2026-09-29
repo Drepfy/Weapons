@@ -30,19 +30,19 @@ function updateBoard(p: player):
     set {_footer} to {cfg::scoreboard-footer} ? "&7discord.gg/zhVxs8prtn"
 
     set title of {_p}'s fastboard to {cfg::title} ? "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ"
-    set line 13 of {_p}'s fastboard to "&r"
-    set line 12 of {_p}'s fastboard to "<##00D6FF>&lʏᴏᴜ"
-    set line 11 of {_p}'s fastboard to " &8▪ &fMoney &a%money(getBalance({_p}))%"
-    set line 10 of {_p}'s fastboard to " &8▪ &fKills &a%{_kills}% &8┃ &fDeaths &c%{_deaths}%"
-    set line 9 of {_p}'s fastboard to " &8▪ &fK/D &e%{_kd}%"
-    set line 8 of {_p}'s fastboard to " &8▪ &fPlaytime &e%fmtPlaytime({economy::playtime::%{_u}%} ? 0)%"
+    set line 1 of {_p}'s fastboard to "&r"
+    set line 2 of {_p}'s fastboard to "&b&lʏᴏᴜ"
+    set line 3 of {_p}'s fastboard to " &8▪ &fMoney &a%money(getBalance({_p}))%"
+    set line 4 of {_p}'s fastboard to " &8▪ &fKills &a%{_kills}% &8┃ &fDeaths &c%{_deaths}%"
+    set line 5 of {_p}'s fastboard to " &8▪ &fK/D &e%{_kd}%"
+    set line 6 of {_p}'s fastboard to " &8▪ &fPlaytime &e%fmtPlaytime({economy::playtime::%{_u}%} ? 0)%"
     set line 7 of {_p}'s fastboard to " &8▪ &fMultiplier &a%multiplier({_p})%x"
-    set line 6 of {_p}'s fastboard to "&r&r"
-    set line 5 of {_p}'s fastboard to "<##A2D0FF>&lsᴇʀᴠᴇʀ"
-    set line 4 of {_p}'s fastboard to " &8▪ &fOnline &a%{_online}%"
-    set line 3 of {_p}'s fastboard to " &8▪ &fMarket reset &e%{_reset}%"
-    set line 2 of {_p}'s fastboard to "&r&r&r"
-    set line 1 of {_p}'s fastboard to {_footer}
+    set line 8 of {_p}'s fastboard to "&r&r"
+    set line 9 of {_p}'s fastboard to "&3&lsᴇʀᴠᴇʀ"
+    set line 10 of {_p}'s fastboard to " &8▪ &fOnline &a%{_online}%"
+    set line 11 of {_p}'s fastboard to " &8▪ &fMarket reset &e%{_reset}%"
+    set line 12 of {_p}'s fastboard to "&r&r&r"
+    set line 13 of {_p}'s fastboard to {_footer}
 
 on join:
     wait 1 tick
