@@ -88,6 +88,10 @@ command /pay <player> <text>:
         if {_amt} <= 0:
             send "%pre()%&cAmount must be at least 1."
             stop
+        # Vanished staff: act exactly like the player isn't online (StaffVanish hides them from this player)
+        if player can't see arg-1:
+            send "%pre()%&cNo player was found."
+            stop
         if arg-1 is player:
             send "%pre()%&cYou can't pay yourself."
             stop
