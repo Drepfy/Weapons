@@ -1,0 +1,98 @@
+name: StaffVanish
+version: '${version}'
+main: com.drepfy.staffvanish.StaffVanishPlugin
+api-version: '1.21.4'
+description: Staff vanish with flight, staff-only teleports and a Breeze Rod player selector.
+
+commands:
+  vanish:
+    description: Toggle vanish and use the vanished staff tools.
+    usage: /<command> on|off|list|tp|stick|reload <player>
+    aliases:
+      - v
+    permission: staffvanish.use
+  invsee:
+    description: Look at another player's inventory (read-only, live).
+    usage: /<command> <player>
+    permission: staffvanish.invsee
+  endersee:
+    description: Look at another player's ender chest (read-only, live).
+    usage: /<command> <player>
+    aliases:
+      - enderchestsee
+    permission: staffvanish.endersee
+
+permissions:
+  staffvanish.*:
+    description: Grants every vanish permission.
+    default: op
+    children:
+      staffvanish.use: true
+      staffvanish.see: true
+      staffvanish.others: true
+      staffvanish.list: true
+      staffvanish.teleport: true
+      staffvanish.reload: true
+      staffvanish.settings: true
+      staffvanish.invsee: true
+      staffvanish.endersee: true
+  staffvanish.use:
+    description: Allows vanishing yourself with /vanish.
+    default: op
+    children:
+      staffvanish.see: true
+      staffvanish.settings: true
+  staffvanish.see:
+    description: Allows seeing vanished players and receiving vanish notifications.
+    default: op
+  staffvanish.others:
+    description: Allows toggling vanish for other staff members.
+    default: op
+  staffvanish.list:
+    description: Allows listing vanished players with /vanish list.
+    default: op
+  staffvanish.teleport:
+    description: Allows vanished staff to teleport to players with /vanish tp and the staff selector.
+    default: op
+  staffvanish.reload:
+    description: Allows reloading the configuration with /vanish reload.
+    default: op
+  staffvanish.settings:
+    description: Open the vanish settings menu with /vanish settings.
+    default: op
+  staffvanish.invsee:
+    description: Look at other players' inventories with /invsee and the Vanish Stick.
+    default: op
+  staffvanish.endersee:
+    description: Look at other players' ender chests with /endersee.
+    default: op
+  staffvanish.level.1:
+    description: Vanish level 1. Staff only see vanished players with the same or a lower level.
+    default: false
+  staffvanish.level.2:
+    description: Vanish level 2. Staff only see vanished players with the same or a lower level.
+    default: false
+  staffvanish.level.3:
+    description: Vanish level 3. Staff only see vanished players with the same or a lower level.
+    default: false
+  staffvanish.level.4:
+    description: Vanish level 4. Staff only see vanished players with the same or a lower level.
+    default: false
+  staffvanish.level.5:
+    description: Vanish level 5. Staff only see vanished players with the same or a lower level.
+    default: false
+  staffvanish.level.6:
+    description: Vanish level 6. Staff only see vanished players with the same or a lower level.
+    default: false
+  staffvanish.level.7:
+    description: Vanish level 7. Staff only see vanished players with the same or a lower level.
+    default: false
+  staffvanish.level.8:
+    description: Vanish level 8. Staff only see vanished players with the same or a lower level.
+    default: false
+  staffvanish.level.9:
+    description: Vanish level 9. Staff only see vanished players with the same or a lower level.
+    default: false
+  staffvanish.level.10:
+    description: Vanish level 10. Staff only see vanished players with the same or a lower level.
+    default: false
