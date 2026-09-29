@@ -73,6 +73,11 @@ public final class ConfigLoader {
         DEFAULT_MESSAGES = java.util.Collections.unmodifiableMap(messages);
     }
 
+    /** Blocks that give bases away to ESP and base finders. */
+    static final List<String> DEFAULT_HIDDEN_STORAGE = List.of("CHEST", "TRAPPED_CHEST", "BARREL", "ENDER_CHEST",
+            "*SHULKER_BOX", "HOPPER", "DROPPER", "DISPENSER", "CRAFTER", "FURNACE", "BLAST_FURNACE", "SMOKER",
+            "BREWING_STAND", "*_BED", "ENCHANTING_TABLE");
+
     static final List<String> DEFAULT_MUTED_BLOCKED_COMMANDS = List.of("msg", "tell", "w", "whisper", "r", "reply",
             "me", "say", "mail", "m", "t", "pm", "dm", "message", "emsg", "etell", "ewhisper", "er", "ereply");
 
@@ -215,6 +220,13 @@ public final class ConfigLoader {
                 r.bool("anticheat.auto-ban.broadcast", true),
                 stripSlash(r.string("anticheat.auto-ban.command", "").trim()));
 
+        Settings.AntiXray antiXray = new Settings.AntiXray(r.bool("anticheat.setup-paper-anti-xray", true));
+        Settings.AntiEsp antiEsp = new Settings.AntiEsp(
+                r.bool("anticheat.hide-storage-from-esp", true),
+                r.number("advanced.anti-esp.reveal-distance", 8.0, 5.0, 64.0),
+                r.number("advanced.anti-esp.look-distance", 48.0, 8.0, 128.0),
+                upper(r.stringList("advanced.anti-esp.blocks", DEFAULT_HIDDEN_STORAGE)));
+
         Settings.Moderation moderation = loadModeration(r);
 
         Map<CheckType, String> sections = resolveCheckSections(r);
@@ -223,7 +235,8 @@ public final class ConfigLoader {
             checks.put(type, loadCheck(r, type, sections.get(type)));
         }
 
-        return new Settings(general, lag, alerts, violations, autoBan, moderation, checks, messages, r.warnings);
+        return new Settings(general, lag, alerts, violations, autoBan, antiXray, antiEsp, moderation, checks, messages,
+                r.warnings);
     }
 
     /** Maps every check to its configuration path, accepting (with a warning) the 1.x check names. */

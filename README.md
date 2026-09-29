@@ -2,10 +2,15 @@
 
 Anti-cheat and moderation for a Spigot/Paper SMP (built for **ᴠᴀɴɪʟʟᴀ sᴍᴘ**).
 
-- **17 server-side checks**: speed, flight (incl. spider and walking on water),
+- **19 server-side checks**: speed, flight (incl. spider and walking on water),
   step, NoFall, timer, NoSlow, anti-knockback, reach, kill aura, no-swing,
-  hitting through walls, auto clicker, block reach, scaffold, fast place, nuker
-  and chest aura.
+  hitting through walls, auto clicker, mace exploits, block reach, scaffold, fast
+  place, nuker, chest aura and x-ray mining patterns.
+- **Anti x-ray**: switches on Paper's built-in anti-xray for you (fake ores hide
+  the real ones from x-ray packs, x-ray mods and ore ESP).
+- **Anti ESP / anti freecam for bases**: chests, barrels, shulker boxes, beds and
+  other storage a player can't see are shown to that player as stone until they
+  get close or can see them.
 - **Automatic bans**: when a check's violation level reaches its `ban-at`, the
   player is banned for 30 days ("Cheating (Flying)"), kicked with a ban screen,
   and everyone is told. Staff see every detection live:
@@ -62,7 +67,7 @@ plugin also has `/ban`, use `/vigil:ban`.
 | `vigil.admin` | op | `/ac reload`, `/ac reset`, `/ac debug` |
 | `vigil.ban`, `vigil.mute`, `vigil.warn`, `vigil.kick` | op | The moderation commands |
 | `vigil.protect` | false | Cannot be punished by staff commands and is never auto-banned (still flagged) |
-| `vigil.bypass` | false | Not checked at all, **only** if `anticheat.bypass-permission: true` (off so `*` permissions can't switch the anti-cheat off) |
+| `vigil.bypass` | false | Not checked at all (and sees hidden storage), **only** if `anticheat.bypass-permission: true` (off so `*` permissions can't switch the anti-cheat off) |
 
 ## Checks
 
@@ -85,6 +90,8 @@ plugin also has `/ban`, use `/vigil:ban`.
 | `fastplace` | Placing more than 20 blocks a second | 12 |
 | `nuker` | Breaking more than 30 blocks a second | 8 |
 | `chestaura` | Opening containers through walls | 8 |
+| `mace` | Mace "one-shot" exploits (MaceKill): faking a huge fall with an impossible jump, or smashing while standing on the ground. The hit is cancelled | 3 |
+| `xray` | X-ray, ore ESP and seed-based ore finders: 5 hidden diamond/debris veins in a row found after mining only a few blocks each | alert only |
 
 **How a ban happens.** A check first collects evidence: several suspicious
 events, a ghost-block resync for flight/NoFall, a second look one tick later for
@@ -95,7 +102,41 @@ minute, while the rare false flag decays away. Players with `vigil.protect` are
 reported to staff instead. Nothing is banned in `advanced.passive-mode`.
 
 Speed, flight and step also pull the player back (setback). Reach, block reach,
-scaffold, nuker and chest aura cancel the action once the pattern is clear.
+scaffold, nuker, chest aura and mace cancel the action once the pattern is clear.
+
+## X-ray, ESP and freecam
+
+These cheats read information the server sends, so the best defence is not
+sending it. Vigil does three things:
+
+1. **Paper anti-xray (prevention).** On first start Vigil switches on Paper's own
+   anti-xray (`engine-mode: 2`, Paper's recommended block lists, nether lists for
+   nether worlds, off in the end). The server then fills solid stone with fake
+   ores, so x-ray and ore ESP show ores everywhere and real ones only when they
+   touch air. Backups (`*.vigil-backup`) are made and **a restart is needed**. It
+   only happens once. If you turn it off again, Vigil leaves it off. Set
+   `anticheat.setup-paper-anti-xray: false` to manage it yourself.
+2. **Hidden storage (prevention, Paper).** Containers, beds and enchanting tables
+   the player cannot see from where they really stand are shown as stone to that
+   player only. They are shown for real within 8 blocks or once there is a clear
+   line of sight (up to 48 blocks). This beats storage ESP, "stash finders" and
+   freecam scouting of bases. The world is never changed.
+3. **X-ray mining pattern (detection).** Catches players who dig straight to
+   hidden diamonds or ancient debris (x-ray, ore ESP, "ore sim"). Staff get an
+   alert. It is statistical, so it never bans on its own.
+
+What no server plugin can do:
+- **Freecam itself** is invisible to the server: the real player just stands
+  still. Vigil stops what freecam is used for (hidden storage, anti-xray) and
+  catches interactions from the camera position (block reach, chest aura).
+- **Player ESP / tracers** can't be hidden without also removing players from the
+  tab list, so Vigil doesn't do it.
+- **Ore sim** (predicting ores from the world seed) is beaten by Paper's
+  `feature-seeds: generate-random-seeds-for-all: true`, but only in chunks
+  generated afterwards. Use it for a new world; Vigil doesn't change it for you.
+  The x-ray pattern check still catches ore-sim users mining.
+- The first moment a chunk arrives, the real chest is in it; a mod that logs every
+  chest instantly can still record it. Paper anti-xray has no such gap for ores.
 
 ## Configuration
 
@@ -110,6 +151,8 @@ anticheat:
   exempt-creative-and-spectator: true
   disabled-worlds: []
   bypass-permission: false
+  setup-paper-anti-xray: true   # switch on Paper's anti-xray once (restart needed)
+  hide-storage-from-esp: true   # anti ESP / freecam for bases (Paper)
   checks:
     speed: {enabled: true, ban-at: 15}
     # ... one line per check; ban-at: 0 = alerts only
@@ -140,6 +183,11 @@ advanced:
   log-retention-days: 30       # 0 = keep forever
   use-client-tick-events: true # Paper: exact client timing
   platform-entities: [BOAT, RAFT, MINECART, SHULKER, HAPPY_GHAST]
+  anti-esp:
+    reveal-distance: 8         # hidden storage is always shown this close
+    look-distance: 48          # ...and within this distance once in line of sight
+    blocks: [CHEST, TRAPPED_CHEST, BARREL, ENDER_CHEST, "*SHULKER_BOX", HOPPER, DROPPER,
+             DISPENSER, CRAFTER, FURNACE, BLAST_FURNACE, SMOKER, BREWING_STAND, "*_BED", ENCHANTING_TABLE]
   lag-protection:
     min-tps: 17.0              # no flags below this TPS
     max-ping-ms: 400           # no flags for players above this ping
@@ -211,13 +259,16 @@ Maven tab → **Lifecycle → package**. GitHub Actions builds every push.
 
 ## Testing
 
-`mvn test` runs 79 tests. 19 of them are end-to-end scenarios on a simulated
+`mvn test` runs 89 tests. 25 of them are end-to-end scenarios on a simulated
 server (MockBukkit). They check that legit sprint-jumping, wall jumps, stairs,
-bridging, knockback, falls with damage, normal fights and fights against a
-strafing target are **never** flagged. They also check that flying, speed,
-walking on water, reach, kill aura, no-swing, auto clicking, anti-knockback (also
-mid-combo), NoFall and scaffold **are** flagged, and that a flyer is auto-banned,
-kicked and refused at login. Physics simulations with random network jitter,
+bridging, knockback, falls with damage, normal fights, fights against a strafing
+target, real mace smashes and normal branch mining are **never** flagged, and that
+chests in plain view are never hidden. They also check that flying, speed, walking
+on water, reach, kill aura, no-swing, auto clicking, anti-knockback (also
+mid-combo), NoFall, scaffold, fake mace falls and x-ray mining **are** flagged; that
+chests behind walls are hidden and reappear up close; and that a flyer is
+auto-banned, kicked and refused at login. The Paper anti-xray setup is tested on
+sample Paper config files (backups, other settings untouched, runs only once). Physics simulations with random network jitter,
 lag spikes and frozen clients guard the speed, timer and flight limits.
 
 On a test server, before going live:
@@ -229,12 +280,18 @@ On a test server, before going live:
 - [ ] `/unban <alt>`, `/ban <alt> Cheating` (30 days), `/mute`, `/warn`, `/kick`
       show the right messages. The banned alt sees the ban screen when rejoining.
 - [ ] Give a staff member `vigil.protect`: they are flagged but not banned.
+- [ ] After the first start, restart once. The console should say
+      "Paper anti-xray is on (engine-mode 2)". With an x-ray pack, stone is full of fake ores.
+- [ ] With a storage-ESP mod, chests inside a closed base show as stone from outside,
+      and appear normally when you walk in.
 
 ## Limitations
 
 - No prediction engine, so subtle cheats that stay within vanilla limits
   (small speed boosts, 3.1-block reach, aim assist, kill aura with legit-looking
-  rotations) are not caught. Blatant ones are. Use Paper's anti-xray for x-ray.
+  rotations) are not caught. Blatant ones are.
+- Freecam, player ESP and tracers can't be detected directly; see
+  "X-ray, ESP and freecam".
 - Auto clicker detection is alert-only by default because drag-clicking can
   legitimately exceed 25 CPS.
 - Plugins that move players through raw packets must call `notifyImpulse`, or

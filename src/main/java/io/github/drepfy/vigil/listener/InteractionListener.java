@@ -7,6 +7,7 @@ import io.github.drepfy.vigil.check.interaction.ChestAuraCheck;
 import io.github.drepfy.vigil.check.interaction.FastPlaceCheck;
 import io.github.drepfy.vigil.check.interaction.InteractCheck;
 import io.github.drepfy.vigil.check.interaction.NukerCheck;
+import io.github.drepfy.vigil.check.interaction.XrayCheck;
 import io.github.drepfy.vigil.data.PlayerData;
 import io.github.drepfy.vigil.util.Clock;
 import org.bukkit.entity.Player;
@@ -35,15 +36,17 @@ public final class InteractionListener implements Listener {
     private final InteractCheck interact;
     private final FastPlaceCheck fastPlace;
     private final NukerCheck nuker;
+    private final XrayCheck xray;
 
     public InteractionListener(CheckContext ctx, BlockReachCheck blockReach, ChestAuraCheck chestAura,
-                               InteractCheck interact, FastPlaceCheck fastPlace, NukerCheck nuker) {
+                               InteractCheck interact, FastPlaceCheck fastPlace, NukerCheck nuker, XrayCheck xray) {
         this.ctx = ctx;
         this.blockReach = blockReach;
         this.chestAura = chestAura;
         this.interact = interact;
         this.fastPlace = fastPlace;
         this.nuker = nuker;
+        this.xray = xray;
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -81,6 +84,17 @@ public final class InteractionListener implements Listener {
         if (!event.isCancelled()) {
             ctx.run(CheckType.FASTPLACE, now, () -> fastPlace.onPlace(player, data, event, now));
         }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onBreak(BlockBreakEvent event) {
+        if (!ctx.settings().general().enabled()) {
+            return;
+        }
+        Player player = event.getPlayer();
+        long now = Clock.now();
+        PlayerData data = ctx.players().get(player);
+        ctx.run(CheckType.XRAY, now, () -> xray.onBreak(player, data, event.getBlock(), now));
     }
 
     // ---- swing causes (all actions, cancelled or not) --------------------------------------

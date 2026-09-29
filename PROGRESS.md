@@ -86,6 +86,28 @@ permission silently bypassed everything.
   The stress simulations caught that a stricter speed leniency (1.2) would flag
   legit sprint-jumping, so it stays at 1.25.
 
+## 2.1.0: x-ray, ESP, freecam and mace
+
+- Paper anti-xray setup: on first start, if Paper's anti-xray is off, Vigil switches
+  it on (engine-mode 2 with Paper's recommended lists, nether lists per nether
+  world, off in the end). Only the relevant lines are edited, backups are made, it
+  runs once, and an admin switching it off again is respected. Restart required.
+- Hidden storage (anti ESP / anti freecam, Paper): when a chunk is sent, storage
+  blocks the player can't see are sent as stone to that player; they are revealed
+  within 8 blocks or on line of sight (48 blocks). Revealed blocks are read from the
+  world, and traces are budgeted per chunk and per check.
+- `mace` check: a smash after a single-move rise of 2+ blocks (fake fall) or while
+  standing exactly on a block is cancelled and flagged. Research: the AntiMaceKill
+  approach (impossible fall in a single tick + apex tracking).
+- `xray` check (alert only): 5 hidden diamond/debris veins in a row found with a
+  small average number of blocks mined per vein (hidden = every open side was dug
+  by the player). Estimated for legit branch mining, from ore density: about 50-100
+  blocks per vein.
+- Research notes: Paper's `feature-seeds` only affects new chunks and can cut off
+  features at old/new chunk borders, so it is documented, not switched on. Player
+  ESP can't be hidden without tab-list side effects. Freecam can't be seen directly.
+- Tests: 89 (6 new scenarios, 4 setup tests).
+
 ## Remaining / next steps
 
 - Validate on a live server with a hacked client on an alt (see the README

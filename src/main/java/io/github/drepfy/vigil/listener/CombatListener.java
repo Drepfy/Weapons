@@ -5,6 +5,7 @@ import io.github.drepfy.vigil.check.CheckContext;
 import io.github.drepfy.vigil.check.combat.AttackSnapshot;
 import io.github.drepfy.vigil.check.combat.AutoClickerCheck;
 import io.github.drepfy.vigil.check.combat.KillAuraCheck;
+import io.github.drepfy.vigil.check.combat.MaceCheck;
 import io.github.drepfy.vigil.check.combat.NoSwingCheck;
 import io.github.drepfy.vigil.check.combat.ReachCheck;
 import io.github.drepfy.vigil.check.combat.WallHitCheck;
@@ -42,10 +43,11 @@ public final class CombatListener implements Listener {
     private final WallHitCheck wallHit;
     private final NoSwingCheck noSwing;
     private final AutoClickerCheck autoClicker;
+    private final MaceCheck mace;
     private volatile boolean packetAttacks;
 
     public CombatListener(CheckContext ctx, LifecycleListener lifecycle, ReachCheck reach, KillAuraCheck killAura,
-                          WallHitCheck wallHit, NoSwingCheck noSwing, AutoClickerCheck autoClicker) {
+                          WallHitCheck wallHit, NoSwingCheck noSwing, AutoClickerCheck autoClicker, MaceCheck mace) {
         this.ctx = ctx;
         this.lifecycle = lifecycle;
         this.reach = reach;
@@ -53,6 +55,7 @@ public final class CombatListener implements Listener {
         this.wallHit = wallHit;
         this.noSwing = noSwing;
         this.autoClicker = autoClicker;
+        this.mace = mace;
     }
 
     /** Switches attack detection to the packet-driven pre-attack event. */
@@ -68,9 +71,16 @@ public final class CombatListener implements Listener {
         }
         long now = Clock.now();
         PlayerData data = ctx.players().get(attacker);
-        // A mace smash (and Wind Burst) launches the attacker upwards and resets its fall.
         if (attacker.getInventory().getItemInMainHand().getType().name().equals("MACE")) {
+            if (ctx.settings().general().enabled()) {
+                ctx.run(CheckType.MACE, now, () -> mace.onMaceHit(attacker, data, event, now));
+            }
+            // A mace smash (and Wind Burst) launches the attacker upwards and resets its fall.
             lifecycle.impulse(attacker, data, 1.0, now);
+            data.lastMaceHitMs = data.lastImpulseMs;
+            if (event.isCancelled()) {
+                return;
+            }
         }
         if (!packetAttacks) {
             onAttack(attacker, event.getEntity(), event, false);

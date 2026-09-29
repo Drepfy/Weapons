@@ -21,11 +21,13 @@ public enum CheckType {
     NOSWING("noswing", "NoSwing", "Kill Aura (No Swing)", CheckCategory.COMBAT),
     WALLHIT("wallhit", "WallHit", "Hitting Through Walls", CheckCategory.COMBAT),
     AUTOCLICKER("autoclicker", "AutoClicker", "Auto Clicker", CheckCategory.COMBAT),
+    MACE("mace", "Mace", "Mace Exploit", CheckCategory.COMBAT),
     BLOCKREACH("blockreach", "BlockReach", "Block Reach", CheckCategory.INTERACTION),
     INTERACT("interact", "Interact", "Scaffold / Impossible Interaction", CheckCategory.INTERACTION),
     FASTPLACE("fastplace", "FastPlace", "Fast Place", CheckCategory.INTERACTION),
     NUKER("nuker", "Nuker", "Nuker", CheckCategory.INTERACTION),
-    CHESTAURA("chestaura", "ChestAura", "Chest Aura", CheckCategory.INTERACTION);
+    CHESTAURA("chestaura", "ChestAura", "Chest Aura", CheckCategory.INTERACTION),
+    XRAY("xray", "XRay", "X-Ray / Ore Finder", CheckCategory.INTERACTION);
 
     /** Identifiers used by version 1.0/1.1, still accepted everywhere. */
     private static final Map<String, CheckType> LEGACY_IDS = Map.of(

@@ -78,6 +78,8 @@ public record CheckSpec(CheckType type, Defaults defaults, List<NumberOption> nu
                 num("max-traces-per-second", 10, 1, 100));
         register(CheckType.AUTOCLICKER, new Defaults(true, 1, 0, 1.0, 1.0, 3, false),
                 num("max-cps", 25, 8, 100));
+        register(CheckType.MACE, new Defaults(true, 1, 3, 1.0, 1.0, 1, true),
+                num("min-rise", 2.0, 1.0, 50.0));
         register(CheckType.BLOCKREACH, new Defaults(true, 1, 8, 1.0, 1.0, 2, true),
                 num("leniency", 0.4, 0.05, 5.0),
                 num("cancel-leniency", 0.8, 0.1, 10.0));
@@ -87,6 +89,8 @@ public record CheckSpec(CheckType type, Defaults defaults, List<NumberOption> nu
                 num("max-per-second", 20, 5, 100));
         register(CheckType.NUKER, new Defaults(true, 1, 8, 1.0, 1.0, 2, true),
                 num("max-per-second", 30, 10, 200));
+        register(CheckType.XRAY, new Defaults(true, 1, 0, 0.1, 1.0, 4, false),
+                num("max-blocks-per-vein", 30, 5, 500));
         SPECS.put(CheckType.CHESTAURA, new CheckSpec(CheckType.CHESTAURA, new Defaults(true, 1, 8, 1.0, 1.0, 3, false),
                 List.of(),
                 List.of(new ListOption("blocks", List.of("CHEST", "TRAPPED_CHEST", "BARREL", "ENDER_CHEST",

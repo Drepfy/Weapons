@@ -5,6 +5,7 @@ import io.github.drepfy.vigil.api.VigilApi;
 import io.github.drepfy.vigil.check.CheckContext;
 import io.github.drepfy.vigil.check.combat.AutoClickerCheck;
 import io.github.drepfy.vigil.check.combat.KillAuraCheck;
+import io.github.drepfy.vigil.check.combat.MaceCheck;
 import io.github.drepfy.vigil.check.combat.NoSwingCheck;
 import io.github.drepfy.vigil.check.combat.ReachCheck;
 import io.github.drepfy.vigil.check.combat.WallHitCheck;
@@ -13,6 +14,7 @@ import io.github.drepfy.vigil.check.interaction.ChestAuraCheck;
 import io.github.drepfy.vigil.check.interaction.FastPlaceCheck;
 import io.github.drepfy.vigil.check.interaction.InteractCheck;
 import io.github.drepfy.vigil.check.interaction.NukerCheck;
+import io.github.drepfy.vigil.check.interaction.XrayCheck;
 import io.github.drepfy.vigil.check.movement.FlightCheck;
 import io.github.drepfy.vigil.check.movement.NoFallCheck;
 import io.github.drepfy.vigil.check.movement.NoSlowCheck;
@@ -21,6 +23,7 @@ import io.github.drepfy.vigil.check.movement.StepCheck;
 import io.github.drepfy.vigil.check.movement.TimerCheck;
 import io.github.drepfy.vigil.check.movement.VelocityCheck;
 import io.github.drepfy.vigil.command.VigilCommand;
+import io.github.drepfy.vigil.compat.PaperAntiXraySetup;
 import io.github.drepfy.vigil.compat.ServerCompat;
 import io.github.drepfy.vigil.config.ConfigLoader;
 import io.github.drepfy.vigil.config.Settings;
@@ -29,6 +32,7 @@ import io.github.drepfy.vigil.data.PlayerData;
 import io.github.drepfy.vigil.data.PlayerDataManager;
 import io.github.drepfy.vigil.env.BlockTraits;
 import io.github.drepfy.vigil.env.DisturbanceRegistry;
+import io.github.drepfy.vigil.env.StorageHider;
 import io.github.drepfy.vigil.env.WorldProbe;
 import io.github.drepfy.vigil.listener.CombatListener;
 import io.github.drepfy.vigil.listener.InteractionListener;
@@ -96,6 +100,7 @@ public class VigilPlugin extends JavaPlugin {
     private KillAuraCheck killAura;
     private NoSwingCheck noSwing;
     private ModerationService moderation;
+    private StorageHider storageHider;
     private BukkitTask tickTask;
     private boolean started;
 
@@ -154,11 +159,11 @@ public class VigilPlugin extends JavaPlugin {
         pm.registerEvents(lifecycle, this);
         pm.registerEvents(new MovementListener(checks, getLogger(), speed, step, noFall, timer), this);
         CombatListener combat = new CombatListener(checks, lifecycle, new ReachCheck(checks), killAura,
-                new WallHitCheck(checks), noSwing, new AutoClickerCheck(checks));
+                new WallHitCheck(checks), noSwing, new AutoClickerCheck(checks), new MaceCheck(checks));
         pm.registerEvents(combat, this);
         InteractionListener interaction = new InteractionListener(checks, new BlockReachCheck(checks),
                 new ChestAuraCheck(checks), new InteractCheck(checks), new FastPlaceCheck(checks),
-                new NukerCheck(checks));
+                new NukerCheck(checks), new XrayCheck(checks));
         pm.registerEvents(interaction, this);
         pm.registerEvents(new WorldActivityListener(disturbances), this);
         new OptionalHooks(this, checks, lifecycle, combat, interaction, timer).registerAll();
@@ -185,6 +190,15 @@ public class VigilPlugin extends JavaPlugin {
 
         getServer().getServicesManager().register(VigilApi.class, new VigilApiImpl(this), this, ServicePriority.Normal);
 
+        setUpAntiXray();
+        if (ServerCompat.classExists("io.papermc.paper.event.packet.PlayerChunkLoadEvent")) {
+            storageHider = new StorageHider(this, this::settings, probe);
+            pm.registerEvents(storageHider, this);
+            storageHider.start();
+        } else if (settings.antiEsp().enabled()) {
+            getLogger().info("Hiding storage from ESP needs Paper; it is off on this server.");
+        }
+
         // Players already online (e.g. after /reload).
         for (Player player : Bukkit.getOnlinePlayers()) {
             handleJoin(player);
@@ -204,6 +218,13 @@ public class VigilPlugin extends JavaPlugin {
     public void onDisable() {
         if (tickTask != null) {
             tickTask.cancel();
+        }
+        if (storageHider != null) {
+            try {
+                storageHider.stop();
+            } catch (Throwable t) {
+                getLogger().log(Level.WARNING, "Could not show hidden storage blocks again", t);
+            }
         }
         if (!started) {
             if (io != null) {
@@ -262,6 +283,26 @@ public class VigilPlugin extends JavaPlugin {
             return ConfigLoader.load(YamlConfiguration.loadConfiguration(reader), warnings);
         } catch (IOException | RuntimeException e) {
             return ConfigLoader.defaults(warnings);
+        }
+    }
+
+    /** Checks Paper's own anti-xray and switches it on once if allowed (takes effect after a restart). */
+    private void setUpAntiXray() {
+        try {
+            Path serverRoot = getDataFolder().getAbsoluteFile().toPath().getParent().getParent();
+            List<PaperAntiXraySetup.WorldInfo> worlds = new ArrayList<>();
+            for (org.bukkit.World world : Bukkit.getWorlds()) {
+                try {
+                    worlds.add(new PaperAntiXraySetup.WorldInfo(world.getName(), world.getWorldFolder().toPath(),
+                            world.getEnvironment()));
+                } catch (RuntimeException e) {
+                    getLogger().fine("Anti-xray: skipping world " + world.getName() + ": " + e);
+                }
+            }
+            PaperAntiXraySetup.run(serverRoot, getDataFolder().toPath().resolve("data").resolve("paper-anti-xray.yml"),
+                    worlds, settings.antiXray().setupPaper(), getLogger());
+        } catch (RuntimeException e) {
+            getLogger().log(Level.WARNING, "Anti-xray setup failed", e);
         }
     }
 
@@ -479,5 +520,10 @@ public class VigilPlugin extends JavaPlugin {
 
     public ModerationService moderation() {
         return moderation;
+    }
+
+    /** Anti-ESP storage hiding, or {@code null} when not on Paper. */
+    public StorageHider storageHider() {
+        return storageHider;
     }
 }

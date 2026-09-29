@@ -18,6 +18,8 @@ public record Settings(General general,
                        Alerts alerts,
                        Violations violations,
                        AutoBan autoBan,
+                       AntiXray antiXray,
+                       AntiEsp antiEsp,
                        Moderation moderation,
                        Map<CheckType, CheckSettings> checks,
                        Messages messages,
@@ -87,6 +89,26 @@ public record Settings(General general,
      * @param command    console command to run instead of Vigil's own ban (empty = use Vigil's ban)
      */
     public record AutoBan(boolean enabled, long durationMs, String reason, boolean broadcast, String command) {
+    }
+
+    /**
+     * @param setupPaper turn on Paper's own anti-xray (engine-mode 2) once, with backups
+     */
+    public record AntiXray(boolean setupPaper) {
+    }
+
+    /**
+     * Hides storage blocks (chests, shulkers, beds...) that a player cannot see, so ESP,
+     * freecam and base finders show nothing. Paper only.
+     *
+     * @param revealDistance blocks within this distance are always shown
+     * @param lookDistance   blocks within this distance are shown once in line of sight
+     * @param blocks         block type patterns to hide
+     */
+    public record AntiEsp(boolean enabled, double revealDistance, double lookDistance, List<String> blocks) {
+        public AntiEsp {
+            blocks = List.copyOf(blocks);
+        }
     }
 
     /**

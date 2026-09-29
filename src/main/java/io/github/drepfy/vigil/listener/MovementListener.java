@@ -64,6 +64,12 @@ public final class MovementListener implements Listener {
         PlayerData data = ctx.players().get(player);
         data.moveEventsSinceSample++;
         data.lastMoveEventMs = now;
+        double rise = to.getY() - from.getY();
+        if (rise > 1.0) {
+            // Remembered for the mace check (fake falls start with an impossible jump up).
+            data.lastBigRise = rise;
+            data.lastBigRiseMs = now;
+        }
 
         Settings settings = ctx.settings();
         if (!settings.general().enabled()) {

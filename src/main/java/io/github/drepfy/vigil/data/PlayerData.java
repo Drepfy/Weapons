@@ -11,6 +11,7 @@ import io.github.drepfy.vigil.model.SpeedBudget;
 import io.github.drepfy.vigil.model.SuspicionBuffer;
 import io.github.drepfy.vigil.model.TimerBalance;
 import io.github.drepfy.vigil.model.ViolationLevel;
+import io.github.drepfy.vigil.model.XrayTracker;
 import io.github.drepfy.vigil.storage.PlayerRecord;
 import org.bukkit.Location;
 
@@ -142,6 +143,16 @@ public final class PlayerData {
     /** Server tick of the previous attack and its target (plugin area damage filter). */
     public long lastAttackServerTick = -1;
     public int lastAttackServerTarget = -1;
+
+    // ---- mace --------------------------------------------------------------------------------
+    /** Largest upward distance of a single recent move and when it happened. */
+    public double lastBigRise;
+    public long lastBigRiseMs = NEVER;
+    /** The impulse a mace hit itself caused (not a reason to excuse the next hit). */
+    public long lastMaceHitMs = NEVER;
+
+    // ---- x-ray -------------------------------------------------------------------------------
+    public final XrayTracker xray = new XrayTracker();
 
     // ---- flags, alerts, auto-ban -----------------------------------------------------------
     private final Deque<FlagRecord> recentFlags = new ArrayDeque<>();

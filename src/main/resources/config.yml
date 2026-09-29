@@ -29,9 +29,15 @@ anticheat:
   disabled-worlds: []
   # Let players with vigil.bypass skip all checks. Off so "*" permissions don't disable the anti-cheat.
   bypass-permission: false
+  # Anti x-ray: switches on Paper's own anti-xray once (fake ores hide the real ones from x-ray and ore ESP).
+  # Backups are made and a restart is needed. If you turn it off afterwards, Vigil leaves it off.
+  setup-paper-anti-xray: true
+  # Anti ESP / anti freecam: chests, barrels, shulkers, beds... that a player cannot see are shown as stone
+  # to that player until they get close or can see them (Paper).
+  hide-storage-from-esp: true
 
   # enabled: turn a check on/off.
-  # ban-at: violation level that bans automatically (0 = alert only, never ban).
+  # ban-at: violation level that bans automatically (0 = alert only, never ban; x-ray is a pattern, not proof).
   # Each flag adds 1 and 1 decays per minute, so short false flags never add up.
   checks:
     speed:       {enabled: true, ban-at: 15}
@@ -46,11 +52,13 @@ anticheat:
     noswing:     {enabled: true, ban-at: 10}
     wallhit:     {enabled: true, ban-at: 8}
     autoclicker: {enabled: true, ban-at: 0}
+    mace:        {enabled: true, ban-at: 3}
     blockreach:  {enabled: true, ban-at: 8}
     interact:    {enabled: true, ban-at: 8}
     fastplace:   {enabled: true, ban-at: 12}
     nuker:       {enabled: true, ban-at: 8}
     chestaura:   {enabled: true, ban-at: 8}
+    xray:        {enabled: true, ban-at: 0}
 
 moderation:
   enabled: true

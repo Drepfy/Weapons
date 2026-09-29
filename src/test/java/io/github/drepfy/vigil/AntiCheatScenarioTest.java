@@ -524,6 +524,154 @@ class AntiCheatScenarioTest {
         move(player, at.clone().add(0.1, 0, 0), true);
     }
 
+    // ---- mace, x-ray, anti-ESP -----------------------------------------------------------------
+
+    private org.bukkit.event.entity.EntityDamageByEntityEvent maceHit(PlayerMock attacker, Entity target) {
+        attacker.getInventory().setItemInMainHand(new org.bukkit.inventory.ItemStack(Material.MACE));
+        DamageSource source = DamageSource.builder(DamageType.PLAYER_ATTACK).withCausingEntity(attacker)
+                .withDirectEntity(attacker).build();
+        var event = new org.bukkit.event.entity.EntityDamageByEntityEvent(attacker, target,
+                EntityDamageEvent.DamageCause.ENTITY_ATTACK, source, 60.0);
+        server.getPluginManager().callEvent(event);
+        return event;
+    }
+
+    @Test
+    void maceSmashWithAFakeFallIsCancelledAndFlagged() {
+        PlayerMock cheater = join("MaceKill", 0.5, groundY, 0.5);
+        PlayerMock victim = join("MaceVictim", 0.5, groundY, 2.0);
+        PlayerData data = data(cheater);
+        // Fake fall while standing on the ground.
+        cheater.setFallDistance(22);
+        var standing = maceHit(cheater, victim);
+        assertTrue(standing.isCancelled(), "the fake smash must not deal damage");
+        tick(20);
+        // Fake fall by jumping 10 blocks up and back down within one tick.
+        Location ground = cheater.getLocation();
+        move(cheater, ground.clone().add(0, 10, 0), false);
+        cheater.simulatePlayerMove(ground.clone().add(0, 0.2, 0));
+        cheater.setFallDistance(9.8f);
+        var teleported = maceHit(cheater, victim);
+        assertTrue(teleported.isCancelled());
+        assertEquals(2, flags(data, CheckType.MACE), describe(data));
+    }
+
+    @Test
+    void realMaceSmashIsNotFlagged() {
+        PlayerMock attacker = join("MaceUser", 0.5, groundY + 12, 0.5);
+        PlayerMock victim = join("MaceTarget", 0.5, groundY, 1.0);
+        PlayerData data = data(attacker);
+        Location at = attacker.getLocation();
+        double velocity = 0.0;
+        double y = at.getY();
+        float fall = 0;
+        while (y > groundY + 2.3) {
+            velocity = (velocity - Physics.GRAVITY) * Physics.VERTICAL_DRAG;
+            y += velocity;
+            fall -= (float) velocity;
+            move(attacker, new Location(world, 0.5, y, 0.5), false);
+        }
+        attacker.setFallDistance(fall);
+        var hit = maceHit(attacker, victim);
+        assertFalse(hit.isCancelled());
+        assertEquals(0, flags(data, CheckType.MACE), describe(data));
+    }
+
+    /** A solid stone bar along X with diamond ore every {@code spacing} blocks, mined straight through. */
+    private void mineThroughOres(PlayerMock miner, int spacing, int veins) {
+        int y = groundY + 2;
+        int length = spacing * veins + 2;
+        for (int x = 0; x <= length; x++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int z = -1; z <= 1; z++) {
+                    world.getBlockAt(x, y + dy, z).setType(Material.STONE);
+                }
+            }
+        }
+        for (int vein = 1; vein <= veins; vein++) {
+            world.getBlockAt(vein * spacing, y, 0).setType(Material.DEEPSLATE_DIAMOND_ORE);
+        }
+        for (int x = 0; x < length; x++) {
+            miner.simulateBlockBreak(world.getBlockAt(x, y, 0));
+            if (x % 4 == 0) {
+                tick(1);
+            }
+        }
+    }
+
+    @Test
+    void miningStraightToHiddenDiamondsIsFlagged() {
+        PlayerMock miner = join("XRayer", -3.5, groundY, 0.5);
+        mineThroughOres(miner, 8, 6);
+        PlayerData data = data(miner);
+        assertEquals(1, flags(data, CheckType.XRAY), describe(data));
+        assertTrue(miner.isOnline(), "x-ray is alert-only by default");
+    }
+
+    @Test
+    void normalBranchMiningIsNotFlaggedForXray() {
+        PlayerMock miner = join("BranchMiner", -3.5, groundY, 0.5);
+        mineThroughOres(miner, 70, 6);
+        assertEquals(0, flags(data(miner), CheckType.XRAY), describe(data(miner)));
+    }
+
+    /** The test server cannot list block entities, so scan the few layers the tests build in. */
+    private io.github.drepfy.vigil.env.StorageHider hider() {
+        var hider = plugin.storageHider();
+        assertNotNull(hider, "Paper API is present in the test server");
+        hider.setTileSource((chunk, types) -> {
+            List<int[]> found = new ArrayList<>();
+            for (int x = 0; x < 16; x++) {
+                for (int z = 0; z < 16; z++) {
+                    for (int y = groundY - 2; y < groundY + 8; y++) {
+                        if (types.contains(chunk.getBlock(x, y, z).getType())) {
+                            found.add(new int[] {(chunk.getX() << 4) + x, y, (chunk.getZ() << 4) + z});
+                        }
+                    }
+                }
+            }
+            return found;
+        });
+        return hider;
+    }
+
+    @Test
+    void chestsBehindWallsAreHiddenUntilThePlayerGetsClose() {
+        var hider = hider();
+        // A chest inside a closed stone room far from the player.
+        int cx = 40;
+        int cy = groundY + 1;
+        for (int x = cx - 2; x <= cx + 2; x++) {
+            for (int y = cy - 1; y <= cy + 3; y++) {
+                for (int z = -2; z <= 2; z++) {
+                    world.getBlockAt(x, y, z).setType(Material.STONE);
+                }
+            }
+        }
+        world.getBlockAt(cx, cy, 0).setType(Material.AIR);
+        world.getBlockAt(cx, cy + 1, 0).setType(Material.AIR);
+        world.getBlockAt(cx, cy, 0).setType(Material.CHEST);
+        PlayerMock looker = join("Esp", 0.5, groundY, 0.5);
+        server.getPluginManager().callEvent(new io.papermc.paper.event.packet.PlayerChunkLoadEvent(
+                world.getChunkAt(cx >> 4, 0), looker));
+        assertEquals(1, hider.hiddenCount(looker.getUniqueId()), "the chest behind walls is hidden");
+
+        // Walking up to it reveals it.
+        looker.teleport(new Location(world, cx - 4.5, groundY, 0.5));
+        tick(10);
+        assertEquals(0, hider.hiddenCount(looker.getUniqueId()), "the chest is shown once the player is close");
+    }
+
+    @Test
+    void visibleChestsAreNeverHidden() {
+        var hider = hider();
+        world.getBlockAt(20, groundY, 0).setType(Material.CHEST); // in the open, 20 blocks away
+        PlayerMock looker = join("Looker", 0.5, groundY, 0.5);
+        server.getPluginManager().callEvent(new io.papermc.paper.event.packet.PlayerChunkLoadEvent(
+                world.getChunkAt(1, 0), looker));
+        assertEquals(0, hider.hiddenCount(looker.getUniqueId()));
+    }
+
     // ---- commands and configuration -----------------------------------------------------------
 
     @Test
