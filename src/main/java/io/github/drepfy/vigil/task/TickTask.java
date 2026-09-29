@@ -2,8 +2,12 @@ package io.github.drepfy.vigil.task;
 
 import io.github.drepfy.vigil.api.CheckType;
 import io.github.drepfy.vigil.check.CheckContext;
-import io.github.drepfy.vigil.check.combat.HitAngleCheck;
+import io.github.drepfy.vigil.check.combat.KillAuraCheck;
+import io.github.drepfy.vigil.check.combat.NoSwingCheck;
 import io.github.drepfy.vigil.check.movement.FlightCheck;
+import io.github.drepfy.vigil.check.movement.NoFallCheck;
+import io.github.drepfy.vigil.check.movement.NoSlowCheck;
+import io.github.drepfy.vigil.check.movement.VelocityCheck;
 import io.github.drepfy.vigil.config.Settings;
 import io.github.drepfy.vigil.data.PlayerData;
 import io.github.drepfy.vigil.env.DisturbanceRegistry;
@@ -20,8 +24,8 @@ import java.util.Set;
  * <ul>
  *   <li>measures TPS and lag spikes,</li>
  *   <li>records every player's hitbox for lag compensation,</li>
- *   <li>drives the flight check with the amount of client time that passed,</li>
- *   <li>confirms pending hit-angle suspicions,</li>
+ *   <li>drives the flight, velocity and no-slow checks with the client time that passed,</li>
+ *   <li>judges pending kill-aura, no-swing and no-fall observations,</li>
  *   <li>refreshes cached bypass permissions and does periodic housekeeping.</li>
  * </ul>
  */
@@ -35,20 +39,23 @@ public final class TickTask implements Runnable {
     private static final int MAX_TICKS_PER_SAMPLE = 20;
     private static final long BYPASS_CACHE_MS = 5000;
 
+    /** The checks driven by this task. */
+    public record Checks(FlightCheck flight, VelocityCheck velocity, NoSlowCheck noSlow, NoFallCheck noFall,
+                         KillAuraCheck killAura, NoSwingCheck noSwing) {
+    }
+
     private final CheckContext ctx;
-    private final FlightCheck flight;
-    private final HitAngleCheck hitAngle;
+    private final Checks checks;
     private final DisturbanceRegistry disturbances;
     private final Runnable every5Seconds;
     private final Runnable every5Minutes;
     private final Location reusable = new Location(null, 0, 0, 0);
     private long ticks;
 
-    public TickTask(CheckContext ctx, FlightCheck flight, HitAngleCheck hitAngle, DisturbanceRegistry disturbances,
+    public TickTask(CheckContext ctx, Checks checks, DisturbanceRegistry disturbances,
                     Runnable every5Seconds, Runnable every5Minutes) {
         this.ctx = ctx;
-        this.flight = flight;
-        this.hitAngle = hitAngle;
+        this.checks = checks;
         this.disturbances = disturbances;
         this.every5Seconds = every5Seconds;
         this.every5Minutes = every5Minutes;
@@ -58,6 +65,7 @@ public final class TickTask implements Runnable {
     public void run() {
         long now = Clock.now();
         ticks++;
+        ctx.advanceTick();
         Settings settings = ctx.settings();
         ctx.tps().onTick(now, settings.lag().lagSpikeThresholdMs());
         boolean enabled = settings.general().enabled();
@@ -72,7 +80,7 @@ public final class TickTask implements Runnable {
             if (ticks % 20 == 0) {
                 ctx.recentPing(player, data, now);
             }
-            if (data.bypassCacheExpired(now, BYPASS_CACHE_MS)) {
+            if (settings.general().bypassPermission() && data.bypassCacheExpired(now, BYPASS_CACHE_MS)) {
                 refreshBypass(player, data, now);
             }
 
@@ -80,10 +88,13 @@ public final class TickTask implements Runnable {
                 double activeMs = activeClientTime(data, now, settings.general().useClientTickEvents());
                 boolean moved = !data.hasSample || x != data.sampleX || y != data.sampleY || z != data.sampleZ;
                 ctx.run(CheckType.FLIGHT, now, () -> {
-                    if (flight.onSample(player, data, reusable, activeMs, moved, now)) {
+                    if (checks.flight().onSample(player, data, reusable, activeMs, moved, now)) {
                         setBack(player, data, now);
                     }
                 });
+                ctx.run(CheckType.VELOCITY, now, () -> checks.velocity().onSample(player, data, y, activeMs, now));
+                ctx.run(CheckType.NOSLOW, now, () -> checks.noSlow().onSample(player, data, now));
+                ctx.run(CheckType.NOFALL, now, () -> checks.noFall().onTick(player, data, now));
             }
             data.sampleX = x;
             data.sampleY = y;
@@ -95,7 +106,8 @@ public final class TickTask implements Runnable {
         }
         reusable.setWorld(null);
 
-        hitAngle.processPending(now);
+        checks.killAura().processPending(now);
+        checks.noSwing().processPending(now);
 
         if (ticks % 100 == 0) {
             disturbances.prune(now, Math.max(settings.lag().disturbanceGraceMs(), 1000));
@@ -123,6 +135,7 @@ public final class TickTask implements Runnable {
         return Math.min(Math.max(0L, now - data.lastSampleMs), (long) MAX_ACTIVE_PER_SAMPLE_MS);
     }
 
+    /** Cached so the permission lookups stay off the hot path; only used when bypass-permission is on. */
     private static void refreshBypass(Player player, PlayerData data, long now) {
         boolean all = player.hasPermission("vigil.bypass");
         Set<CheckType> perCheck = EnumSet.noneOf(CheckType.class);

@@ -37,33 +37,28 @@ class ConfigLoaderTest {
         Settings settings = ConfigLoader.load(bundled());
         assertEquals(List.of(), settings.warnings());
         assertTrue(settings.general().enabled());
-        assertFalse(settings.punishments().enabled(), "automatic punishments must be off by default");
-        assertTrue(settings.punishments().dryRun());
+        assertTrue(settings.alerts().enabled());
+        assertTrue(settings.autoBan().enabled(), "auto-ban is on by default");
+        assertEquals(30L * 24 * 3600 * 1000, settings.autoBan().durationMs());
+        assertEquals("", settings.autoBan().command());
+        assertFalse(settings.general().bypassPermission(), "wildcard permissions must not disable checks");
+        assertFalse(settings.general().passiveMode());
+        assertFalse(ConfigLoader.isLegacyLayout(bundled()));
     }
 
     @Test
-    void bundledConfigMatchesSpecDefaultsExactly() throws Exception {
+    void bundledConfigMatchesSpecDefaults() throws Exception {
         YamlConfiguration yaml = bundled();
         for (CheckType type : CheckType.values()) {
-            CheckSpec spec = CheckSpec.of(type);
-            ConfigurationSection section = yaml.getConfigurationSection("checks." + type.id());
-            assertNotNull(section, "config.yml is missing checks." + type.id());
-            CheckSpec.Defaults d = spec.defaults();
+            CheckSpec.Defaults d = CheckSpec.of(type).defaults();
+            ConfigurationSection section = yaml.getConfigurationSection("anticheat.checks." + type.id());
+            assertNotNull(section, "config.yml is missing anticheat.checks." + type.id());
             assertEquals(d.enabled(), section.getBoolean("enabled"), type.id() + ".enabled");
-            assertEquals(d.alertVl(), section.getDouble("alert-vl"), 1e-9, type.id() + ".alert-vl");
-            assertEquals(d.reviewVl(), section.getDouble("review-vl"), 1e-9, type.id() + ".review-vl");
-            assertEquals(d.decayPerMinute(), section.getDouble("decay-per-minute"), 1e-9, type.id());
-            assertEquals(d.vlPerFlag(), section.getDouble("vl-per-flag"), 1e-9, type.id());
-            assertEquals(d.bufferThreshold(), section.getDouble("buffer-threshold"), 1e-9, type.id());
-            assertEquals(d.mitigate(), section.getBoolean("mitigate"), type.id() + ".mitigate");
-            for (CheckSpec.NumberOption option : spec.numbers()) {
-                assertTrue(section.isSet(option.key()), "config.yml is missing " + type.id() + "." + option.key());
-                assertEquals(option.defaultValue(), section.getDouble(option.key()), 1e-9,
-                        type.id() + "." + option.key());
-            }
-            for (CheckSpec.ListOption option : spec.lists()) {
-                assertEquals(option.defaultValue(), section.getStringList(option.key()), type.id() + "." + option.key());
-            }
+            assertEquals(d.banVl(), section.getDouble("ban-at"), 1e-9, type.id() + ".ban-at");
+        }
+        Settings settings = ConfigLoader.load(yaml);
+        for (CheckType type : CheckType.values()) {
+            assertEquals(CheckSettings.defaults(type), settings.check(type), type.id());
         }
     }
 
@@ -77,10 +72,42 @@ class ConfigLoaderTest {
         for (java.util.Map.Entry<String, String> entry : ConfigLoader.DEFAULT_MESSAGES.entrySet()) {
             assertEquals(entry.getValue(), settings.messages().get(entry.getKey()), "messages." + entry.getKey());
         }
-        assertEquals(ConfigLoader.DEFAULT_ALERT_FORMAT, settings.alerts().format());
+        assertEquals(ConfigLoader.DEFAULT_MESSAGES.get("flagged"), settings.alerts().format());
         assertEquals(io.github.drepfy.vigil.moderation.Durations.PERMANENT, settings.moderation().defaultBanMs());
         assertTrue(settings.moderation().mutedBlockedCommands().contains("msg"));
         assertTrue(settings.messages().get("prefix").contains("ᴠᴀɴɪʟʟᴀ sᴍᴘ"));
+    }
+
+    @Test
+    void legacyLayoutIsDetectedAndReported() throws Exception {
+        YamlConfiguration old = yaml("""
+                config-version: 1
+                general:
+                  enabled: true
+                checks:
+                  speed:
+                    alert-vl: 3
+                """);
+        assertTrue(ConfigLoader.isLegacyLayout(old));
+        Settings settings = ConfigLoader.load(old);
+        assertTrue(settings.warnings().stream().anyMatch(w -> w.contains("old 1.x layout")), settings.warnings().toString());
+        // Old check tuning is ignored: the new defaults apply.
+        assertEquals(CheckSettings.defaults(CheckType.SPEED), settings.check(CheckType.SPEED));
+    }
+
+    @Test
+    void shorthandAndRenamedChecksAreAccepted() throws Exception {
+        Settings settings = ConfigLoader.load(yaml("""
+                anticheat:
+                  checks:
+                    speed: false
+                    hit-angle:
+                      ban-at: 4
+                """));
+        assertFalse(settings.check(CheckType.SPEED).enabled());
+        assertEquals(4.0, settings.check(CheckType.KILLAURA).banVl(), 1e-9);
+        assertTrue(settings.warnings().stream().anyMatch(w -> w.contains("renamed to killaura")),
+                settings.warnings().toString());
     }
 
     @Test
@@ -121,66 +148,47 @@ class ConfigLoaderTest {
     @Test
     void invalidValuesFallBackToDefaultsWithWarnings() throws Exception {
         Settings settings = ConfigLoader.load(yaml("""
-                general:
+                anticheat:
                   enabled: maybe
-                lag-protection:
-                  min-tps: 42
-                  max-ping-ms: fast
-                checks:
-                  speed:
-                    leniency: 0.2
-                    alert-vl: -3
-                    typo-option: 1
-                  reach:
-                    leniency: 1.5
-                    cancel-leniency: 1.0
-                  not-a-check:
-                    enabled: true
+                  auto-ban:
+                    duration: soon
+                  checks:
+                    speed:
+                      leniency: 0.2
+                      ban-at: -3
+                      typo-option: 1
+                    reach:
+                      leniency: 1.5
+                      cancel-leniency: 1.0
+                    not-a-check:
+                      enabled: true
+                advanced:
+                  lag-protection:
+                    min-tps: 42
+                    max-ping-ms: fast
                 """));
         assertTrue(settings.general().enabled());
+        assertEquals(30L * 24 * 3600 * 1000, settings.autoBan().durationMs());
         assertEquals(17.0, settings.lag().minTps(), 1e-9);
         assertEquals(400, settings.lag().maxPingMs());
         assertEquals(1.25, settings.check(CheckType.SPEED).num("leniency"), 1e-9);
-        assertEquals(3.0, settings.check(CheckType.SPEED).alertVl(), 1e-9);
+        assertEquals(15.0, settings.check(CheckType.SPEED).banVl(), 1e-9);
         // cancel-leniency may never be stricter than leniency.
         assertEquals(1.5, settings.check(CheckType.REACH).num("cancel-leniency"), 1e-9);
         List<String> warnings = settings.warnings();
-        assertTrue(warnings.stream().anyMatch(w -> w.contains("general.enabled")), warnings.toString());
-        assertTrue(warnings.stream().anyMatch(w -> w.contains("min-tps")), warnings.toString());
-        assertTrue(warnings.stream().anyMatch(w -> w.contains("max-ping-ms")), warnings.toString());
-        assertTrue(warnings.stream().anyMatch(w -> w.contains("checks.speed.leniency")), warnings.toString());
-        assertTrue(warnings.stream().anyMatch(w -> w.contains("typo-option")), warnings.toString());
-        assertTrue(warnings.stream().anyMatch(w -> w.contains("not-a-check")), warnings.toString());
-        assertTrue(warnings.stream().anyMatch(w -> w.contains("cancel-leniency")), warnings.toString());
-    }
-
-    @Test
-    void actionRulesAreParsedAndValidated() throws Exception {
-        Settings settings = ConfigLoader.load(yaml("""
-                checks:
-                  flight:
-                    actions:
-                      - vl: 40
-                        commands: ["/kick {player} bye"]
-                      - vl: 20
-                        commands: ["say {player} flagged"]
-                      - vl: -1
-                        commands: ["ban {player}"]
-                      - commands: []
-                """));
-        List<ActionRule> rules = settings.check(CheckType.FLIGHT).actions();
-        assertEquals(2, rules.size());
-        assertEquals(20.0, rules.get(0).vl(), 1e-9);
-        assertEquals(List.of("kick {player} bye"), rules.get(1).commands());
-        assertEquals(2, settings.warnings().size(), settings.warnings().toString());
+        for (String expected : List.of("anticheat.enabled", "auto-ban.duration", "min-tps", "max-ping-ms",
+                "checks.speed.leniency", "checks.speed.ban-at", "typo-option", "not-a-check", "cancel-leniency")) {
+            assertTrue(warnings.stream().anyMatch(w -> w.contains(expected)), expected + " in " + warnings);
+        }
     }
 
     @Test
     void numbersWrittenAsTextAreAccepted() throws Exception {
         Settings settings = ConfigLoader.load(yaml("""
-                checks:
-                  timer:
-                    max-debt-ms: "800"
+                anticheat:
+                  checks:
+                    timer:
+                      max-debt-ms: "800"
                 """));
         assertEquals(800.0, settings.check(CheckType.TIMER).num("max-debt-ms"), 1e-9);
         assertEquals(List.of(), settings.warnings());

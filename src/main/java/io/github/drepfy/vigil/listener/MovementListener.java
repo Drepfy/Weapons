@@ -2,10 +2,10 @@ package io.github.drepfy.vigil.listener;
 
 import io.github.drepfy.vigil.api.CheckType;
 import io.github.drepfy.vigil.check.CheckContext;
-import io.github.drepfy.vigil.check.movement.GroundSpoofCheck;
+import io.github.drepfy.vigil.check.movement.NoFallCheck;
 import io.github.drepfy.vigil.check.movement.SpeedCheck;
 import io.github.drepfy.vigil.check.movement.TimerCheck;
-import io.github.drepfy.vigil.check.movement.VerticalCheck;
+import io.github.drepfy.vigil.check.movement.StepCheck;
 import io.github.drepfy.vigil.config.Settings;
 import io.github.drepfy.vigil.data.PlayerData;
 import io.github.drepfy.vigil.env.BlockTraits;
@@ -37,18 +37,18 @@ public final class MovementListener implements Listener {
     private final CheckContext ctx;
     private final Logger logger;
     private final SpeedCheck speed;
-    private final VerticalCheck vertical;
-    private final GroundSpoofCheck groundSpoof;
+    private final StepCheck step;
+    private final NoFallCheck noFall;
     private final TimerCheck timer;
     private boolean environmentErrorLogged;
 
-    public MovementListener(CheckContext ctx, Logger logger, SpeedCheck speed, VerticalCheck vertical,
-                            GroundSpoofCheck groundSpoof, TimerCheck timer) {
+    public MovementListener(CheckContext ctx, Logger logger, SpeedCheck speed, StepCheck step, NoFallCheck noFall,
+                            TimerCheck timer) {
         this.ctx = ctx;
         this.logger = logger;
         this.speed = speed;
-        this.vertical = vertical;
-        this.groundSpoof = groundSpoof;
+        this.step = step;
+        this.noFall = noFall;
         this.timer = timer;
     }
 
@@ -70,8 +70,9 @@ public final class MovementListener implements Listener {
             return;
         }
         boolean exemptState = ctx.isMovementExemptState(player, data, now);
-        if (ctx.isActive(player, data, CheckType.SPEED, now) || ctx.isActive(player, data, CheckType.VERTICAL, now)
-                || ctx.isActive(player, data, CheckType.GROUND_SPOOF, now)) {
+        if (ctx.isActive(player, data, CheckType.SPEED, now) || ctx.isActive(player, data, CheckType.STEP, now)
+                || ctx.isActive(player, data, CheckType.NOFALL, now) || ctx.isActive(player, data, CheckType.NOSLOW, now)
+                || ctx.isActive(player, data, CheckType.VELOCITY, now)) {
             sampleEnvironment(player, data, to, now);
         }
 
@@ -81,10 +82,10 @@ public final class MovementListener implements Listener {
         boolean[] setback = new boolean[1];
         ctx.run(CheckType.SPEED, now,
                 () -> setback[0] |= speed.onMove(player, data, from, to, exemptState, now));
-        ctx.run(CheckType.VERTICAL, now,
-                () -> setback[0] |= vertical.onMove(player, data, from, to, exemptState, now));
-        ctx.run(CheckType.GROUND_SPOOF, now,
-                () -> setback[0] |= groundSpoof.onMove(player, data, from, to, exemptState, now));
+        ctx.run(CheckType.STEP, now,
+                () -> setback[0] |= step.onMove(player, data, from, to, exemptState, now));
+        ctx.run(CheckType.NOFALL, now,
+                () -> setback[0] |= noFall.onMove(player, data, from, to, exemptState, now));
 
         if (setback[0]) {
             applySetback(event, data, now);
@@ -147,7 +148,7 @@ public final class MovementListener implements Listener {
             return false;
         }
         return settings.check(CheckType.SPEED).mitigate() || settings.check(CheckType.FLIGHT).mitigate()
-                || settings.check(CheckType.VERTICAL).mitigate() || settings.check(CheckType.GROUND_SPOOF).mitigate();
+                || settings.check(CheckType.STEP).mitigate() || settings.check(CheckType.NOFALL).mitigate();
     }
 
     private void updateSafeLocation(Player player, PlayerData data, Location to, boolean exemptState, long now) {

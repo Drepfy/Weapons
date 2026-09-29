@@ -4,6 +4,7 @@ import io.github.drepfy.vigil.api.CheckCategory;
 import io.github.drepfy.vigil.api.CheckType;
 import io.github.drepfy.vigil.model.FlightTracker;
 import io.github.drepfy.vigil.model.PositionHistory;
+import io.github.drepfy.vigil.model.RateCounter;
 import io.github.drepfy.vigil.model.RateLimiter;
 import io.github.drepfy.vigil.model.RollingMax;
 import io.github.drepfy.vigil.model.SpeedBudget;
@@ -86,7 +87,7 @@ public final class PlayerData {
     public String flightSuspectDetail = "";
     public Location lastSafeLocation;
     public long lastSafeUpdateMs = NEVER;
-    /** Last time the ground-spoof check re-sent nearby blocks to this player. */
+    /** Last time the no-fall check re-sent nearby blocks to this player. */
     public long lastGroundSpoofResyncMs = NEVER;
 
     private final Map<CheckType, SuspicionBuffer> buffers = new EnumMap<>(CheckType.class);
@@ -99,13 +100,55 @@ public final class PlayerData {
     private final Set<CheckType> bypass = EnumSet.noneOf(CheckType.class);
     private long bypassCheckedMs = NEVER;
 
-    // ---- flags, alerts, punishments --------------------------------------------------------
+    // ---- velocity (anti-knockback) ---------------------------------------------------------
+    /** Knockback waiting to be taken, or {@code velocityRequiredRise <= 0} when none. */
+    public double velocityStartY;
+    public double velocityMaxY;
+    public double velocityRequiredRise;
+    public double velocityActiveMs;
+    public double velocityWindowMs;
+
+    // ---- no-slow ---------------------------------------------------------------------------
+    /** Monotonic time the player started using an item (eating, blocking, drawing a bow), or -1. */
+    public long itemUseSinceMs = -1;
+    public long lastNoSlowSampleMs = NEVER;
+
+    // ---- no-fall ---------------------------------------------------------------------------
+    /** Highest feet height since the player last stood on something (or was reset). */
+    public double fallPeakY = Double.NaN;
+    public long fallPeakMs = NEVER;
+    public long lastFallDamageMs = NEVER;
+    /** Landing that should have caused fall damage, or {@code pendingFallDistance <= 0} when none. */
+    public double pendingFallDistance;
+    public double pendingFallLandingY;
+    public long pendingFallLandingMs;
+    public long pendingFallStartMs;
+
+    // ---- clicks, swings and block actions ----------------------------------------------------
+    public final RateCounter swings = new RateCounter();
+    public final RateCounter blockPlaces = new RateCounter();
+    public final RateCounter blockStarts = new RateCounter();
+    public long lastSwingMs = NEVER;
+    /** Last right click, block place or item drop (these swing the arm without attacking). */
+    public long lastNonAttackSwingCauseMs = NEVER;
+    public long diggingSinceMs = -1;
+    public long lastAutoClickerSampleMs = NEVER;
+    public long lastFastPlaceFlagMs = NEVER;
+    public long lastNukerFlagMs = NEVER;
+    /** Client tick counter (Paper tick-end events) and the entity last attacked in that tick. */
+    public long clientTick;
+    public long lastAttackClientTick = -1;
+    public int lastAttackTargetId = -1;
+    /** Server tick of the previous attack and its target (plugin area damage filter). */
+    public long lastAttackServerTick = -1;
+    public int lastAttackServerTarget = -1;
+
+    // ---- flags, alerts, auto-ban -----------------------------------------------------------
     private final Deque<FlagRecord> recentFlags = new ArrayDeque<>();
     public final Map<CheckType, Long> lastAlertMs = new EnumMap<>(CheckType.class);
     public final Map<CheckType, Integer> suppressedAlerts = new EnumMap<>(CheckType.class);
-    public final Map<CheckType, Deque<Long>> punishWindow = new EnumMap<>(CheckType.class);
-    public final Map<CheckType, Long> lastPunishMs = new EnumMap<>(CheckType.class);
-    public final Map<CheckType, Double> highestExecutedRule = new EnumMap<>(CheckType.class);
+    /** Set once the player was banned automatically, so it happens only once. */
+    public boolean autoBanned;
 
     /** Persistent record, loaded asynchronously after join (may be null for a moment). */
     public volatile PlayerRecord record;
@@ -225,8 +268,6 @@ public final class PlayerData {
             if (onlyType == null || onlyType == type) {
                 violations.get(type).reset();
                 buffers.get(type).reset();
-                highestExecutedRule.remove(type);
-                punishWindow.remove(type);
             }
         }
     }
@@ -245,6 +286,10 @@ public final class PlayerData {
         flightConfirmActiveMs = 0;
         moveEventsSinceSample = 0;
         clientTicksSinceSample = 0;
+        velocityRequiredRise = 0;
+        fallPeakY = Double.NaN;
+        pendingFallDistance = 0;
+        itemUseSinceMs = -1;
     }
 
     public static long never() {

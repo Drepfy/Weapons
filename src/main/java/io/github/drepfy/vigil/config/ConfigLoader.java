@@ -21,29 +21,29 @@ import java.util.Set;
  *
  * <p>Loading never fails because of a bad value: every invalid or out-of-range
  * value is replaced by its default and reported as a warning. Missing keys silently
- * use their defaults, so configuration files from older versions keep working.
+ * use their defaults, so a short config.yml is a complete config.yml.
  */
 public final class ConfigLoader {
 
-    public static final int SUPPORTED_CONFIG_VERSION = 1;
+    public static final int SUPPORTED_CONFIG_VERSION = 2;
 
     public static final String DEFAULT_PREFIX = "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ » &r";
-    public static final String DEFAULT_ALERT_FORMAT =
-            "{prefix}&f{player} &7has been flagged for &c{reason} &8(VL {vl}){suppressed}";
 
     static final Map<String, String> DEFAULT_MESSAGES;
 
     static {
         Map<String, String> messages = new LinkedHashMap<>();
         messages.put("prefix", DEFAULT_PREFIX);
+        // Anti-cheat. Placeholders: {player} {reason} {check} {vl} {detail}
+        messages.put("flagged", "&f{player} &7has been flagged for &c{reason} &8(VL {vl})");
+        messages.put("auto-banned", "&c{player} &7has been banned for &c{reason}&7.");
+        messages.put("alerts-enabled", "&aAnti-cheat alerts enabled.");
+        messages.put("alerts-disabled", "&eAnti-cheat alerts disabled.");
+        messages.put("reloaded", "&aConfiguration reloaded. &7({warnings} warning(s), see console)");
+        messages.put("reload-failed", "&cReload failed, previous configuration kept: &f{error}");
         messages.put("no-permission", "&cYou do not have permission to do that.");
         messages.put("player-not-found", "&cPlayer not found: &f{player}");
-        messages.put("alerts-enabled", "&aStaff alerts enabled.");
-        messages.put("alerts-disabled", "&eStaff alerts disabled.");
-        messages.put("reloaded", "&aConfiguration reloaded. &7({warnings} warning(s))");
-        messages.put("reload-failed", "&cReload failed, previous configuration kept: &f{error}");
-        messages.put("case-opened", "&eReview case &f#{id} &eopened for &f{player}&e: {reason}");
-        // Moderation. Placeholders: {player} {staff} {reason} {duration} {expires} {count} {id}
+        // Moderation. Placeholders: {player} {staff} {reason} {duration} {expires} {count}
         messages.put("no-reason", "No Reason");
         messages.put("permanent", "Permanent");
         messages.put("ban-success", "&7You have banned player &b{player} &7for &b{reason} &7for &b{duration}&7.");
@@ -70,7 +70,7 @@ public final class ConfigLoader {
         messages.put("not-muted", "&c{player} is not muted.");
         messages.put("cannot-punish", "&cYou cannot punish {player}.");
         messages.put("moderation-disabled", "&cModeration commands are disabled in the configuration.");
-        DEFAULT_MESSAGES = Map.copyOf(messages);
+        DEFAULT_MESSAGES = java.util.Collections.unmodifiableMap(messages);
     }
 
     static final List<String> DEFAULT_MUTED_BLOCKED_COMMANDS = List.of("msg", "tell", "w", "whisper", "r", "reply",
@@ -117,8 +117,11 @@ public final class ConfigLoader {
         return List.copyOf(result);
     }
 
-    private static final Set<String> COMMON_CHECK_KEYS = Set.of("enabled", "alert-vl", "review-vl",
-            "decay-per-minute", "vl-per-flag", "buffer-threshold", "mitigate", "actions");
+    private static final Set<String> COMMON_CHECK_KEYS = Set.of("enabled", "ban-at", "alert-at",
+            "decay-per-minute", "vl-per-flag", "buffer-threshold", "mitigate");
+
+    private static final String CHECKS = "anticheat.checks";
+    private static final String LAG = "advanced.lag-protection.";
 
     private ConfigLoader() {
     }
@@ -132,6 +135,16 @@ public final class ConfigLoader {
         return load(root, new ArrayList<>());
     }
 
+    /**
+     * Whether {@code root} uses the version 1 layout ({@code general:}, {@code checks:} ...
+     * at the root) that needs migrating to the current one.
+     */
+    public static boolean isLegacyLayout(ConfigurationSection root) {
+        return !root.isConfigurationSection("anticheat")
+                && (root.isConfigurationSection("general") || root.isConfigurationSection("checks")
+                || root.isConfigurationSection("review") || root.isConfigurationSection("punishments"));
+    }
+
     /** Loads settings, prepending {@code initialWarnings} to the reported warnings. */
     public static Settings load(ConfigurationSection root, List<String> initialWarnings) {
         Reader r = new Reader(root, new ArrayList<>(initialWarnings));
@@ -141,80 +154,103 @@ public final class ConfigLoader {
             r.warn("config-version " + version + " is newer than this plugin supports ("
                     + SUPPORTED_CONFIG_VERSION + "); unknown options are ignored.");
         }
+        if (isLegacyLayout(root)) {
+            r.warn("config.yml uses the old 1.x layout; its anti-cheat settings are ignored. Delete it (or rename it) "
+                    + "and restart to get the new, shorter config.yml.");
+        }
 
         Settings.General general = new Settings.General(
-                r.bool("general.enabled", true),
-                r.bool("general.passive-mode", false),
-                r.bool("general.exempt-creative-and-spectator", true),
-                new HashSet<>(r.stringList("general.disabled-worlds", List.of())),
-                r.bool("general.use-client-tick-events", true),
-                upper(r.stringList("general.platform-entities", List.of("BOAT", "RAFT", "MINECART", "SHULKER", "HAPPY_GHAST"))),
-                r.bool("general.debug", false));
+                r.bool("anticheat.enabled", true),
+                r.bool("advanced.passive-mode", false),
+                r.bool("anticheat.exempt-creative-and-spectator", true),
+                new HashSet<>(r.stringList("anticheat.disabled-worlds", List.of())),
+                r.bool("advanced.use-client-tick-events", true),
+                upper(r.stringList("advanced.platform-entities",
+                        List.of("BOAT", "RAFT", "MINECART", "SHULKER", "HAPPY_GHAST"))),
+                r.bool("advanced.debug", false),
+                r.bool("anticheat.bypass-permission", false));
 
         Settings.Lag lag = new Settings.Lag(
-                r.number("lag-protection.min-tps", 17.0, 0.0, 20.0),
-                r.millis("lag-protection.lag-spike-threshold-ms", 400, 100, 60_000),
-                r.millis("lag-protection.lag-spike-grace-ms", 3000, 0, 120_000),
-                r.millis("lag-protection.max-ping-ms", 400, 50, 10_000),
-                r.millis("lag-protection.join-grace-ms", 5000, 0, 120_000),
-                r.millis("lag-protection.respawn-grace-ms", 3000, 0, 120_000),
-                r.millis("lag-protection.teleport-grace-ms", 1500, 0, 120_000),
-                r.millis("lag-protection.world-change-grace-ms", 3000, 0, 120_000),
-                r.millis("lag-protection.gamemode-change-grace-ms", 2000, 0, 120_000),
-                r.millis("lag-protection.velocity-grace-ms", 1500, 0, 120_000),
-                r.millis("lag-protection.vehicle-exit-grace-ms", 1500, 0, 120_000),
-                r.millis("lag-protection.elytra-grace-ms", 2500, 0, 120_000),
-                r.millis("lag-protection.riptide-grace-ms", 3000, 0, 120_000),
-                r.number("lag-protection.disturbance-radius", 8.0, 0.0, 64.0),
-                r.millis("lag-protection.disturbance-grace-ms", 3000, 0, 120_000));
-
-        Settings.Alerts alerts = new Settings.Alerts(
-                r.bool("alerts.enabled", true),
-                r.bool("alerts.console", true),
-                r.millis("alerts.cooldown-ms", 5000, 0, 3_600_000),
-                r.string("alerts.format", DEFAULT_ALERT_FORMAT),
-                r.bool("alerts.clickable", true));
-
-        Settings.Violations violations = new Settings.Violations(
-                (int) r.number("violations.history-size", 50, 1, 1000),
-                r.bool("violations.log-to-file", true),
-                (int) r.number("violations.log-retention-days", 0, 0, 36500));
-
-        Settings.Review review = new Settings.Review(
-                r.bool("review.enabled", true),
-                (int) r.number("review.max-evidence", 25, 1, 500),
-                r.bool("review.notify", true),
-                (int) r.number("review.max-cases", 1000, 10, 100_000));
-
-        Settings.Punishments punishments = new Settings.Punishments(
-                r.bool("punishments.enabled", false),
-                r.bool("punishments.dry-run", true),
-                (int) r.number("punishments.min-flags-in-window", 5, 1, 10_000),
-                r.millis("punishments.window-ms", 600_000, 1000, 86_400_000L),
-                r.millis("punishments.cooldown-ms", 1_800_000, 0, 86_400_000L));
-
-        Settings.Moderation moderation = loadModeration(r);
-
-        Map<CheckType, CheckSettings> checks = new EnumMap<>(CheckType.class);
-        for (CheckType type : CheckType.values()) {
-            checks.put(type, loadCheck(r, type));
-        }
-        ConfigurationSection checksSection = root.getConfigurationSection("checks");
-        if (checksSection != null) {
-            for (String key : checksSection.getKeys(false)) {
-                if (CheckType.fromId(key) == null || !CheckType.fromId(key).id().equals(key)) {
-                    r.warn("checks." + key + " is not a known check and is ignored.");
-                }
-            }
-        }
+                r.number(LAG + "min-tps", 17.0, 0.0, 20.0),
+                r.millis(LAG + "lag-spike-threshold-ms", 400, 100, 60_000),
+                r.millis(LAG + "lag-spike-grace-ms", 3000, 0, 120_000),
+                r.millis(LAG + "max-ping-ms", 400, 50, 10_000),
+                r.millis(LAG + "join-grace-ms", 3000, 0, 120_000),
+                r.millis(LAG + "respawn-grace-ms", 2000, 0, 120_000),
+                r.millis(LAG + "teleport-grace-ms", 1000, 0, 120_000),
+                r.millis(LAG + "world-change-grace-ms", 2000, 0, 120_000),
+                r.millis(LAG + "gamemode-change-grace-ms", 1500, 0, 120_000),
+                r.millis(LAG + "velocity-grace-ms", 1500, 0, 120_000),
+                r.millis(LAG + "vehicle-exit-grace-ms", 1000, 0, 120_000),
+                r.millis(LAG + "elytra-grace-ms", 2500, 0, 120_000),
+                r.millis(LAG + "riptide-grace-ms", 3000, 0, 120_000),
+                r.number(LAG + "disturbance-radius", 8.0, 0.0, 64.0),
+                r.millis(LAG + "disturbance-grace-ms", 3000, 0, 120_000));
 
         Map<String, String> messageValues = new HashMap<>();
         for (Map.Entry<String, String> entry : DEFAULT_MESSAGES.entrySet()) {
             messageValues.put(entry.getKey(), r.text("messages." + entry.getKey(), entry.getValue()));
         }
+        // The prefix lives at the top of the file so it is easy to find.
+        messageValues.put("prefix", r.text("prefix", messageValues.get("prefix")));
+        Settings.Messages messages = new Settings.Messages(messageValues);
 
-        return new Settings(general, lag, alerts, violations, review, punishments, moderation, checks,
-                new Settings.Messages(messageValues), r.warnings);
+        Settings.Alerts alerts = new Settings.Alerts(
+                r.bool("anticheat.alerts", true),
+                r.bool("advanced.alert-console", true),
+                r.millis("advanced.alert-cooldown-ms", 3000, 0, 3_600_000),
+                messages.get("flagged"),
+                r.bool("advanced.alert-clickable", true));
+
+        Settings.Violations violations = new Settings.Violations(
+                (int) r.number("advanced.history-size", 50, 1, 1000),
+                r.bool("advanced.log-to-file", true),
+                (int) r.number("advanced.log-retention-days", 30, 0, 36500));
+
+        long autoBanDuration = r.duration("anticheat.auto-ban.duration", Durations.parse("30d"));
+        Settings.AutoBan autoBan = new Settings.AutoBan(
+                r.bool("anticheat.auto-ban.enabled", true),
+                autoBanDuration,
+                r.string("anticheat.auto-ban.reason", "Cheating ({reason})"),
+                r.bool("anticheat.auto-ban.broadcast", true),
+                stripSlash(r.string("anticheat.auto-ban.command", "").trim()));
+
+        Settings.Moderation moderation = loadModeration(r);
+
+        Map<CheckType, String> sections = resolveCheckSections(r);
+        Map<CheckType, CheckSettings> checks = new EnumMap<>(CheckType.class);
+        for (CheckType type : CheckType.values()) {
+            checks.put(type, loadCheck(r, type, sections.get(type)));
+        }
+
+        return new Settings(general, lag, alerts, violations, autoBan, moderation, checks, messages, r.warnings);
+    }
+
+    /** Maps every check to its configuration path, accepting (with a warning) the 1.x check names. */
+    private static Map<CheckType, String> resolveCheckSections(Reader r) {
+        Map<CheckType, String> sections = new EnumMap<>(CheckType.class);
+        for (CheckType type : CheckType.values()) {
+            sections.put(type, CHECKS + "." + type.id());
+        }
+        ConfigurationSection checksSection = r.root.getConfigurationSection(CHECKS);
+        if (checksSection == null) {
+            return sections;
+        }
+        Set<String> keys = checksSection.getKeys(false);
+        for (String key : keys) {
+            CheckType type = CheckType.fromId(key);
+            if (type == null) {
+                r.warn(CHECKS + "." + key + " is not a known check and is ignored.");
+            } else if (!type.id().equals(key)) {
+                if (keys.contains(type.id())) {
+                    r.warn(CHECKS + "." + key + " is an old name of " + type.id() + " and is ignored.");
+                } else {
+                    r.warn(CHECKS + "." + key + " was renamed to " + type.id() + "; please rename it.");
+                    sections.put(type, CHECKS + "." + key);
+                }
+            }
+        }
+        return sections;
     }
 
     private static Settings.Moderation loadModeration(Reader r) {
@@ -276,10 +312,20 @@ public final class ConfigLoader {
         return presets;
     }
 
-    private static CheckSettings loadCheck(Reader r, CheckType type) {
+    private static CheckSettings loadCheck(Reader r, CheckType type, String path) {
         CheckSpec spec = CheckSpec.of(type);
         CheckSpec.Defaults d = spec.defaults();
-        String base = "checks." + type.id() + ".";
+        String base = path + ".";
+
+        // "speed: false" is accepted as a shorthand for "speed: {enabled: false}".
+        Object raw = r.root.get(path);
+        if (raw != null && !(raw instanceof ConfigurationSection)) {
+            boolean enabled = r.bool(path, d.enabled());
+            CheckSettings defaults = CheckSettings.defaults(type);
+            return new CheckSettings(type, enabled, defaults.alertVl(), defaults.banVl(), defaults.decayPerMinute(),
+                    defaults.vlPerFlag(), defaults.bufferThreshold(), defaults.mitigate(), defaults.numbers(),
+                    defaults.lists());
+        }
 
         Map<String, Double> numbers = new HashMap<>();
         for (CheckSpec.NumberOption option : spec.numbers()) {
@@ -297,7 +343,7 @@ public final class ConfigLoader {
             numbers.put("cancel-leniency", numbers.get("leniency"));
         }
 
-        ConfigurationSection section = r.root.getConfigurationSection("checks." + type.id());
+        ConfigurationSection section = r.root.getConfigurationSection(path);
         if (section != null) {
             Set<String> known = new HashSet<>(COMMON_CHECK_KEYS);
             spec.numbers().forEach(option -> known.add(option.key()));
@@ -311,60 +357,18 @@ public final class ConfigLoader {
 
         return new CheckSettings(type,
                 r.bool(base + "enabled", d.enabled()),
-                r.number(base + "alert-vl", d.alertVl(), 0.0, 1_000_000.0),
-                r.number(base + "review-vl", d.reviewVl(), 0.0, 1_000_000.0),
+                r.number(base + "alert-at", d.alertVl(), 0.0, 1_000_000.0),
+                r.number(base + "ban-at", d.banVl(), 0.0, 1_000_000.0),
                 r.number(base + "decay-per-minute", d.decayPerMinute(), 0.0, 1_000_000.0),
                 r.number(base + "vl-per-flag", d.vlPerFlag(), 0.01, 1000.0),
                 r.number(base + "buffer-threshold", d.bufferThreshold(), 1.0, 1000.0),
                 r.bool(base + "mitigate", d.mitigate()),
-                loadActions(r, base + "actions"),
                 numbers,
                 lists);
     }
 
-    private static List<ActionRule> loadActions(Reader r, String path) {
-        Object raw = r.root.get(path);
-        if (raw == null) {
-            return List.of();
-        }
-        if (!(raw instanceof List<?> list)) {
-            r.warn(path + " must be a list; ignoring it.");
-            return List.of();
-        }
-        List<ActionRule> rules = new ArrayList<>();
-        for (int i = 0; i < list.size(); i++) {
-            Object entry = list.get(i);
-            Map<?, ?> map = null;
-            if (entry instanceof Map<?, ?> m) {
-                map = m;
-            } else if (entry instanceof ConfigurationSection s) {
-                map = s.getValues(false);
-            }
-            if (map == null) {
-                r.warn(path + "[" + i + "] must contain 'vl' and 'commands'; ignoring it.");
-                continue;
-            }
-            Double vl = Reader.toDouble(map.get("vl"));
-            Object commandsRaw = map.get("commands");
-            if (vl == null || vl <= 0 || !Double.isFinite(vl) || !(commandsRaw instanceof List<?> commands)) {
-                r.warn(path + "[" + i + "] needs a positive 'vl' and a 'commands' list; ignoring it.");
-                continue;
-            }
-            List<String> cleaned = new ArrayList<>();
-            for (Object command : commands) {
-                if (command != null && !command.toString().isBlank()) {
-                    String text = command.toString().trim();
-                    cleaned.add(text.startsWith("/") ? text.substring(1) : text);
-                }
-            }
-            if (cleaned.isEmpty()) {
-                r.warn(path + "[" + i + "] has no commands; ignoring it.");
-                continue;
-            }
-            rules.add(new ActionRule(vl, cleaned));
-        }
-        rules.sort((a, b) -> Double.compare(a.vl(), b.vl()));
-        return rules;
+    private static String stripSlash(String command) {
+        return command.startsWith("/") ? command.substring(1) : command;
     }
 
     private static List<String> upper(List<String> values) {

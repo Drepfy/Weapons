@@ -7,7 +7,7 @@ import org.bukkit.event.player.PlayerEvent;
 
 /**
  * Called on the server thread right before a violation is recorded. Cancelling it
- * discards the flag entirely (no VL, alert, log entry or review case).
+ * discards the flag entirely (no VL, alert, log entry or automatic ban).
  */
 public class VigilFlagEvent extends PlayerEvent implements Cancellable {
 

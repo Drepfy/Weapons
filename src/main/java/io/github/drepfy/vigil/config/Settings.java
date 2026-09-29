@@ -17,8 +17,7 @@ public record Settings(General general,
                        Lag lag,
                        Alerts alerts,
                        Violations violations,
-                       Review review,
-                       Punishments punishments,
+                       AutoBan autoBan,
                        Moderation moderation,
                        Map<CheckType, CheckSettings> checks,
                        Messages messages,
@@ -38,13 +37,18 @@ public record Settings(General general,
         return checks.get(type);
     }
 
+    /**
+     * @param bypassPermission whether {@code vigil.bypass(.<check>)} is honoured at all. Off by
+     *                         default so wildcard ("*") permissions never silently disable checks.
+     */
     public record General(boolean enabled,
                           boolean passiveMode,
                           boolean exemptCreativeAndSpectator,
                           Set<String> disabledWorlds,
                           boolean useClientTickEvents,
                           List<String> platformEntities,
-                          boolean debug) {
+                          boolean debug,
+                          boolean bypassPermission) {
         public General {
             disabledWorlds = Set.copyOf(disabledWorlds);
             platformEntities = List.copyOf(platformEntities);
@@ -74,10 +78,15 @@ public record Settings(General general,
     public record Violations(int historySize, boolean logToFile, int logRetentionDays) {
     }
 
-    public record Review(boolean enabled, int maxEvidence, boolean notifyStaff, int maxCases) {
-    }
-
-    public record Punishments(boolean enabled, boolean dryRun, int minFlagsInWindow, long windowMs, long cooldownMs) {
+    /**
+     * Automatic bans once a check's VL reaches its {@code ban-at}.
+     *
+     * @param durationMs ban length ({@code -1} = permanent)
+     * @param reason     ban reason; {@code {reason}} is replaced by the check reason, e.g. "Flying"
+     * @param broadcast  announce the ban to every player (staff are always told)
+     * @param command    console command to run instead of Vigil's own ban (empty = use Vigil's ban)
+     */
+    public record AutoBan(boolean enabled, long durationMs, String reason, boolean broadcast, String command) {
     }
 
     /**

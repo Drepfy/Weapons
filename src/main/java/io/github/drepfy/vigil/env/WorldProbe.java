@@ -3,7 +3,6 @@ package io.github.drepfy.vigil.env;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
-import org.bukkit.block.Block;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.Waterlogged;
 import org.bukkit.entity.Player;
@@ -17,7 +16,7 @@ import org.bukkit.util.VoxelShape;
  */
 public final class WorldProbe {
 
-    /** A collision box is inside the support region (the player could be standing on or against it). */
+    /** The top of a collision box is inside the support region (the player could be standing on it). */
     public static final int SUPPORT = 1;
     public static final int LIQUID = 1 << 1;
     public static final int CLIMBABLE = 1 << 2;
@@ -33,6 +32,10 @@ public final class WorldProbe {
 
     private static final double EPSILON = 1.0E-7;
     private static final double SPECIAL_MARGIN = 0.1;
+    /** Liquid surface height inside a cell without liquid above (vanilla sources are 8/9 = 0.889). */
+    private static final double SURFACE_HEIGHT = 0.9;
+    /** The feet count as in a liquid while they are at most this far above its surface. */
+    private static final double LIQUID_FEET_MARGIN = 0.02;
 
     private final BlockTraits traits;
 
@@ -112,8 +115,7 @@ public final class WorldProbe {
                         continue;
                     }
                     if (cellOverlaps(bx, by, bz, pMinX, pMinY, pMinZ, pMaxX, pMaxY, pMaxZ)) {
-                        if ((f & BlockTraits.LIQUID) != 0
-                                || ((f & BlockTraits.WATERLOGGABLE) != 0 && isWaterlogged(world, bx, by, bz))) {
+                        if (isLiquid(world, f, bx, by, bz) && by + liquidHeight(world, bx, by, bz) >= y - LIQUID_FEET_MARGIN) {
                             result |= LIQUID;
                         }
                         if ((f & BlockTraits.CLIMBABLE) != 0) {
@@ -127,7 +129,7 @@ public final class WorldProbe {
                             && cellOverlaps(bx, by, bz, sMinX - 1, sMinY - 1, sMinZ - 1, sMaxX + 1, pMaxY + 1, sMaxZ + 1)) {
                         result |= PISTON;
                     }
-                    if (collides(world, material, f, bx, by, bz, sMinX, sMinY, sMinZ, sMaxX, sMaxY, sMaxZ)) {
+                    if (supports(world, material, f, bx, by, bz, sMinX, sMinY, sMinZ, sMaxX, sMaxY, sMaxZ)) {
                         result |= SUPPORT;
                         if ((f & BlockTraits.BOUNCY) != 0) {
                             result |= BOUNCY;
@@ -164,8 +166,7 @@ public final class WorldProbe {
                     if ((f & BlockTraits.AIR) != 0) {
                         continue;
                     }
-                    if ((f & BlockTraits.LIQUID) != 0
-                            || ((f & BlockTraits.WATERLOGGABLE) != 0 && isWaterlogged(world, bx, by, bz))) {
+                    if (isLiquid(world, f, bx, by, bz) && by + liquidHeight(world, bx, by, bz) >= y - LIQUID_FEET_MARGIN) {
                         result |= LIQUID;
                     }
                     if ((f & BlockTraits.CLIMBABLE) != 0) {
@@ -178,6 +179,26 @@ public final class WorldProbe {
             }
         }
         return result;
+    }
+
+    /** Whether an upward bubble column is right below the player (it launches players out of the water). */
+    public boolean isAboveBubbleColumn(World world, double x, double y, double z) {
+        int bx = floor(x);
+        int bz = floor(z);
+        int feet = floor(y);
+        for (int by = feet; by >= feet - 3; by--) {
+            Material material = typeAt(world, bx, by, bz);
+            if (material == null) {
+                return true;
+            }
+            if (material.name().equals("BUBBLE_COLUMN")) {
+                return true;
+            }
+            if (!traits.has(material, BlockTraits.AIR)) {
+                return false;
+            }
+        }
+        return false;
     }
 
     /**
@@ -220,6 +241,34 @@ public final class WorldProbe {
             int f = traits.of(material);
             if ((f & (BlockTraits.AIR | BlockTraits.LIQUID)) == 0) {
                 return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether any solid block (or an unloaded one) is within {@code distance} above the
+     * head, over the whole hitbox width.
+     */
+    public boolean hasBlockAbove(World world, double x, double headY, double z, double width, double distance) {
+        double half = width / 2.0;
+        int minBX = floor(x - half);
+        int maxBX = floor(x + half);
+        int minBZ = floor(z - half);
+        int maxBZ = floor(z + half);
+        int minBY = floor(headY);
+        int maxBY = floor(headY + distance);
+        for (int bx = minBX; bx <= maxBX; bx++) {
+            for (int bz = minBZ; bz <= maxBZ; bz++) {
+                for (int by = minBY; by <= maxBY; by++) {
+                    Material material = typeAt(world, bx, by, bz);
+                    if (material == null) {
+                        return true;
+                    }
+                    if (material.isSolid()) {
+                        return true;
+                    }
+                }
             }
         }
         return false;
@@ -316,26 +365,68 @@ public final class WorldProbe {
         }
     }
 
-    private boolean collides(World world, Material material, int f, int bx, int by, int bz,
+    /**
+     * Whether a block offers something to stand on inside the support region: a collision
+     * box whose top lies between the region's bottom and top and overlaps it horizontally.
+     * The side of a wall is never support (that would hide climbing and wall flying), and
+     * neither is a top that is covered by a full block (the inside of a wall).
+     */
+    private boolean supports(World world, Material material, int f, int bx, int by, int bz,
                              double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
         if ((f & BlockTraits.FULL) != 0) {
-            return cellOverlaps(bx, by, bz, minX, minY, minZ, maxX, maxY, maxZ);
+            double top = by + 1.0;
+            return top >= minY - EPSILON && top <= maxY + EPSILON
+                    && bx <= maxX + EPSILON && bx + 1 >= minX - EPSILON
+                    && bz <= maxZ + EPSILON && bz + 1 >= minZ - EPSILON
+                    && !isCovered(world, bx, by + 1, bz);
         }
-        // Only cells that can possibly reach the region need a shape lookup (shapes can be 1.5 tall).
-        if (bx + 1 < minX - EPSILON || bx > maxX + EPSILON || bz + 1 < minZ - EPSILON || bz > maxZ + EPSILON
+        // Fluids and water plants never collide. Only cells that can possibly reach the region
+        // need a shape lookup (shapes can be 1.5 tall).
+        if ((f & BlockTraits.LIQUID) != 0
+                || bx + 1 < minX - EPSILON || bx > maxX + EPSILON || bz + 1 < minZ - EPSILON || bz > maxZ + EPSILON
                 || by + 1.5 < minY - EPSILON || by > maxY + EPSILON) {
             return false;
         }
-        Block block = world.getBlockAt(bx, by, bz);
-        VoxelShape shape = block.getCollisionShape();
+        VoxelShape shape;
+        try {
+            shape = world.getBlockAt(bx, by, bz).getCollisionShape();
+        } catch (LinkageError | RuntimeException e) {
+            return true; // Shape unknown: assume the player could stand on it (never flag).
+        }
         for (BoundingBox box : shape.getBoundingBoxes()) {
+            double top = by + box.getMaxY();
             if (bx + box.getMinX() <= maxX + EPSILON && bx + box.getMaxX() >= minX - EPSILON
-                    && by + box.getMinY() <= maxY + EPSILON && by + box.getMaxY() >= minY - EPSILON
-                    && bz + box.getMinZ() <= maxZ + EPSILON && bz + box.getMaxZ() >= minZ - EPSILON) {
+                    && top >= minY - EPSILON && top <= maxY + EPSILON
+                    && bz + box.getMinZ() <= maxZ + EPSILON && bz + box.getMaxZ() >= minZ - EPSILON
+                    && !isCovered(world, bx, floor(top + 0.01), bz)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /** Whether the cell is a full block (so nothing below it can be stood on). Unknown counts as open. */
+    private boolean isCovered(World world, int x, int y, int z) {
+        Material above = typeAt(world, x, y, z);
+        return above != null && traits.has(above, BlockTraits.FULL);
+    }
+
+    private boolean isLiquid(World world, int f, int x, int y, int z) {
+        return (f & BlockTraits.LIQUID) != 0
+                || ((f & BlockTraits.WATERLOGGABLE) != 0 && isWaterlogged(world, x, y, z));
+    }
+
+    /**
+     * Height of the fluid surface inside a liquid cell: a full block when more liquid is on
+     * top of it, otherwise slightly above the vanilla source height (8/9).
+     */
+    private double liquidHeight(World world, int x, int y, int z) {
+        Material above = typeAt(world, x, y + 1, z);
+        if (above == null) {
+            return 1.0;
+        }
+        int f = traits.of(above);
+        return isLiquid(world, f, x, y + 1, z) ? 1.0 : SURFACE_HEIGHT;
     }
 
     private boolean isWaterlogged(World world, int x, int y, int z) {

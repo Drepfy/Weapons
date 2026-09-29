@@ -65,30 +65,30 @@ public final class AlertService {
         data.lastAlertMs.put(flag.check(), now);
         Integer suppressed = data.suppressedAlerts.remove(flag.check());
 
-        String message = Text.color(Text.replace(config.format(),
-                "prefix", settings.get().messages().get("prefix"),
+        String message = Text.color(settings.get().messages().get("prefix") + Text.replace(config.format(),
                 "player", player.getName(),
                 "reason", flag.check().reason(),
                 "check", flag.check().displayName(),
-                "vl", Text.num(flag.vl()),
+                "vl", Text.num(Math.round(flag.vl() * 10) / 10.0),
                 "detail", flag.detail(),
                 "ping", flag.ping(),
                 "tps", Text.num(tps),
-                "suppressed", suppressed != null && suppressed > 0 ? " &8(+" + suppressed + ")" : ""));
+                "ban-at", check.banVl() > 0 ? Text.num(check.banVl()) : "-"))
+                + (suppressed != null && suppressed > 0 ? Text.color(" &8(+" + suppressed + " more)") : "");
 
         List<String> hover = List.of(
                 "&7Player: &f" + player.getName(),
                 "&7Flagged for: &f" + flag.check().reason() + " &8(" + flag.check().displayName() + " check)",
-                "&7VL: &f" + Text.num(flag.vl()) + " &8(alert at " + Text.num(check.alertVl())
-                        + ", review at " + Text.num(check.reviewVl()) + ")",
+                "&7VL: &f" + Text.num(flag.vl()) + (check.banVl() > 0 && settings.get().autoBan().enabled()
+                        ? " &8(auto-ban at " + Text.num(check.banVl()) + ")" : " &8(no auto-ban)"),
                 "&7Evidence: &f" + flag.detail(),
                 "&7Location: &f" + flag.world() + " " + Text.num(flag.x()) + ", " + Text.num(flag.y()) + ", "
                         + Text.num(flag.z()),
                 "&7Ping: &f" + flag.ping() + "ms &7TPS: &f" + Text.num(tps),
                 "",
-                "&eClick for /vigil info " + player.getName());
+                "&eClick to run /ac check " + player.getName());
 
-        broadcast(message, String.join("\n", hover), "/vigil info " + player.getName(), config.clickable());
+        broadcast(message, String.join("\n", hover), "/ac check " + player.getName(), config.clickable());
         if (config.console()) {
             logger.info(org.bukkit.ChatColor.stripColor(message) + " - " + flag.detail());
         }
@@ -106,15 +106,21 @@ public final class AlertService {
                     components = clickable(coloredMessage, hoverLegacy, command);
                 }
                 if (components != null) {
-                    staff.spigot().sendMessage(components);
-                    continue;
+                    try {
+                        staff.spigot().sendMessage(components);
+                        continue;
+                    } catch (LinkageError | RuntimeException e) {
+                        // Chat components not supported by this server: plain text below.
+                        components = null;
+                        clickable = false;
+                    }
                 }
             }
             staff.sendMessage(coloredMessage);
         }
     }
 
-    /** Sends to staff holding a specific permission (used for review notifications). */
+    /** Sends to staff holding a specific permission who have alerts enabled. */
     public void notify(String permission, String coloredMessage) {
         for (Player staff : Bukkit.getOnlinePlayers()) {
             if (staff.hasPermission(permission) && !disabled.contains(staff.getUniqueId())) {

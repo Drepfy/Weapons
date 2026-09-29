@@ -1,134 +1,68 @@
-# =====================================================================
-#  Vigil - server-side anti-cheat for SMPs
-# =====================================================================
-#  Design principles:
-#   * Extremely low false positives. Every check is lenient by default
-#     and suppresses itself whenever the situation is uncertain
-#     (server lag, high ping, knockback, pistons, explosions, ice, ...).
-#   * Nobody is punished automatically by default. Detections raise a
-#     violation level (VL), alert online staff, and open review cases
-#     for a human to judge. Automatic commands exist but are OFF.
-#   * Fail safe. Invalid values fall back to their defaults and are
-#     reported in the console and in /vigil status. Vigil never rewrites
-#     or deletes this file.
-#
-#  All times are in milliseconds (ms) unless the key says otherwise.
-# =====================================================================
+# ============================================================
+#  Vigil - anti-cheat and moderation for Vanilla SMP
+#  Commands: /ac  /ban  /unban  /mute  /unmute  /warn  /kick
+#  After editing, run /ac reload.
+# ============================================================
+config-version: 2
 
-config-version: 1
+# Shown in front of every message.
+prefix: "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ » &r"
 
-general:
-  # Master switch for every check. Commands, history and reviews keep working.
+anticheat:
   enabled: true
-  # When true, no check ever cancels an action or sets a player back,
-  # regardless of each check's "mitigate" option. Detection still works.
-  passive-mode: false
-  # Players in creative or spectator mode are never checked.
+  # Staff with vigil.alerts see "Steve has been flagged for Flying".
+  alerts: true
+  auto-ban:
+    enabled: true
+    # How long automatic bans last (e.g. 7d, 30d, perm).
+    duration: 30d
+    # {reason} = what was detected, e.g. "Flying".
+    reason: "Cheating ({reason})"
+    # Tell every player about the ban (staff are always told).
+    broadcast: true
+    # Leave empty to use Vigil's own bans. To use another ban plugin instead, e.g.:
+    # command: "tempban {player} {duration} {reason}"
+    command: ""
+  # Creative and spectator players are never checked.
   exempt-creative-and-spectator: true
-  # Worlds (by name) in which no checks run.
+  # Worlds where nothing is checked.
   disabled-worlds: []
-  # Use Paper's client-tick event when the server provides it. This lets the
-  # flight check notice stationary hovering while ignoring frozen/lagging
-  # clients. Harmless on Spigot (the event simply does not exist there).
-  use-client-tick-events: true
-  # Entity types a player can stand on. A player near one of these is never
-  # considered airborne. Matched against the entity type name (contains).
-  platform-entities: [BOAT, RAFT, MINECART, SHULKER, HAPPY_GHAST]
-  # Extra console output for tuning. Very noisy - leave off in production.
-  debug: false
+  # Let players with vigil.bypass skip all checks. Off so "*" permissions don't disable the anti-cheat.
+  bypass-permission: false
 
-lag-protection:
-  # No violations are recorded while the server TPS is below this.
-  min-tps: 17.0
-  # A single server tick longer than this is treated as a lag spike...
-  lag-spike-threshold-ms: 400
-  # ...and all flags are suppressed for this long afterwards.
-  lag-spike-grace-ms: 3000
-  # Players whose recent maximum ping exceeds this are not flagged at all.
-  # Ping is only ever used to make checks MORE lenient, never as evidence.
-  max-ping-ms: 400
-  # Grace periods during which movement checks do not flag.
-  join-grace-ms: 5000
-  respawn-grace-ms: 3000
-  teleport-grace-ms: 1500
-  world-change-grace-ms: 3000
-  gamemode-change-grace-ms: 2000
-  # After knockback, velocity changes, explosions or damage.
-  velocity-grace-ms: 1500
-  # After leaving a vehicle, stopping elytra flight or a riptide.
-  vehicle-exit-grace-ms: 1500
-  elytra-grace-ms: 2500
-  riptide-grace-ms: 3000
-  # Radius (blocks) and duration for "disturbances" such as pistons,
-  # explosions and wind charges. Nearby players are not flagged.
-  disturbance-radius: 8
-  disturbance-grace-ms: 3000
+  # enabled: turn a check on/off.
+  # ban-at: violation level that bans automatically (0 = alert only, never ban).
+  # Each flag adds 1 and 1 decays per minute, so short false flags never add up.
+  checks:
+    speed:       {enabled: true, ban-at: 15}
+    flight:      {enabled: true, ban-at: 8}
+    step:        {enabled: true, ban-at: 8}
+    nofall:      {enabled: true, ban-at: 10}
+    timer:       {enabled: true, ban-at: 10}
+    noslow:      {enabled: true, ban-at: 12}
+    velocity:    {enabled: true, ban-at: 10}
+    reach:       {enabled: true, ban-at: 10}
+    killaura:    {enabled: true, ban-at: 10}
+    noswing:     {enabled: true, ban-at: 10}
+    wallhit:     {enabled: true, ban-at: 8}
+    autoclicker: {enabled: true, ban-at: 0}
+    blockreach:  {enabled: true, ban-at: 8}
+    interact:    {enabled: true, ban-at: 8}
+    fastplace:   {enabled: true, ban-at: 12}
+    nuker:       {enabled: true, ban-at: 8}
+    chestaura:   {enabled: true, ban-at: 8}
 
-alerts:
-  enabled: true
-  # Also print alerts to the server console.
-  console: true
-  # Minimum time between two alerts for the same player and check.
-  # Suppressed alerts are counted and shown on the next one.
-  cooldown-ms: 5000
-  # Placeholders: {prefix} {player} {reason} (e.g. Kill Aura) {check} (e.g. HitAngle)
-  #               {vl} {detail} {ping} {tps} {suppressed}
-  # The evidence ({detail}) is also shown when hovering the alert.
-  format: "{prefix}&f{player} &7has been flagged for &c{reason} &8(VL {vl}){suppressed}"
-  # Hovering an alert shows details; clicking runs /vigil info <player>.
-  clickable: true
-
-violations:
-  # Recent flags kept per player (in memory and in the player's record).
-  history-size: 50
-  # Append every flag to plugins/Vigil/logs/flags-YYYY-MM-DD.log
-  log-to-file: true
-  # Delete flag logs older than this many days. 0 = keep forever (default).
-  log-retention-days: 0
-
-review:
-  enabled: true
-  # Evidence lines stored per case.
-  max-evidence: 25
-  # Staff with vigil.review are told when a case is opened.
-  notify: true
-  # Upper bound on open cases; the oldest resolved cases are archived first.
-  max-cases: 1000
-
-punishments:
-  # Automatic commands. OFF by default: Vigil is built for staff review.
-  enabled: false
-  # When true, commands are only written to the console/log, never run.
-  dry-run: true
-  # A command only runs when the player was flagged by that check at least
-  # this many times within the window. Protects against one-off detections.
-  min-flags-in-window: 5
-  window-ms: 600000
-  # Minimum time between automatic commands for the same player and check.
-  cooldown-ms: 1800000
-
-# ---------------------------------------------------------------------
-#  Moderation commands: /ban /tempban /unban /mute /tempmute /unmute
-#  /warn /kick /punishments. Typing a preset reason (tab completes) uses
-#  its default duration unless you type a duration yourself:
-#    /ban Steve Cheating        -> banned for 30 days, reason "Cheating"
-#    /ban Steve 7d Griefing     -> banned for 7 days
-#    /ban Steve                 -> permanent, reason "No Reason"
-#  Durations: 30s 15m 12h 7d 2w 1mo 1y perm (can be combined: 1d12h)
-# ---------------------------------------------------------------------
 moderation:
   enabled: true
-  # Who else is told about a punishment: staff (vigil.moderation.notify),
-  # all (every player) or none. The console always logs it.
+  # Who else sees punishments: staff (vigil.alerts), all, or none.
   broadcast: staff
-  # Used when neither a duration nor a preset with a duration is given.
+  # Used when no duration is typed and the reason has no preset duration.
   default-duration:
     ban: perm
     mute: perm
-  # Commands muted players cannot use (besides chat).
+  # Commands muted players cannot use.
   muted-blocked-commands: [msg, tell, w, whisper, r, reply, me, say, mail, m, t, pm, dm, message, emsg, etell, ewhisper, er, ereply]
-  # Preset reasons per command. "Name: duration" (leave the duration empty for
-  # none). Underscores are shown as spaces. Add, remove or rename freely.
+  # Preset reasons: "/ban Steve Cheating" bans for 30 days. Underscores show as spaces.
   reasons:
     ban:
       Cheating: 30d
@@ -179,193 +113,10 @@ moderation:
     unban: [Appeal_Accepted, False_Ban, Served_Time, Staff_Decision]
     unmute: [Appeal_Accepted, False_Mute, Served_Time, Staff_Decision]
 
-# ---------------------------------------------------------------------
-#  Checks. Common options for every check:
-#    enabled           turn the check on/off
-#    alert-vl          VL at which staff alerts start (0 = alert on every flag)
-#    review-vl         VL at which a review case is opened (0 = never)
-#    decay-per-minute  VL removed per minute without new flags
-#    vl-per-flag       VL added by one flag
-#    buffer-threshold  suspicious events needed before a single flag
-#    mitigate          cancel/set back the action (off for movement checks)
-#    actions           optional automatic commands, see README (requires
-#                      punishments.enabled). Example:
-#                        actions:
-#                          - vl: 40
-#                            commands: ["kick {player} Please disable your cheats"]
-# ---------------------------------------------------------------------
-checks:
-  speed:
-    enabled: true
-    alert-vl: 3
-    review-vl: 10
-    decay-per-minute: 1.0
-    vl-per-flag: 1.0
-    buffer-threshold: 1
-    # Set the player back to their last legitimate position on flag.
-    mitigate: false
-    # Multiplier on the computed maximum legitimate speed.
-    leniency: 1.25
-    # How much over-speed distance can be absorbed, in ticks of max speed.
-    burst-ticks: 20
-    # Constant extra distance (blocks) tolerated on top of the burst.
-    extra-blocks: 2.0
-    # Speed multipliers for special surfaces (the largest applicable wins).
-    ice-multiplier: 3.2
-    ceiling-multiplier: 1.8
-    slime-multiplier: 2.0
-    soul-speed-multiplier: 1.8
-    # How long a surface keeps affecting the limit after leaving it.
-    surface-memory-ms: 2000
-    # Distance credit granted per block/tick of received velocity.
-    velocity-credit: 15.0
-
-  flight:
-    enabled: true
-    alert-vl: 2
-    review-vl: 6
-    decay-per-minute: 1.0
-    vl-per-flag: 1.0
-    buffer-threshold: 1
-    mitigate: false
-    # Once a player stops rising, gravity must pull them down. Over every
-    # window of this much client time they must descend at least min-descent
-    # blocks. Vanilla free fall covers ~14 blocks in the first second; a
-    # client waiting for chunks sinks at ~2 blocks/second.
-    hover-window-ms: 1000
-    min-descent: 1.0
-    # Blocks of rise tolerated above the highest possible jump.
-    ascend-tolerance: 1.0
-    # A suspicion must persist this long after Vigil resynchronises the
-    # blocks around the player (removes "ghost block" false positives).
-    confirm-ms: 1000
-    # Longest rise accepted after knockback/velocity before normal rules apply.
-    impulse-max-rise-ms: 4000
-
-  vertical:
-    enabled: true
-    alert-vl: 2
-    review-vl: 6
-    decay-per-minute: 1.0
-    vl-per-flag: 1.0
-    buffer-threshold: 2
-    mitigate: false
-    # Extra blocks tolerated above the highest possible single-tick ascent.
-    tolerance: 0.1
-
-  ground-spoof:
-    enabled: true
-    alert-vl: 3
-    review-vl: 8
-    decay-per-minute: 1.0
-    vl-per-flag: 1.0
-    buffer-threshold: 8
-    mitigate: false
-    # How far below the feet (blocks) a supporting block may be.
-    vertical-tolerance: 0.5
-    # How far beyond the player's hitbox (blocks) a supporting block may be.
-    horizontal-tolerance: 0.3
-
-  timer:
-    enabled: true
-    alert-vl: 3
-    review-vl: 10
-    decay-per-minute: 1.0
-    vl-per-flag: 1.0
-    buffer-threshold: 1
-    mitigate: false
-    # Flag once the player has sent this much more movement time than
-    # has actually passed (ms of "debt").
-    max-debt-ms: 600
-    # Unused time a player can bank while idle.
-    max-credit-ms: 1000
-    # Time that passes during a connection stall is kept as credit for the
-    # burst of queued packets that follows (only packets arriving in a burst
-    # can use it). It expires after this much normal packet flow.
-    stall-forgiveness-ms: 2500
-
-  reach:
-    enabled: true
-    alert-vl: 3
-    review-vl: 10
-    decay-per-minute: 1.0
-    vl-per-flag: 1.0
-    buffer-threshold: 3
-    # Cancel hits that are far beyond any legitimate reach (see cancel-leniency).
-    mitigate: true
-    # Blocks tolerated beyond the attacker's interaction range (3.0 in survival)
-    # after lag compensation.
-    leniency: 0.5
-    # Hits beyond range + cancel-leniency are cancelled when mitigate is on.
-    cancel-leniency: 2.0
-    # Lag compensation window = ping + this (ms), capped by max-lag-window-ms.
-    lag-window-extra-ms: 250
-    max-lag-window-ms: 1000
-    # Additional tolerance for non-player targets (their history is not tracked).
-    mob-leniency: 0.6
-
-  hit-angle:
-    enabled: true
-    alert-vl: 3
-    review-vl: 8
-    decay-per-minute: 1.0
-    vl-per-flag: 1.0
-    buffer-threshold: 4
-    mitigate: false
-    # Degrees between the player's view and the target, taking the whole
-    # rotation of the attack tick into account.
-    max-angle: 70.0
-    # Targets closer than this (blocks) are ignored.
-    min-distance: 1.2
-
-  wall-hit:
-    enabled: true
-    alert-vl: 3
-    review-vl: 8
-    decay-per-minute: 1.0
-    vl-per-flag: 1.0
-    buffer-threshold: 3
-    mitigate: false
-    # Performance guard: at most this many line-of-sight traces per player/second.
-    max-traces-per-second: 10
-
-  block-reach:
-    enabled: true
-    alert-vl: 2
-    review-vl: 6
-    decay-per-minute: 1.0
-    vl-per-flag: 1.0
-    buffer-threshold: 2
-    mitigate: true
-    # Blocks tolerated beyond the block interaction range (4.5 in survival).
-    leniency: 1.0
-    # Break/place beyond range + cancel-leniency is cancelled when mitigate is on.
-    cancel-leniency: 1.5
-
-  wall-interact:
-    enabled: true
-    alert-vl: 3
-    review-vl: 8
-    decay-per-minute: 1.0
-    vl-per-flag: 1.0
-    buffer-threshold: 3
-    mitigate: false
-    # Only these blocks are checked (suffix * matches any prefix/suffix).
-    blocks: [CHEST, TRAPPED_CHEST, BARREL, ENDER_CHEST, "*SHULKER_BOX", FURNACE, BLAST_FURNACE, SMOKER, HOPPER, DROPPER, DISPENSER, BREWING_STAND]
-
-# Every message starts with the prefix. Colour codes use &.
-# Moderation placeholders: {player} {staff} {reason} {duration} {expires} {count} {id}
+# Placeholders: {player} {staff} {reason} {duration} {expires} {count} {vl}
 messages:
-  prefix: "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ » &r"
-  no-permission: "&cYou do not have permission to do that."
-  player-not-found: "&cPlayer not found: &f{player}"
-  alerts-enabled: "&aStaff alerts enabled."
-  alerts-disabled: "&eStaff alerts disabled."
-  reloaded: "&aConfiguration reloaded. &7({warnings} warning(s))"
-  reload-failed: "&cReload failed, previous configuration kept: &f{error}"
-  case-opened: "&eReview case &f#{id} &eopened for &f{player}&e: {reason}"
-  no-reason: "No Reason"
-  permanent: "Permanent"
+  flagged: "&f{player} &7has been flagged for &c{reason} &8(VL {vl})"
+  auto-banned: "&c{player} &7has been banned for &c{reason}&7."
   ban-success: "&7You have banned player &b{player} &7for &b{reason} &7for &b{duration}&7."
   unban-success: "&7You have unbanned player &b{player} &7for &b{reason}&7."
   mute-success: "&7You have muted player &b{player} &7for &b{reason} &7for &b{duration}&7."
@@ -378,7 +129,6 @@ messages:
   unmute-broadcast: "&b{staff} &7unmuted &b{player} &7for &b{reason}&7."
   warn-broadcast: "&b{staff} &7warned &b{player} &7for &b{reason}&7."
   kick-broadcast: "&b{staff} &7kicked &b{player} &7for &b{reason}&7."
-  # Shown on the disconnect screen (one entry per line).
   ban-screen:
     - "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ"
     - ""
@@ -399,7 +149,17 @@ messages:
   muted-chat: "&cYou are muted for &f{reason}&c. &7Expires in: &f{expires}"
   unmute-notify: "&aYou have been unmuted."
   warn-notify: "&cYou have been warned for &f{reason}&c. &7(warning #{count})"
+  no-reason: "No Reason"
+  permanent: "Permanent"
+  no-permission: "&cYou do not have permission to do that."
+  player-not-found: "&cPlayer not found: &f{player}"
   not-banned: "&c{player} is not banned."
   not-muted: "&c{player} is not muted."
   cannot-punish: "&cYou cannot punish {player}."
+  alerts-enabled: "&aAnti-cheat alerts enabled."
+  alerts-disabled: "&eAnti-cheat alerts disabled."
+  reloaded: "&aConfiguration reloaded. &7({warnings} warning(s), see console)"
+  reload-failed: "&cReload failed, previous configuration kept: &f{error}"
   moderation-disabled: "&cModeration commands are disabled in the configuration."
+
+# Fine-tuning (lag protection, per-check thresholds...) is optional and described in the README.

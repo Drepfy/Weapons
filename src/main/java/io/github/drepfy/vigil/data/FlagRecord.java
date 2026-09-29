@@ -24,7 +24,7 @@ public record FlagRecord(long timeMs,
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
             .withZone(ZoneId.systemDefault());
 
-    /** Single line used in logs, player records and review evidence. */
+    /** Single line used in logs and player records. */
     public String toLine() {
         return TIME.format(Instant.ofEpochMilli(timeMs)) + " " + check.displayName()
                 + " vl=" + Text.num(vl)

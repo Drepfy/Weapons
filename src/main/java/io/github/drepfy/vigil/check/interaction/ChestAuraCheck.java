@@ -19,22 +19,22 @@ import org.bukkit.event.player.PlayerInteractEvent;
  * only when every line from every plausible eye position to a grid of points on the
  * clicked face passes through another full, opaque block.
  */
-public final class WallInteractCheck {
+public final class ChestAuraCheck {
 
-    private static final CheckType TYPE = CheckType.WALL_INTERACT;
+    private static final CheckType TYPE = CheckType.CHESTAURA;
     private static final double INSET = 0.05;
     private static final double OFFSET = 0.01;
 
     private final CheckContext ctx;
 
-    public WallInteractCheck(CheckContext ctx) {
+    public ChestAuraCheck(CheckContext ctx) {
         this.ctx = ctx;
     }
 
     public void onInteract(Player player, PlayerData data, PlayerInteractEvent event, long now) {
         Block block = event.getClickedBlock();
         BlockFace face = event.getBlockFace();
-        if (block == null || !ctx.isActive(player, data, TYPE, now)) {
+        if (block == null || !ctx.isActive(player, data, TYPE, now) || ctx.recentlyRelocated(data, now)) {
             return;
         }
         CheckSettings settings = ctx.settings(TYPE);

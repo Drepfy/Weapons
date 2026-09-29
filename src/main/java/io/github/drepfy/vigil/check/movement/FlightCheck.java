@@ -71,6 +71,11 @@ public final class FlightCheck {
         }
         boolean supported = (flags & WorldProbe.NOT_AIRBORNE) != 0;
         boolean bouncy = (flags & WorldProbe.BOUNCY) != 0;
+        if (!supported && ctx.probe().isAboveBubbleColumn(world, location.getX(), y, location.getZ())) {
+            // Bubble columns launch players out of the water.
+            supported = true;
+            data.lastLiquidMs = now;
+        }
         if ((flags & WorldProbe.LIQUID) != 0) {
             data.lastLiquidMs = now;
         }

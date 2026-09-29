@@ -8,12 +8,19 @@ package io.github.drepfy.vigil.util;
 public final class Clock {
 
     private static final long ORIGIN = System.nanoTime();
+    private static volatile java.util.function.LongSupplier testSource;
 
     private Clock() {
     }
 
     /** Milliseconds since plugin class loading, monotonic. */
     public static long now() {
-        return (System.nanoTime() - ORIGIN) / 1_000_000L;
+        java.util.function.LongSupplier source = testSource;
+        return source != null ? source.getAsLong() : (System.nanoTime() - ORIGIN) / 1_000_000L;
+    }
+
+    /** Tests only: replaces the time source ({@code null} restores the real clock). */
+    public static void setTestSource(java.util.function.LongSupplier source) {
+        testSource = source;
     }
 }

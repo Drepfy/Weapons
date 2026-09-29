@@ -123,6 +123,37 @@ public final class PositionHistory {
         return elapsed <= 0 ? 0.0 : path * 50.0 / elapsed;
     }
 
+    /**
+     * Average horizontal speed in blocks per 50 ms along the path recorded between
+     * {@code fromMs} and {@code toMs}, or {@link Double#NaN} when the history does not
+     * cover at least 80% of that window.
+     */
+    public double averageHorizontalSpeed(long fromMs, long toMs) {
+        double path = 0.0;
+        long first = Long.MAX_VALUE;
+        long last = Long.MIN_VALUE;
+        for (int i = 0; i + 1 < size; i++) {
+            int newer = Math.floorMod(head - 1 - i, times.length);
+            int older = Math.floorMod(head - 2 - i, times.length);
+            if (times[older] < fromMs) {
+                break;
+            }
+            if (times[newer] > toMs) {
+                continue;
+            }
+            double dx = xs[newer] - xs[older];
+            double dz = zs[newer] - zs[older];
+            path += Math.sqrt(dx * dx + dz * dz);
+            first = Math.min(first, times[older]);
+            last = Math.max(last, times[newer]);
+        }
+        long covered = last - first;
+        if (first == Long.MAX_VALUE || covered < (toMs - fromMs) * 0.8) {
+            return Double.NaN;
+        }
+        return path * 50.0 / covered;
+    }
+
     /** Horizontal speed (blocks/tick) between the two most recent samples, 0 if unknown. */
     public double recentHorizontalSpeed() {
         if (size < 2) {

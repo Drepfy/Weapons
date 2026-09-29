@@ -8,14 +8,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Timer detection with the default settings (600 ms debt, 1000 ms credit, 2500 ms
+ * Timer detection with the default settings (400 ms debt, 1000 ms credit, 2500 ms
  * stall forgiveness).
  */
 class TimerBalanceTest {
 
     private static final double MAX_CREDIT = 1000;
     private static final long FORGIVENESS = 2500;
-    private static final double MAX_DEBT = 600;
+    private static final double MAX_DEBT = 400;
 
     private static double tick(TimerBalance balance, long arrival) {
         return balance.onClientTick(arrival, MAX_CREDIT, FORGIVENESS, MAX_DEBT);

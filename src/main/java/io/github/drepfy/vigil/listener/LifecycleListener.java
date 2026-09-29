@@ -2,6 +2,7 @@ package io.github.drepfy.vigil.listener;
 
 import io.github.drepfy.vigil.api.CheckType;
 import io.github.drepfy.vigil.check.CheckContext;
+import io.github.drepfy.vigil.check.movement.VelocityCheck;
 import io.github.drepfy.vigil.data.PlayerData;
 import io.github.drepfy.vigil.util.Clock;
 import org.bukkit.Location;
@@ -40,11 +41,14 @@ public final class LifecycleListener implements Listener {
     private static final long BONUS_DURATION_MS = 3000;
 
     private final CheckContext ctx;
+    private final VelocityCheck velocityCheck;
     private final Consumer<Player> onJoin;
     private final Consumer<Player> onQuit;
 
-    public LifecycleListener(CheckContext ctx, Consumer<Player> onJoin, Consumer<Player> onQuit) {
+    public LifecycleListener(CheckContext ctx, VelocityCheck velocityCheck, Consumer<Player> onJoin,
+                             Consumer<Player> onQuit) {
         this.ctx = ctx;
+        this.velocityCheck = velocityCheck;
         this.onJoin = onJoin;
         this.onQuit = onQuit;
     }
@@ -114,20 +118,35 @@ public final class LifecycleListener implements Listener {
         Vector velocity = event.getVelocity();
         double horizontal = Math.sqrt(velocity.getX() * velocity.getX() + velocity.getZ() * velocity.getZ());
         impulse(player, data, horizontal, now);
+        if (ctx.settings().general().enabled()) {
+            ctx.run(CheckType.VELOCITY, now, () -> velocityCheck.onVelocity(player, data, velocity, now));
+        }
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    /**
+     * Knockback from hits arrives as a velocity event, so damage itself grants no grace;
+     * only explosions push players without one. Cancelled damage counts too: a fall whose
+     * damage another plugin cancelled was still a legitimate fall.
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
     public void onDamage(EntityDamageEvent event) {
         if (!(event.getEntity() instanceof Player player)) {
             return;
         }
         long now = Clock.now();
         PlayerData data = ctx.players().get(player);
-        data.lastDamageMs = now;
         EntityDamageEvent.DamageCause cause = event.getCause();
-        boolean explosion = cause == EntityDamageEvent.DamageCause.BLOCK_EXPLOSION
-                || cause == EntityDamageEvent.DamageCause.ENTITY_EXPLOSION;
-        impulse(player, data, explosion ? EXPLOSION_KNOCKBACK : UNKNOWN_KNOCKBACK, now);
+        if (cause == EntityDamageEvent.DamageCause.FALL) {
+            data.lastFallDamageMs = now;
+            return;
+        }
+        if (!event.isCancelled()) {
+            data.lastDamageMs = now;
+        }
+        if (cause == EntityDamageEvent.DamageCause.BLOCK_EXPLOSION
+                || cause == EntityDamageEvent.DamageCause.ENTITY_EXPLOSION) {
+            impulse(player, data, EXPLOSION_KNOCKBACK, now);
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)

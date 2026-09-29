@@ -18,7 +18,7 @@ import org.bukkit.event.Cancellable;
  */
 public final class WallHitCheck {
 
-    private static final CheckType TYPE = CheckType.WALL_HIT;
+    private static final CheckType TYPE = CheckType.WALLHIT;
     private static final int MAX_BOXES = 4;
     private static final double INSET = 0.05;
     private static final int GRID = 3;
@@ -30,7 +30,7 @@ public final class WallHitCheck {
     }
 
     public void onAttack(Player attacker, PlayerData data, AttackSnapshot hit, Cancellable event, long now) {
-        if (!ctx.isActive(attacker, data, TYPE, now)) {
+        if (!ctx.isActive(attacker, data, TYPE, now) || ctx.recentlyRelocated(data, now)) {
             return;
         }
         CheckSettings settings = ctx.settings(TYPE);

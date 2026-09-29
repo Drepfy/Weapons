@@ -3,16 +3,23 @@ package io.github.drepfy.vigil;
 import io.github.drepfy.vigil.api.CheckType;
 import io.github.drepfy.vigil.api.VigilApi;
 import io.github.drepfy.vigil.check.CheckContext;
-import io.github.drepfy.vigil.check.combat.HitAngleCheck;
+import io.github.drepfy.vigil.check.combat.AutoClickerCheck;
+import io.github.drepfy.vigil.check.combat.KillAuraCheck;
+import io.github.drepfy.vigil.check.combat.NoSwingCheck;
 import io.github.drepfy.vigil.check.combat.ReachCheck;
 import io.github.drepfy.vigil.check.combat.WallHitCheck;
 import io.github.drepfy.vigil.check.interaction.BlockReachCheck;
-import io.github.drepfy.vigil.check.interaction.WallInteractCheck;
+import io.github.drepfy.vigil.check.interaction.ChestAuraCheck;
+import io.github.drepfy.vigil.check.interaction.FastPlaceCheck;
+import io.github.drepfy.vigil.check.interaction.InteractCheck;
+import io.github.drepfy.vigil.check.interaction.NukerCheck;
 import io.github.drepfy.vigil.check.movement.FlightCheck;
-import io.github.drepfy.vigil.check.movement.GroundSpoofCheck;
+import io.github.drepfy.vigil.check.movement.NoFallCheck;
+import io.github.drepfy.vigil.check.movement.NoSlowCheck;
 import io.github.drepfy.vigil.check.movement.SpeedCheck;
+import io.github.drepfy.vigil.check.movement.StepCheck;
 import io.github.drepfy.vigil.check.movement.TimerCheck;
-import io.github.drepfy.vigil.check.movement.VerticalCheck;
+import io.github.drepfy.vigil.check.movement.VelocityCheck;
 import io.github.drepfy.vigil.command.VigilCommand;
 import io.github.drepfy.vigil.compat.ServerCompat;
 import io.github.drepfy.vigil.config.ConfigLoader;
@@ -32,7 +39,6 @@ import io.github.drepfy.vigil.listener.WorldActivityListener;
 import io.github.drepfy.vigil.moderation.ModerationCommand;
 import io.github.drepfy.vigil.moderation.ModerationListener;
 import io.github.drepfy.vigil.moderation.ModerationService;
-import io.github.drepfy.vigil.review.ReviewService;
 import io.github.drepfy.vigil.storage.FlagLogWriter;
 import io.github.drepfy.vigil.storage.IoExecutor;
 import io.github.drepfy.vigil.storage.PlayerRecord;
@@ -41,8 +47,8 @@ import io.github.drepfy.vigil.task.TickTask;
 import io.github.drepfy.vigil.task.TpsMonitor;
 import io.github.drepfy.vigil.util.Clock;
 import io.github.drepfy.vigil.violation.AlertService;
+import io.github.drepfy.vigil.violation.AutoBanService;
 import io.github.drepfy.vigil.violation.DebugService;
-import io.github.drepfy.vigil.violation.PunishmentService;
 import io.github.drepfy.vigil.violation.ViolationService;
 import org.bukkit.Bukkit;
 import org.bukkit.command.PluginCommand;
@@ -61,7 +67,9 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
@@ -73,7 +81,7 @@ import java.util.logging.Level;
  * (the file is never rewritten); a failure while wiring components disables the
  * plugin cleanly instead of leaving it half-running.
  */
-public final class VigilPlugin extends JavaPlugin {
+public class VigilPlugin extends JavaPlugin {
 
     private volatile Settings settings;
     private IoExecutor io;
@@ -81,12 +89,12 @@ public final class VigilPlugin extends JavaPlugin {
     private PlayerRecordStore records;
     private FlagLogWriter flagLog;
     private AlertService alerts;
-    private ReviewService review;
     private DebugService debug;
     private TpsMonitor tps;
     private CheckContext checks;
     private LifecycleListener lifecycle;
-    private HitAngleCheck hitAngle;
+    private KillAuraCheck killAura;
+    private NoSwingCheck noSwing;
     private ModerationService moderation;
     private BukkitTask tickTask;
     private boolean started;
@@ -103,6 +111,7 @@ public final class VigilPlugin extends JavaPlugin {
     }
 
     private void start() {
+        migrateLegacyConfig();
         saveDefaultConfig();
         settings = readSettings(null);
         logWarnings(settings.warnings());
@@ -117,44 +126,47 @@ public final class VigilPlugin extends JavaPlugin {
         ServerCompat compat = new ServerCompat(getLogger());
         WorldProbe probe = new WorldProbe(new BlockTraits(getLogger()));
         DisturbanceRegistry disturbances = new DisturbanceRegistry();
+        PluginManager pm = getServer().getPluginManager();
+
+        moderation = new ModerationService(getLogger(), io, dataDir.resolve("data").resolve("punishments.yml"));
+        ModerationListener moderationListener = new ModerationListener(this::settings, moderation);
+        pm.registerEvents(moderationListener, this);
 
         alerts = new AlertService(this::settings, getLogger(), io, dataDir.resolve("data").resolve("staff.yml"));
-        review = new ReviewService(this::settings, getLogger(), io, dataDir.resolve("data").resolve("cases.yml"),
-                dataDir.resolve("data").resolve("cases-archive.log"), alerts);
-        PunishmentService punishments = new PunishmentService(this::settings, getLogger(),
-                line -> flagLog.append("[punishment] " + line));
-        ViolationService violations = new ViolationService(this::settings, alerts, review, punishments, flagLog, tps,
-                compat);
+        AutoBanService autoBan = new AutoBanService(this, this::settings, moderation, moderationListener, alerts,
+                getLogger(), line -> flagLog.append(line));
+        ViolationService violations = new ViolationService(this::settings, alerts, autoBan, flagLog, tps, compat);
         debug = new DebugService(getLogger(), () -> settings.general().debug());
         checks = new CheckContext(this::settings, getLogger(), compat, probe, disturbances, tps, violations, debug,
                 players);
 
         SpeedCheck speed = new SpeedCheck(checks);
-        VerticalCheck vertical = new VerticalCheck(checks);
-        GroundSpoofCheck groundSpoof = new GroundSpoofCheck(checks);
+        StepCheck step = new StepCheck(checks);
+        NoFallCheck noFall = new NoFallCheck(checks);
         TimerCheck timer = new TimerCheck(checks);
         FlightCheck flight = new FlightCheck(checks);
-        hitAngle = new HitAngleCheck(checks);
+        VelocityCheck velocity = new VelocityCheck(checks);
+        NoSlowCheck noSlow = new NoSlowCheck(checks);
+        killAura = new KillAuraCheck(checks);
+        noSwing = new NoSwingCheck(checks);
 
-        lifecycle = new LifecycleListener(checks, this::handleJoin, this::handleQuit);
-        PluginManager pm = getServer().getPluginManager();
+        lifecycle = new LifecycleListener(checks, velocity, this::handleJoin, this::handleQuit);
         pm.registerEvents(lifecycle, this);
-        pm.registerEvents(new MovementListener(checks, getLogger(), speed, vertical, groundSpoof, timer), this);
-        pm.registerEvents(new CombatListener(checks, lifecycle, new ReachCheck(checks), hitAngle,
-                new WallHitCheck(checks)), this);
-        pm.registerEvents(new InteractionListener(checks, new BlockReachCheck(checks), new WallInteractCheck(checks)),
-                this);
+        pm.registerEvents(new MovementListener(checks, getLogger(), speed, step, noFall, timer), this);
+        CombatListener combat = new CombatListener(checks, lifecycle, new ReachCheck(checks), killAura,
+                new WallHitCheck(checks), noSwing, new AutoClickerCheck(checks));
+        pm.registerEvents(combat, this);
+        InteractionListener interaction = new InteractionListener(checks, new BlockReachCheck(checks),
+                new ChestAuraCheck(checks), new InteractCheck(checks), new FastPlaceCheck(checks),
+                new NukerCheck(checks));
+        pm.registerEvents(interaction, this);
         pm.registerEvents(new WorldActivityListener(disturbances), this);
-        new OptionalHooks(this, checks, lifecycle, timer).registerAll();
+        new OptionalHooks(this, checks, lifecycle, combat, interaction, timer).registerAll();
         registerBypassPermissions(pm);
 
-        moderation = new ModerationService(getLogger(), io, dataDir.resolve("data").resolve("punishments.yml"));
-        ModerationListener moderationListener = new ModerationListener(this::settings, moderation);
-        pm.registerEvents(moderationListener, this);
         ModerationCommand moderationCommand = new ModerationCommand(this::settings, moderation, moderationListener,
                 getLogger());
-        for (String name : List.of("ban", "tempban", "unban", "mute", "tempmute", "unmute", "warn", "kick",
-                "punishments")) {
+        for (String name : List.of("ban", "unban", "mute", "unmute", "warn", "kick")) {
             PluginCommand moderationPluginCommand = getCommand(name);
             if (moderationPluginCommand != null) {
                 moderationPluginCommand.setExecutor(moderationCommand);
@@ -162,13 +174,13 @@ public final class VigilPlugin extends JavaPlugin {
             }
         }
 
-        PluginCommand command = getCommand("vigil");
+        PluginCommand command = getCommand("ac");
         if (command != null) {
             VigilCommand executor = new VigilCommand(this);
             command.setExecutor(executor);
             command.setTabCompleter(executor);
         } else {
-            getLogger().severe("The /vigil command is missing from plugin.yml; staff commands are unavailable.");
+            getLogger().severe("The /ac command is missing from plugin.yml; staff commands are unavailable.");
         }
 
         getServer().getServicesManager().register(VigilApi.class, new VigilApiImpl(this), this, ServicePriority.Normal);
@@ -177,16 +189,15 @@ public final class VigilPlugin extends JavaPlugin {
         for (Player player : Bukkit.getOnlinePlayers()) {
             handleJoin(player);
         }
+        TickTask.Checks driven = new TickTask.Checks(flight, velocity, noSlow, noFall, killAura, noSwing);
         tickTask = Bukkit.getScheduler().runTaskTimer(this,
-                new TickTask(checks, flight, hitAngle, disturbances, () -> {
-                    review.saveIfDirty();
-                    moderation.saveIfDirty();
-                }, this::saveDirtyRecords), 1L, 1L);
+                new TickTask(checks, driven, disturbances, moderation::saveIfDirty, this::saveDirtyRecords), 1L, 1L);
 
-        getLogger().info("Vigil enabled: " + enabledChecks() + " of " + CheckType.values().length + " checks active"
-                + (settings.general().passiveMode() ? " (passive mode)" : "")
-                + (settings.punishments().enabled() ? ", automatic commands ON"
-                + (settings.punishments().dryRun() ? " (dry-run)" : "") : ", automatic commands off") + ".");
+        Settings.AutoBan autoBanSettings = settings.autoBan();
+        getLogger().info("Enabled: " + enabledChecks() + " of " + CheckType.values().length + " checks active"
+                + (settings.general().passiveMode() ? " (passive mode: no setbacks, no bans)" : "")
+                + ", auto-ban " + (autoBanSettings.enabled() && !settings.general().passiveMode() ? "ON" : "off")
+                + ". Staff commands: /ac, /ban, /mute, /warn, /kick.");
     }
 
     @Override
@@ -213,9 +224,9 @@ public final class VigilPlugin extends JavaPlugin {
             io.shutdown(5000);
             // The IO thread has stopped: write whatever is still dirty synchronously.
             records.saveAllNow(pending);
-            review.saveNow();
             moderation.saveNow();
-            hitAngle.clear();
+            killAura.clear();
+            noSwing.clear();
             players.clear();
         } catch (Throwable t) {
             getLogger().log(Level.WARNING, "Error while shutting down Vigil", t);
@@ -239,7 +250,7 @@ public final class VigilPlugin extends JavaPlugin {
                 throw new IllegalStateException(e.getMessage() == null ? e.toString() : e.getMessage(), e);
             }
             getLogger().severe("config.yml could not be read (" + e.getMessage() + "). Using built-in defaults; "
-                    + "fix the file and run /vigil reload. The file was not modified.");
+                    + "fix the file and run /ac reload. The file was not modified.");
             return defaultsFromJar(e.getMessage());
         }
     }
@@ -252,6 +263,83 @@ public final class VigilPlugin extends JavaPlugin {
         } catch (IOException | RuntimeException e) {
             return ConfigLoader.defaults(warnings);
         }
+    }
+
+    /**
+     * A config.yml from Vigil 1.x is moved to {@code config-1.x-backup.yml} and replaced
+     * by the new, shorter file. Moderation settings, messages and the basic anti-cheat
+     * switches are carried over; check tuning is not (the new defaults detect far more).
+     */
+    private void migrateLegacyConfig() {
+        File file = new File(getDataFolder(), "config.yml");
+        if (!file.isFile()) {
+            return;
+        }
+        YamlConfiguration old = new YamlConfiguration();
+        try {
+            old.load(file);
+        } catch (IOException | InvalidConfigurationException | RuntimeException e) {
+            return; // Reported by readSettings; never touch an unreadable file.
+        }
+        if (!ConfigLoader.isLegacyLayout(old)) {
+            return;
+        }
+        File backup = new File(getDataFolder(), "config-1.x-backup.yml");
+        for (int i = 2; backup.exists(); i++) {
+            backup = new File(getDataFolder(), "config-1.x-backup-" + i + ".yml");
+        }
+        try {
+            Files.move(file.toPath(), backup.toPath(), StandardCopyOption.ATOMIC_MOVE);
+        } catch (IOException | RuntimeException e) {
+            getLogger().warning("config.yml is from Vigil 1.x but could not be backed up (" + e.getMessage()
+                    + "); it is used as is. Delete it to get the new config.yml.");
+            return;
+        }
+        saveResource("config.yml", true);
+        try {
+            YamlConfiguration fresh = new YamlConfiguration();
+            fresh.load(file);
+            int copied = 0;
+            copied += copyLeaves(old, fresh, "moderation", "moderation");
+            copied += copyLeaves(old, fresh, "messages", "messages");
+            copied += copyValue(old, "messages.prefix", fresh, "prefix");
+            copied += copyValue(old, "general.enabled", fresh, "anticheat.enabled");
+            copied += copyValue(old, "general.disabled-worlds", fresh, "anticheat.disabled-worlds");
+            copied += copyValue(old, "general.exempt-creative-and-spectator", fresh,
+                    "anticheat.exempt-creative-and-spectator");
+            fresh.save(file);
+            getLogger().warning("Your config.yml was from Vigil 1.x. It was saved as " + backup.getName()
+                    + " and replaced by the new, shorter config.yml (" + copied
+                    + " moderation/message settings kept). Auto-ban is now ON; see the anticheat section.");
+        } catch (IOException | InvalidConfigurationException | RuntimeException e) {
+            getLogger().warning("Could not carry old settings into the new config.yml: " + e.getMessage());
+        }
+    }
+
+    private static int copyLeaves(YamlConfiguration from, YamlConfiguration to, String fromPath, String toPath) {
+        org.bukkit.configuration.ConfigurationSection section = from.getConfigurationSection(fromPath);
+        if (section == null) {
+            return 0;
+        }
+        int copied = 0;
+        for (String key : section.getKeys(true)) {
+            if (!section.isConfigurationSection(key)) {
+                copied += copyValue(from, fromPath + "." + key, to, toPath + "." + key);
+            }
+        }
+        return copied;
+    }
+
+    private static int copyValue(YamlConfiguration from, String fromPath, YamlConfiguration to, String toPath) {
+        Object value = from.get(fromPath);
+        if (value == null || value.equals(to.get(toPath))) {
+            return 0;
+        }
+        if (toPath.startsWith("messages.") && !to.contains(toPath)) {
+            return 0; // Messages that no longer exist.
+        }
+        to.set(toPath, value);
+        return 1;
     }
 
     /**
@@ -292,6 +380,11 @@ public final class VigilPlugin extends JavaPlugin {
     private void handleJoin(Player player) {
         long now = Clock.now();
         PlayerData data = players.join(player, now);
+        if (data.autoBanned) {
+            // Only possible after the ban was lifted: start over with a clean slate.
+            data.autoBanned = false;
+            data.resetViolations(null);
+        }
         data.flight.reset(player.getLocation().getY(), true);
         if (data.record != null) {
             data.record.seen(player.getName());
@@ -362,10 +455,6 @@ public final class VigilPlugin extends JavaPlugin {
 
     public AlertService alerts() {
         return alerts;
-    }
-
-    public ReviewService review() {
-        return review;
     }
 
     public DebugService debugService() {

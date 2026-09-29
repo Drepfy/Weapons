@@ -20,9 +20,8 @@
 - **Persistence**: async single-thread IO with a bounded queue; atomic writes;
   corrupt files moved aside, never deleted; player records, review queue,
   staff alert preferences, daily flag logs.
-- **Commands/permissions**: `/vigil` with alerts, info, history (offline), review
-  (list/view/claim/resolve/open), note, exempt/unexempt, reset, status, reload,
-  debug. Tab completion; per-check bypass nodes default to false.
+- **Commands/permissions** (1.x): `/vigil` with alerts, info, history, review,
+  note, exempt, reset, status, reload, debug. Replaced in 2.0.0, see below.
 - **API**: `VigilApi` service (exempt, notifyImpulse, VL lookup) and `VigilFlagEvent`.
 - **Tests**: 50 unit tests including vanilla-physics simulations under network
   jitter, stalls and client catch-up. A one-off sweep of 10,000 simulated
@@ -51,17 +50,46 @@
 - 9 new tests (durations, presets, expiry, persistence across restarts, corrupt
   file handling, config consistency). 59 in total.
 
+## 2.0.0: detection that bans, fewer commands, short config
+
+Diagnosis of "it doesn't detect anything": alerts started at VL 2-3 and cases
+only opened after that. Automatic punishment was off. Any wall next to the
+player counted as "ground", which hid wall climbing and wall flying. Water
+counted up to the full block, which hid walking on water. Every kind of damage
+(poison, fire, fall) paused all movement checks for 1.5 s. And an op or `*`
+permission silently bypassed everything.
+
+- Support now means the exposed top of a collision box near the feet. Liquid
+  surfaces use the real height. Damage no longer grants grace; knockback still
+  does, through its velocity event.
+- New checks, with ideas from Grim and NoCheatPlus (their code was not copied):
+  velocity (anti-knockback), noslow, killaura (look ray vs. lag-compensated
+  hitbox one tick later, plus multi-target per client tick), noswing,
+  autoclicker, interact (scaffold: placing on a hidden face), fastplace, nuker,
+  and NoFall by missing fall damage. Flight catches spider and Jesus.
+- Faster: alerts from the first flag, flight window 0.5 s. Setbacks are on for
+  speed, flight and step.
+- Automatic ban at `ban-at`, 30 days, "Cheating (Flying)", kick with the ban
+  screen, broadcast. Optional external ban command. `vigil.protect` exempts
+  staff. Bans are enforced at login even with the moderation commands disabled.
+- On Paper, attacks come from the packet-level pre-attack event, so plugin area
+  damage never looks like reach or kill aura. Spear attacks (1.21.11) are
+  skipped.
+- Commands reduced to `/ac` (alerts, check, reset, debug, reload) and
+  `/ban /unban /mute /unmute /warn /kick`. The review queue, `/tempban`,
+  `/tempmute`, `/punishments` and automatic-command rules were removed
+  (`/ac check` shows punishment history). Permissions simplified.
+- The config was reduced from 405 to 165 lines. Tuning moved to optional
+  `advanced:` keys. A 1.x config is migrated automatically, with a backup.
+- Tests: 79, including 19 MockBukkit end-to-end scenarios (legit play never
+  flagged; each cheat flagged; auto-ban, login denial, commands, migration).
+  The stress simulations caught that a stricter speed leniency (1.2) would flag
+  legit sprint-jumping, so it stays at 1.25.
+
 ## Remaining / next steps
 
-- Validate on a live test server (see the checklist in README) and tune
-  defaults from real review verdicts. Only simulations and unit tests have
-  been run so far. The Paper/Spigot repositories were unreachable from the
-  build environment, so the jar was compiled against a local build of the
-  Paper 1.21.4 API from source.
-- Integration tests with MockBukkit (listener wiring, commands).
-- Possible further checks with low false-positive potential: nuker (many
-  instant breaks per second), boat/vehicle fly, jesus (liquid walking).
-- Optional per-world threshold overrides and localisation files.
-- Optional SQL storage for networks with several servers.
-- Moderation ideas: IP bans, warning escalation (auto-mute after N warnings),
-  a GUI for choosing reasons, Discord webhook for punishments.
+- Validate on a live server with a hacked client on an alt (see the README
+  checklist) and tune `ban-at` values from real alerts.
+- Prediction-based movement (Grim style) would catch subtle speed and strafe
+  cheats, but it is a large project.
+- Moderation ideas: IP bans, warning escalation, a Discord webhook for bans.

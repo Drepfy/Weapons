@@ -14,7 +14,7 @@ import java.util.Locale;
 import java.util.function.Supplier;
 
 /**
- * Enforces bans at login and mutes in chat and private-message commands.
+ * Enforces bans at login (always) and mutes in chat and private-message commands.
  * Login and chat events run off the server thread; the lookups are thread safe.
  */
 public final class ModerationListener implements Listener {
@@ -29,9 +29,7 @@ public final class ModerationListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH)
     public void onPreLogin(AsyncPlayerPreLoginEvent event) {
-        if (!settings.get().moderation().enabled()) {
-            return;
-        }
+        // Always enforced: automatic bans are stored here even when the commands are disabled.
         Punishment ban = service.activeBan(event.getUniqueId());
         if (ban != null) {
             event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_BANNED, screen("ban-screen", ban));
@@ -82,12 +80,12 @@ public final class ModerationListener implements Listener {
     }
 
     /** Multi-line kick/ban screen for a punishment. */
-    String screen(String key, Punishment punishment) {
+    public String screen(String key, Punishment punishment) {
         return Text.color(fill(settings.get().messages().get(key), punishment));
     }
 
     /** Replaces the punishment placeholders in a message. */
-    String fill(String template, Punishment punishment) {
+    public String fill(String template, Punishment punishment) {
         Settings.Messages messages = settings.get().messages();
         String permanent = messages.get("permanent");
         String expires = punishment.isPermanent() ? permanent

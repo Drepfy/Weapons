@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class FlightTrackerTest {
 
-    private static final FlightTracker.Params PARAMS = new FlightTracker.Params(1000, 1.0, 1.0, 4000);
+    private static final FlightTracker.Params PARAMS = new FlightTracker.Params(500, 0.5, 0.8, 4000);
     private static final double APEX = Physics.jumpApex(Physics.DEFAULT_JUMP_STRENGTH);
 
     /** Simulates a vertical trajectory from an initial velocity until landing on groundY. */

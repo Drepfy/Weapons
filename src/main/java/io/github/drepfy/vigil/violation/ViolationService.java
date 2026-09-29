@@ -7,7 +7,6 @@ import io.github.drepfy.vigil.config.CheckSettings;
 import io.github.drepfy.vigil.config.Settings;
 import io.github.drepfy.vigil.data.FlagRecord;
 import io.github.drepfy.vigil.data.PlayerData;
-import io.github.drepfy.vigil.review.ReviewService;
 import io.github.drepfy.vigil.storage.FlagLogWriter;
 import io.github.drepfy.vigil.storage.PlayerRecord;
 import io.github.drepfy.vigil.task.TpsMonitor;
@@ -20,26 +19,23 @@ import java.util.function.Supplier;
 
 /**
  * The single place where a violation becomes official: fires the API event, raises
- * the VL, stores the evidence, and hands the flag to alerts, review and (optional)
- * punishments. Checks call {@link #flag} only after their own buffering and
+ * the VL, stores the evidence, and hands the flag to staff alerts and the auto-ban. Checks call {@link #flag} only after their own buffering and
  * exemption logic already decided the behaviour is clearly abnormal.
  */
 public final class ViolationService {
 
     private final Supplier<Settings> settings;
     private final AlertService alerts;
-    private final ReviewService review;
-    private final PunishmentService punishments;
+    private final AutoBanService autoBan;
     private final FlagLogWriter log;
     private final TpsMonitor tps;
     private final ServerCompat compat;
 
-    public ViolationService(Supplier<Settings> settings, AlertService alerts, ReviewService review,
-                            PunishmentService punishments, FlagLogWriter log, TpsMonitor tps, ServerCompat compat) {
+    public ViolationService(Supplier<Settings> settings, AlertService alerts, AutoBanService autoBan,
+                            FlagLogWriter log, TpsMonitor tps, ServerCompat compat) {
         this.settings = settings;
         this.alerts = alerts;
-        this.review = review;
-        this.punishments = punishments;
+        this.autoBan = autoBan;
         this.log = log;
         this.tps = tps;
         this.compat = compat;
@@ -83,8 +79,7 @@ public final class ViolationService {
         }
 
         alerts.onFlag(player, data, flag, check, currentTps);
-        review.onFlag(player, data, flag, check);
-        punishments.onFlag(player, data, flag, check);
+        autoBan.onFlag(player, data, flag, check);
         return vl;
     }
 }

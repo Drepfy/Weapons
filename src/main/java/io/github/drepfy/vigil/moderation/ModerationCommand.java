@@ -22,22 +22,22 @@ import java.util.logging.Logger;
 /**
  * Staff punishment commands. Syntax:
  * <pre>
- * /ban &lt;player&gt; [duration] [reason]      /tempban &lt;player&gt; &lt;duration&gt; [reason]
- * /mute &lt;player&gt; [duration] [reason]     /tempmute &lt;player&gt; &lt;duration&gt; [reason]
- * /unban &lt;player&gt; [reason]               /unmute &lt;player&gt; [reason]
+ * /ban &lt;player&gt; [duration] [reason]      /unban &lt;player&gt; [reason]
+ * /mute &lt;player&gt; [duration] [reason]     /unmute &lt;player&gt; [reason]
  * /warn &lt;player&gt; [reason]                /kick &lt;player&gt; [reason]
- * /punishments &lt;player&gt; [page]
  * </pre>
  * A reason that matches a preset (e.g. {@code Cheating}) uses the preset's default
- * duration unless a duration is given. Without a reason, "No Reason" is used.
+ * duration unless a duration is given. Without a reason, "No Reason" is used. A
+ * player's punishment history is part of {@code /ac check}.
  */
 public final class ModerationCommand implements CommandExecutor, TabCompleter {
 
-    public static final String NOTIFY_PERMISSION = "vigil.moderation.notify";
-    public static final String EXEMPT_PERMISSION = "vigil.moderation.exempt";
+    /** Staff who see everyone's punishments (same as anti-cheat alerts). */
+    public static final String NOTIFY_PERMISSION = "vigil.alerts";
+    /** Players who cannot be punished by other players (and are never banned automatically). */
+    public static final String EXEMPT_PERMISSION = "vigil.protect";
     private static final List<String> DURATION_SUGGESTIONS = List.of("30m", "1h", "6h", "12h", "1d", "3d", "7d",
             "14d", "30d", "perm");
-    private static final int PAGE_SIZE = 8;
 
     private record Target(UUID uuid, String name, Player online) {
     }
@@ -67,15 +67,12 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         switch (name) {
-            case "ban" -> punish(sender, PunishmentType.BAN, false, args, label);
-            case "tempban" -> punish(sender, PunishmentType.BAN, true, args, label);
-            case "mute" -> punish(sender, PunishmentType.MUTE, false, args, label);
-            case "tempmute" -> punish(sender, PunishmentType.MUTE, true, args, label);
+            case "ban" -> punish(sender, PunishmentType.BAN, args, label);
+            case "mute" -> punish(sender, PunishmentType.MUTE, args, label);
             case "unban" -> lift(sender, PunishmentType.UNBAN, args, label);
             case "unmute" -> lift(sender, PunishmentType.UNMUTE, args, label);
             case "warn" -> warnOrKick(sender, PunishmentType.WARN, args, label);
             case "kick" -> warnOrKick(sender, PunishmentType.KICK, args, label);
-            case "punishments" -> history(sender, args, label);
             default -> {
                 return false;
             }
@@ -85,10 +82,9 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
 
     // ---- ban / mute ----------------------------------------------------------------------------
 
-    private void punish(CommandSender sender, PunishmentType type, boolean requireDuration, String[] args,
-                        String label) {
-        if (args.length < (requireDuration ? 2 : 1)) {
-            usage(sender, label + " <player> " + (requireDuration ? "<duration>" : "[duration]") + " [reason]");
+    private void punish(CommandSender sender, PunishmentType type, String[] args, String label) {
+        if (args.length < 1) {
+            usage(sender, label + " <player> [duration] [reason]");
             return;
         }
         Target target = resolve(args[0]);
@@ -106,10 +102,6 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
             if (duration != null) {
                 reasonStart = 2;
             }
-        }
-        if (requireDuration && duration == null) {
-            send(sender, "&c'" + args[1] + "' is not a duration. Use e.g. 30m, 12h, 7d or 1mo.");
-            return;
         }
         String input = join(args, reasonStart);
         List<ReasonPreset> presets = settings.get().moderation().reasons(type);
@@ -217,59 +209,6 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
         broadcast(sender, Text.replace(formatter.fill(message(key + "-broadcast"), punishment), "count", count));
     }
 
-    // ---- history --------------------------------------------------------------------------------
-
-    private void history(CommandSender sender, String[] args, String label) {
-        if (args.length < 1) {
-            usage(sender, label + " <player> [page]");
-            return;
-        }
-        Target target = resolve(args[0]);
-        if (target == null) {
-            send(sender, Text.replace(message("player-not-found"), "player", args[0]));
-            return;
-        }
-        List<Punishment> history = service.history(target.uuid());
-        int pages = Math.max(1, (history.size() + PAGE_SIZE - 1) / PAGE_SIZE);
-        int page = 1;
-        if (args.length > 1) {
-            try {
-                page = Math.max(1, Math.min(pages, Integer.parseInt(args[1])));
-            } catch (NumberFormatException ignored) {
-                page = 1;
-            }
-        }
-        Punishment ban = service.activeBan(target.uuid());
-        Punishment mute = service.activeMute(target.uuid());
-        send(sender, "&fPunishments of &b" + target.name() + " &7(page " + page + "/" + pages + ")");
-        sender.sendMessage(Text.color("&7Banned: " + (ban != null ? "&cyes" : "&ano") + " &7Muted: "
-                + (mute != null ? "&cyes" : "&ano") + " &7Warnings: &f" + service.warningCount(target.uuid())));
-        if (history.isEmpty()) {
-            sender.sendMessage(Text.color("&aNo punishments."));
-            return;
-        }
-        String permanent = message("permanent");
-        long now = System.currentTimeMillis();
-        for (int i = (page - 1) * PAGE_SIZE; i < Math.min(history.size(), page * PAGE_SIZE); i++) {
-            Punishment p = history.get(i);
-            StringBuilder line = new StringBuilder("  &8#").append(p.id()).append(" &e")
-                    .append(p.type().name()).append(" &f").append(p.reason());
-            if (p.type() == PunishmentType.BAN || p.type() == PunishmentType.MUTE) {
-                line.append(" &7(").append(Durations.format(p.durationMs(), permanent)).append(")");
-                if (p.revoked()) {
-                    line.append(" &a[lifted by ").append(p.revokedBy()).append(": ").append(p.revokeReason()).append("]");
-                } else if (p.isInEffect(now)) {
-                    line.append(" &c[active]");
-                } else {
-                    line.append(" &8[expired]");
-                }
-            }
-            line.append(" &7by &f").append(p.staff()).append(" &8")
-                    .append(Text.duration(now - p.createdEpochMs())).append(" ago");
-            sender.sendMessage(Text.color(line.toString()));
-        }
-    }
-
     // ---- helpers -----------------------------------------------------------------------------------
 
     private boolean mayPunish(CommandSender sender, Target target) {
@@ -341,10 +280,9 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
 
     private static String permission(String command) {
         return switch (command) {
-            case "ban", "tempban" -> "vigil.moderation.ban";
-            case "mute", "tempmute" -> "vigil.moderation.mute";
-            case "punishments" -> "vigil.moderation.history";
-            default -> "vigil.moderation." + command;
+            case "unban" -> "vigil.ban";
+            case "unmute" -> "vigil.mute";
+            default -> "vigil." + command;
         };
     }
 
@@ -377,9 +315,6 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
             };
             return filter(names, args[0]);
         }
-        if (name.equals("punishments")) {
-            return List.of();
-        }
         List<String> options = new ArrayList<>();
         switch (name) {
             case "ban", "mute" -> {
@@ -388,14 +323,6 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
                     options.addAll(presetNames(moderation.reasons(type)));
                     options.addAll(DURATION_SUGGESTIONS);
                 } else if (args.length == 3 && Durations.parse(args[1]) != null) {
-                    options.addAll(presetNames(moderation.reasons(type)));
-                }
-            }
-            case "tempban", "tempmute" -> {
-                PunishmentType type = name.equals("tempban") ? PunishmentType.BAN : PunishmentType.MUTE;
-                if (args.length == 2) {
-                    options.addAll(DURATION_SUGGESTIONS.subList(0, DURATION_SUGGESTIONS.size() - 1));
-                } else if (args.length == 3) {
                     options.addAll(presetNames(moderation.reasons(type)));
                 }
             }

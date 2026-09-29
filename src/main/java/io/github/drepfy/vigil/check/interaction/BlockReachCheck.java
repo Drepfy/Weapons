@@ -22,7 +22,7 @@ import org.bukkit.event.player.PlayerInteractEvent;
  */
 public final class BlockReachCheck {
 
-    private static final CheckType TYPE = CheckType.BLOCK_REACH;
+    private static final CheckType TYPE = CheckType.BLOCKREACH;
 
     private final CheckContext ctx;
 
@@ -32,7 +32,9 @@ public final class BlockReachCheck {
 
     public void onInteract(Player player, PlayerData data, PlayerInteractEvent event, long now) {
         Block block = event.getClickedBlock();
-        if (block == null || !ctx.isActive(player, data, TYPE, now) || !ctx.canFlag(player, data, now)) {
+        // Right after a teleport the client may still click from where it was.
+        if (block == null || !ctx.isActive(player, data, TYPE, now) || ctx.recentlyRelocated(data, now)
+                || !ctx.canFlag(player, data, now)) {
             return;
         }
         CheckSettings settings = ctx.settings(TYPE);

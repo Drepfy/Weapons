@@ -2,26 +2,27 @@ package io.github.drepfy.vigil.config;
 
 import io.github.drepfy.vigil.api.CheckType;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * Validated, immutable settings of one check.
+ *
+ * @param banVl VL at which the player is banned automatically (0 = never)
  */
 public record CheckSettings(CheckType type,
                             boolean enabled,
                             double alertVl,
-                            double reviewVl,
+                            double banVl,
                             double decayPerMinute,
                             double vlPerFlag,
                             double bufferThreshold,
                             boolean mitigate,
-                            List<ActionRule> actions,
                             Map<String, Double> numbers,
                             Map<String, List<String>> lists) {
 
     public CheckSettings {
-        actions = List.copyOf(actions);
         numbers = Map.copyOf(numbers);
         lists = Map.copyOf(lists);
     }
@@ -56,15 +57,15 @@ public record CheckSettings(CheckType type,
     public static CheckSettings defaults(CheckType type) {
         CheckSpec spec = CheckSpec.of(type);
         CheckSpec.Defaults d = spec.defaults();
-        Map<String, Double> numbers = new java.util.HashMap<>();
+        Map<String, Double> numbers = new HashMap<>();
         for (CheckSpec.NumberOption option : spec.numbers()) {
             numbers.put(option.key(), option.defaultValue());
         }
-        Map<String, List<String>> lists = new java.util.HashMap<>();
+        Map<String, List<String>> lists = new HashMap<>();
         for (CheckSpec.ListOption option : spec.lists()) {
             lists.put(option.key(), option.defaultValue());
         }
-        return new CheckSettings(type, d.enabled(), d.alertVl(), d.reviewVl(), d.decayPerMinute(), d.vlPerFlag(),
-                d.bufferThreshold(), d.mitigate(), List.of(), numbers, lists);
+        return new CheckSettings(type, d.enabled(), d.alertVl(), d.banVl(), d.decayPerMinute(), d.vlPerFlag(),
+                d.bufferThreshold(), d.mitigate(), numbers, lists);
     }
 }

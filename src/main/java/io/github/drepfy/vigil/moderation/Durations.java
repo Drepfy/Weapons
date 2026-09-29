@@ -66,6 +66,22 @@ public final class Durations {
         return total > 0 ? total : null;
     }
 
+    /** Short form accepted by {@link #parse} and most ban plugins, e.g. {@code 30d} or {@code 1d12h}. */
+    public static String compact(long millis) {
+        long remaining = Math.max(SECOND, millis);
+        long[] units = {DAY, HOUR, MINUTE, SECOND};
+        String[] names = {"d", "h", "m", "s"};
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < units.length; i++) {
+            long amount = remaining / units[i];
+            if (amount > 0) {
+                text.append(amount).append(names[i]);
+                remaining -= amount * units[i];
+            }
+        }
+        return text.toString();
+    }
+
     /** Human readable duration, e.g. {@code 30 days} or {@code 1 hour 30 minutes}. */
     public static String format(long millis, String permanentText) {
         if (millis == PERMANENT) {

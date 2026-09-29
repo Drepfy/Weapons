@@ -18,15 +18,15 @@ import org.bukkit.entity.Player;
  * their step height (0.6 or the step_height attribute). Bukkit merges moves smaller
  * than 1/16 block into the next event, so that much is added as well.
  */
-public final class VerticalCheck {
+public final class StepCheck {
 
-    private static final CheckType TYPE = CheckType.VERTICAL;
+    private static final CheckType TYPE = CheckType.STEP;
     private static final long ENVIRONMENT_GRACE_MS = 750;
     private static final long BOUNCE_GRACE_MS = 2500;
 
     private final CheckContext ctx;
 
-    public VerticalCheck(CheckContext ctx) {
+    public StepCheck(CheckContext ctx) {
         this.ctx = ctx;
     }
 

@@ -28,7 +28,8 @@ public final class ReachCheck {
     }
 
     public void onAttack(Player attacker, PlayerData data, AttackSnapshot hit, Cancellable event, long now) {
-        if (!ctx.isActive(attacker, data, TYPE, now) || !ctx.canFlag(attacker, data, now)) {
+        if (!ctx.isActive(attacker, data, TYPE, now) || ctx.recentlyRelocated(data, now)
+                || !ctx.canFlag(attacker, data, now)) {
             return;
         }
         CheckSettings settings = ctx.settings(TYPE);

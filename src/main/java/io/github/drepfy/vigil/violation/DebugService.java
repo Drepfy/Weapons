@@ -14,7 +14,7 @@ import java.util.function.Supplier;
 import java.util.logging.Logger;
 
 /**
- * Streams check diagnostics to staff who asked for them with /vigil debug.
+ * Streams check diagnostics to staff who asked for them with /ac debug.
  * Message text is only built when someone is listening.
  */
 public final class DebugService {

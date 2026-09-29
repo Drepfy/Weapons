@@ -46,6 +46,7 @@ public final class CheckContext {
     private final Map<CheckType, int[]> errorCounts = new EnumMap<>(CheckType.class);
     private final Map<CheckType, Long> errorWindowStart = new EnumMap<>(CheckType.class);
     private final Map<CheckType, Boolean> brokenChecks = new EnumMap<>(CheckType.class);
+    private long tick;
 
     public CheckContext(Supplier<Settings> settings, Logger logger, ServerCompat compat, WorldProbe probe,
                         DisturbanceRegistry disturbances, TpsMonitor tps, ViolationService violations,
@@ -85,6 +86,15 @@ public final class CheckContext {
         return players;
     }
 
+    /** Server ticks since the plugin started (advanced by the tick task). */
+    public long currentTick() {
+        return tick;
+    }
+
+    public void advanceTick() {
+        tick++;
+    }
+
     // ---- activation ----------------------------------------------------------------------
 
     /**
@@ -96,7 +106,7 @@ public final class CheckContext {
         if (!config.general().enabled() || !config.check(type).enabled() || brokenChecks.containsKey(type)) {
             return false;
         }
-        if (data.bypasses(type) || data.isManuallyExempt(type, nowMs)) {
+        if ((config.general().bypassPermission() && data.bypasses(type)) || data.isManuallyExempt(type, nowMs)) {
             return false;
         }
         if (config.general().exemptCreativeAndSpectator()) {
@@ -170,12 +180,23 @@ public final class CheckContext {
                 || nowMs - data.lastWorldChangeMs < lag.worldChangeGraceMs()
                 || nowMs - data.lastGamemodeChangeMs < lag.gamemodeChangeGraceMs()
                 || nowMs - data.lastVelocityMs < lag.velocityGraceMs()
-                || nowMs - data.lastDamageMs < lag.velocityGraceMs()
                 || nowMs - data.lastImpulseMs < lag.velocityGraceMs()
                 || nowMs - data.lastVehicleMs < lag.vehicleExitGraceMs()
                 || nowMs - data.lastFlyingMs < lag.vehicleExitGraceMs()
                 || nowMs - data.lastGlideMs < lag.elytraGraceMs()
                 || nowMs - data.lastRiptideMs < lag.riptideGraceMs();
+    }
+
+    /**
+     * Grace after the server moved the player (join, teleport, respawn, world change): the
+     * client may still act from its previous position for a moment.
+     */
+    public boolean recentlyRelocated(PlayerData data, long nowMs) {
+        Settings.Lag lag = settings.get().lag();
+        return nowMs - data.joinMs < lag.joinGraceMs()
+                || nowMs - data.lastTeleportMs < lag.teleportGraceMs()
+                || nowMs - data.lastRespawnMs < lag.respawnGraceMs()
+                || nowMs - data.lastWorldChangeMs < lag.worldChangeGraceMs();
     }
 
     /** Whether pistons, explosions or wind charges were active near the location recently. */
@@ -261,7 +282,7 @@ public final class CheckContext {
         if (count[0] >= MAX_ERRORS_PER_WINDOW) {
             brokenChecks.put(type, Boolean.TRUE);
             logger.severe("Check " + type.displayName() + " failed " + count[0]
-                    + " times within a minute and was disabled until the next /vigil reload.");
+                    + " times within a minute and was disabled until the next /ac reload.");
         }
     }
 
