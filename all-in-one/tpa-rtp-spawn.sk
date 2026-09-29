@@ -7,7 +7,7 @@ options:
     prefix: &b&lᴠᴀɴɪʟʟᴀ sᴍᴘ &8» &7
 
 on load:
-    # Seconds to stand still before teleporting. Staff with smp.tp.bypass skip it.
+    # Seconds to stand still before teleporting. Everyone waits, staff included.
     set {cfg::tp-warmup} to 5
     set {cfg::tpa-expire} to 60
     set {cfg::tpa-cooldown} to 10
@@ -54,8 +54,9 @@ function warmupTeleport(p: player, dest: location, what: text):
     set {_secs} to {cfg::tp-warmup}
     if {_secs} is not set:
         set {_secs} to 3
-    if {_p} has permission "smp.tp.bypass":
-        set {_secs} to 0
+    # Nobody teleports instantly - not even staff
+    if {_secs} < 1:
+        set {_secs} to 1
     add 1 to {-tp::warmup::%{_u}%}
     set {_id} to {-tp::warmup::%{_u}%}
     set {_start} to location of {_p}

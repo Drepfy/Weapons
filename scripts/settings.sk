@@ -25,7 +25,7 @@ on load:
     set {cfg::player-death-penalty} to 0
 
     # --- Teleports (/tpa /rtp /spawn) ---
-    # Seconds to stand still before teleporting (0 = instant). Staff with smp.tp.bypass skip it.
+    # Seconds to stand still before teleporting (0 = instant). Everyone waits, staff included (minimum 1).
     set {cfg::tp-warmup} to 5
     # Seconds a /tpa request stays valid
     set {cfg::tpa-expire} to 60
