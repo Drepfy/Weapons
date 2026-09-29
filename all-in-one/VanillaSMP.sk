@@ -48,7 +48,7 @@ on load:
     # --- Ranks (shown in /ranks, NOT buyable with in-game money) ---
     # Give a rank with /setrank <player> <id> or the permission smp.rank.<id>.
     # Multiply the money you get from mob and player kills.
-    set {cfg::store-url} to "store.yourserver.net"
+    set {cfg::store-url} to "discord.gg/zhVxs8prtn"
     # rank(id, display name, multiplier, price shown in /ranks (real money, text), icon)
     delete {cfg::rank::*}
     rank("vip", "&a&lVIP", 1.5, "$5", emerald)
