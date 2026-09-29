@@ -1,0 +1,191 @@
+# -----------------------------------------------------------------------------
+#  StaffVanish
+#
+#  Text can use colour codes like &b (aqua) and &l (bold), or MiniMessage:
+#  https://docs.papermc.io/adventure/minimessage/format
+#  Set any message to "" to turn it off.
+# -----------------------------------------------------------------------------
+
+vanish:
+  # Let vanished staff fly. Flight is taken away again when they reappear,
+  # unless they could already fly beforehand (creative mode, another plugin, ...).
+  flight: true
+
+  # When someone vanishes, everyone is told they left the game, and when they
+  # reappear, that they joined. The wording is under messages: fake-leave and
+  # fake-join.
+  fake-join-leave-messages: true
+
+  # Vanished players are left out of the tab list for everyone, including
+  # themselves and other staff. Set this to true to let staff (and the vanished
+  # player) still see them in the tab list, shown with tab-list-format.
+  show-in-tab-for-staff: false
+  # <name> is the player's normal tab-list name.
+  tab-list-format: "<name> &bᴠᴀɴɪsʜᴇᴅ"
+
+  # Leave vanished players out of the player count and the hover list in the
+  # multiplayer server browser.
+  hide-from-server-list: true
+
+  # Remind vanished players with an action bar message.
+  action-bar-reminder: true
+
+  # How often, in ticks (20 ticks = 1 second), visibility is re-checked so it
+  # follows permission changes made while players are online. This also
+  # refreshes the action bar reminder. 0 turns the periodic check off.
+  refresh-interval-ticks: 40
+
+  # Stops vanished players from giving themselves away.
+  protection:
+    # Can't be hurt and can't die, not even from /kill or the void. Anyone who
+    # falls into the void is caught and left flying.
+    invulnerable: true
+    # Hunger doesn't go down.
+    no-hunger: true
+    # Don't pick up items, arrows or tridents.
+    no-item-pickup: true
+    # Don't trigger pressure plates or tripwires, or trample farmland and turtle eggs.
+    no-physical-interaction: true
+    # Mobs don't target vanished players and experience orbs don't fly towards them.
+    no-mob-targeting: true
+    # Sculk sensors, sculk shriekers and wardens don't notice vanished players.
+    no-sculk-detection: true
+    # Projectiles fly through vanished players instead of hitting an invisible wall.
+    projectiles-pass-through: true
+    # Stop vanished players' messages from reaching public chat.
+    block-chat: true
+    # Commands that take a player name first and could reveal that someone is
+    # online. Players who can't see vanished staff get the usual "No player was
+    # found" error when using them on vanished staff. Namespaced versions such
+    # as minecraft:msg are covered too.
+    private-message-commands:
+      - msg
+      - tell
+      - w
+      - whisper
+      - m
+      - pm
+      - dm
+
+# The Vanish Stick: a Breeze Rod handed to vanished staff who have
+# staffvanish.teleport. It's removed when they reappear and can't be
+# dropped, stored in containers or crafted with.
+selector:
+  enabled: true
+  # Preferred hotbar slot (0-8). If it's taken, the first free slot is used.
+  # -1 means no preference.
+  slot: 8
+  item:
+    material: BREEZE_ROD
+    name: "&b&lᴠᴀɴɪsʜ sᴛɪᴄᴋ"
+    lore:
+      - "&7Sneak + right-click: &fchoose a player's head to teleport to"
+      - "&7Sneak + left-click: &fteleport to a random player"
+      - "&7Left-click: &fteleport to the next player"
+      - "&7Right-click a player: &finspect them"
+    glint: true
+    # Optional item model from a resource pack, e.g. "myserver:vanish_stick".
+    # Leave empty to use the material's normal look.
+    item-model: ""
+
+  # What each kind of click does. Options:
+  #   NONE            - do nothing
+  #   OPEN_MENU       - open a menu of player heads; click one to teleport to them
+  #   NEXT_PLAYER     - teleport to the next player (alphabetical, wraps around)
+  #   PREVIOUS_PLAYER - teleport to the previous player
+  #   RANDOM_PLAYER   - teleport to a random player
+  #   INSPECT         - show details about the clicked player, or the player
+  #                     you're looking at (within inspect-range blocks)
+  actions:
+    right-click: OPEN_MENU
+    sneak-right-click: OPEN_MENU
+    left-click: NEXT_PLAYER
+    sneak-left-click: RANDOM_PLAYER
+    click-player: INSPECT
+  inspect-range: 64
+
+  menu:
+    title: "&8Teleport to a player"
+    # Number of rows, including the bottom navigation row (2-6).
+    rows: 6
+    # Also list other vanished staff.
+    show-vanished: true
+    head:
+      name: "&e<player><vanished>"
+      # Replaces <vanished> above for vanished players.
+      vanished-tag: " &bᴠᴀɴɪsʜᴇᴅ"
+      lore:
+        - "&7World: &f<world>"
+        - "&7Location: &f<x>, <y>, <z>"
+        - "&7Health: &f<health> &8| &7Food: &f<food>"
+        - "&7Game mode: &f<gamemode>"
+        - "&7Ping: &f<ping>ms"
+        - ""
+        - "&eClick to teleport"
+    previous-page: "&e« Previous page"
+    next-page: "&eNext page »"
+    close: "&cClose"
+    page-info: "&7Page &f<page> &7of &f<pages>"
+
+messages:
+  prefix: "&b&lᴠᴀɴɪsʜ &8» "
+
+  # Shown to everyone, so it looks like the player really left or joined.
+  # These use Minecraft's own wording, e.g. "IV10nesy left the game".
+  fake-leave: "&e<lang:multiplayer.player.left:'<player>'>"
+  fake-join: "&e<lang:multiplayer.player.joined:'<player>'>"
+
+  vanished: "<prefix>&7You are now &bvanished&7. Only staff can see you."
+  unvanished: "<prefix>&7You are now &evisible &7to everyone."
+  vanished-other: "<prefix>&7Vanished &f<target>&7."
+  unvanished-other: "<prefix>&7Made &f<target> &7visible."
+  vanished-by: "<prefix>&f<player> &7vanished you."
+  unvanished-by: "<prefix>&f<player> &7made you visible."
+  already-vanished: "<prefix>&7<target> is already vanished."
+  already-visible: "<prefix>&7<target> is already visible."
+  target-not-staff: "<prefix>&c<target> doesn't have permission to vanish."
+  rejoined-vanished: "<prefix>&7You joined &bvanished&7. Use &f/vanish &7to reappear."
+  permission-revoked: "<prefix>&7You're visible again because you no longer have permission to vanish."
+  action-bar: "&b&lᴠᴀɴɪsʜᴇᴅ &8| &7Only staff can see you"
+  chat-blocked: "<prefix>&cYour message wasn't sent because you're vanished. Use &f/vanish &cto reappear first."
+
+  # Sent to staff who can see vanished players.
+  staff-vanished: "<prefix>&f<player> &7vanished."
+  staff-unvanished: "<prefix>&f<player> &7reappeared."
+  staff-joined: "<prefix>&f<player> &7joined silently."
+  staff-left: "<prefix>&f<player> &7left silently."
+
+  teleported: "<prefix>&7Teleported to &f<target>&7."
+  teleport-failed: "<prefix>&cCouldn't teleport to &f<target>&c."
+  must-be-vanished: "<prefix>&cYou need to be vanished to do that."
+  no-players: "<prefix>&7There's nobody else online to teleport to."
+  no-target: "<prefix>&7Look at a player, or right-click one, to inspect them."
+  player-not-found: "<prefix>&cNo online player called &f<input>&c."
+  players-only: "<prefix>&cOnly players can do that."
+  no-permission: "<prefix>&cYou don't have permission to do that."
+
+  list: "<prefix>&7Vanished (&f<count>&7): <players>"
+  list-empty: "<prefix>&7Nobody is vanished."
+  list-offline-tag: " &8(offline)"
+
+  selector-given: "<prefix>&7You received the &b&lᴠᴀɴɪsʜ sᴛɪᴄᴋ&7."
+  selector-disabled: "<prefix>&cThe Vanish Stick is turned off."
+  inventory-full: "<prefix>&cYour inventory is full. Make some room and use &f/vanish stick&c."
+
+  inspect:
+    - "<prefix>&7Inspecting &f<target><vanished>"
+    - "&7  World: &f<world> &8@ &f<x>, <y>, <z>"
+    - "&7  Health: &f<health> &8| &7Food: &f<food> &8| &7Game mode: &f<gamemode>"
+    - "&7  Ping: &f<ping>ms  <teleport>"
+  inspect-teleport-button: "<hover:show_text:'&7Click to teleport'>&e&nTeleport</hover>"
+
+  reloaded: "<prefix>&aConfiguration reloaded."
+  usage:
+    - "<prefix>&7Commands:"
+    - "&7  /vanish &8- &7toggle vanish"
+    - "&7  /vanish on&8|&7off"
+    - "&7  /vanish \\<player> &8- &7toggle someone else"
+    - "&7  /vanish list"
+    - "&7  /vanish tp \\<player>"
+    - "&7  /vanish stick"
+    - "&7  /vanish reload"
