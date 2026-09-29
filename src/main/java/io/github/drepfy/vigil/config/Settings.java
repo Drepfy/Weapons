@@ -20,6 +20,7 @@ public record Settings(General general,
                        AutoBan autoBan,
                        AntiXray antiXray,
                        AntiEsp antiEsp,
+                       ClientCheck clientCheck,
                        Moderation moderation,
                        Map<CheckType, CheckSettings> checks,
                        Messages messages,
@@ -88,7 +89,23 @@ public record Settings(General general,
      * @param broadcast  announce the ban to every player (staff are always told)
      * @param command    console command to run instead of Vigil's own ban (empty = use Vigil's ban)
      */
-    public record AutoBan(boolean enabled, long durationMs, String reason, boolean broadcast, String command) {
+    public record AutoBan(boolean enabled, long durationMs, String reason, boolean broadcast, String command,
+                          boolean animation) {
+    }
+
+    /**
+     * Kicks clients that identify themselves as hacked clients or world downloaders.
+     *
+     * @param blockedBrands   client brand patterns that are kicked (e.g. {@code *meteor*})
+     * @param blockedChannels plugin channel patterns that are kicked (e.g. {@code wdl:*})
+     * @param blockModLoaders also kick every Fabric/Forge/Quilt client (blocks all mods)
+     */
+    public record ClientCheck(boolean enabled, List<String> blockedBrands, List<String> blockedChannels,
+                              boolean blockModLoaders) {
+        public ClientCheck {
+            blockedBrands = List.copyOf(blockedBrands);
+            blockedChannels = List.copyOf(blockedChannels);
+        }
     }
 
     /**
@@ -98,16 +115,21 @@ public record Settings(General general,
     }
 
     /**
-     * Hides storage blocks (chests, shulkers, beds...) that a player cannot see, so ESP,
-     * freecam and base finders show nothing. Paper only.
+     * Blocks a player cannot see are shown to them as stone until they are close or in
+     * line of sight (anti-ESP, anti-freecam, cave anti-xray). Paper only.
      *
+     * @param hideStorage    hide storage blocks (chests, shulkers, beds...)
+     * @param hideOres       hide valuable ores (diamonds, ancient debris), also in caves
      * @param revealDistance blocks within this distance are always shown
-     * @param lookDistance   blocks within this distance are shown once in line of sight
-     * @param blocks         block type patterns to hide
+     * @param lookDistance   blocks within this distance are shown while in line of sight
+     * @param blocks         storage block type patterns
+     * @param ores           ore block type patterns
      */
-    public record AntiEsp(boolean enabled, double revealDistance, double lookDistance, List<String> blocks) {
+    public record AntiEsp(boolean hideStorage, boolean hideOres, double revealDistance, double lookDistance,
+                          List<String> blocks, List<String> ores) {
         public AntiEsp {
             blocks = List.copyOf(blocks);
+            ores = List.copyOf(ores);
         }
     }
 

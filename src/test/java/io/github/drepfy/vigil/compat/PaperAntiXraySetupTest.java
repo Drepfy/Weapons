@@ -102,6 +102,35 @@ class PaperAntiXraySetupTest {
     }
 
     @Test
+    void listsFromTheFirstVersionGetFakeCaves(@TempDir Path root) throws Exception {
+        Path config = root.resolve("config");
+        Files.createDirectories(config);
+        Path defaults = config.resolve("paper-world-defaults.yml");
+        StringBuilder v1 = new StringBuilder("anticheat:\n  anti-xray:\n    enabled: true\n    engine-mode: 2\n"
+                + "    hidden-blocks:\n");
+        for (String block : PaperAntiXraySetup.OVERWORLD_HIDDEN.subList(1, PaperAntiXraySetup.OVERWORLD_HIDDEN.size())) {
+            v1.append("    - ").append(block).append('\n');
+        }
+        v1.append("    lava-obscures: false\n");
+        Files.writeString(defaults, v1.toString(), StandardCharsets.UTF_8);
+        Path marker = root.resolve("marker.yml");
+        Files.writeString(marker, "configured: 1\n", StandardCharsets.UTF_8);
+
+        PaperAntiXraySetup.run(root, marker, List.of(), true, LOGGER);
+        String text = Files.readString(defaults);
+        assertTrue(text.contains("    hidden-blocks:\n    - air\n    - copper_ore"), text);
+        assertTrue(text.contains("lava-obscures: false"));
+        assertTrue(Files.readString(marker).contains("lists-version: 2"));
+
+        // Customised lists are left alone.
+        String custom = "anticheat:\n  anti-xray:\n    enabled: true\n    hidden-blocks:\n    - diamond_ore\n";
+        Files.writeString(defaults, custom, StandardCharsets.UTF_8);
+        Files.writeString(marker, "configured: 1\n", StandardCharsets.UTF_8);
+        PaperAntiXraySetup.run(root, marker, List.of(), true, LOGGER);
+        assertEquals(custom, Files.readString(defaults));
+    }
+
+    @Test
     void noPaperConfigMeansNoChanges(@TempDir Path root) {
         PaperAntiXraySetup.run(root, root.resolve("marker.yml"), List.of(), true, LOGGER);
         assertFalse(Files.exists(root.resolve("config")));

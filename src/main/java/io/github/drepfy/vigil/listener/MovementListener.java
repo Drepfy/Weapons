@@ -62,6 +62,11 @@ public final class MovementListener implements Listener {
         Player player = event.getPlayer();
         long now = Clock.now();
         PlayerData data = ctx.players().get(player);
+        if (data.frozenUntilMs > now) {
+            // Caught cheating: held in place while the ban animation plays.
+            event.setCancelled(true);
+            return;
+        }
         data.moveEventsSinceSample++;
         data.lastMoveEventMs = now;
         double rise = to.getY() - from.getY();

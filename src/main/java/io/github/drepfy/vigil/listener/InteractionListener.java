@@ -6,6 +6,7 @@ import io.github.drepfy.vigil.check.interaction.BlockReachCheck;
 import io.github.drepfy.vigil.check.interaction.ChestAuraCheck;
 import io.github.drepfy.vigil.check.interaction.FastPlaceCheck;
 import io.github.drepfy.vigil.check.interaction.InteractCheck;
+import io.github.drepfy.vigil.check.interaction.InventoryCheck;
 import io.github.drepfy.vigil.check.interaction.NukerCheck;
 import io.github.drepfy.vigil.check.interaction.XrayCheck;
 import io.github.drepfy.vigil.data.PlayerData;
@@ -17,6 +18,9 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -37,9 +41,11 @@ public final class InteractionListener implements Listener {
     private final FastPlaceCheck fastPlace;
     private final NukerCheck nuker;
     private final XrayCheck xray;
+    private final InventoryCheck inventory;
 
     public InteractionListener(CheckContext ctx, BlockReachCheck blockReach, ChestAuraCheck chestAura,
-                               InteractCheck interact, FastPlaceCheck fastPlace, NukerCheck nuker, XrayCheck xray) {
+                               InteractCheck interact, FastPlaceCheck fastPlace, NukerCheck nuker, XrayCheck xray,
+                               InventoryCheck inventory) {
         this.ctx = ctx;
         this.blockReach = blockReach;
         this.chestAura = chestAura;
@@ -47,6 +53,7 @@ public final class InteractionListener implements Listener {
         this.fastPlace = fastPlace;
         this.nuker = nuker;
         this.xray = xray;
+        this.inventory = inventory;
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -95,6 +102,38 @@ public final class InteractionListener implements Listener {
         long now = Clock.now();
         PlayerData data = ctx.players().get(player);
         ctx.run(CheckType.XRAY, now, () -> xray.onBreak(player, data, event.getBlock(), now));
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onInventoryClick(InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player) || !ctx.settings().general().enabled()) {
+            return;
+        }
+        long now = Clock.now();
+        PlayerData data = ctx.players().get(player);
+        ctx.run(CheckType.INVENTORY, now, () -> inventory.onClick(player, data, event, now));
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onInventoryOpen(InventoryOpenEvent event) {
+        if (event.getPlayer() instanceof Player player) {
+            inventory.onOpen(ctx.players().get(player), Clock.now());
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onInventoryClose(InventoryCloseEvent event) {
+        if (event.getPlayer() instanceof Player player) {
+            inventory.onClose(ctx.players().get(player));
+        }
+    }
+
+    /** Nothing a player does counts while the ban animation plays. */
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onFrozenInteract(PlayerInteractEvent event) {
+        if (ctx.players().get(event.getPlayer()).frozenUntilMs > Clock.now()) {
+            event.setCancelled(true);
+        }
     }
 
     // ---- swing causes (all actions, cancelled or not) --------------------------------------

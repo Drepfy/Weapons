@@ -13,6 +13,7 @@ import io.github.drepfy.vigil.check.interaction.BlockReachCheck;
 import io.github.drepfy.vigil.check.interaction.ChestAuraCheck;
 import io.github.drepfy.vigil.check.interaction.FastPlaceCheck;
 import io.github.drepfy.vigil.check.interaction.InteractCheck;
+import io.github.drepfy.vigil.check.interaction.InventoryCheck;
 import io.github.drepfy.vigil.check.interaction.NukerCheck;
 import io.github.drepfy.vigil.check.interaction.XrayCheck;
 import io.github.drepfy.vigil.check.movement.FlightCheck;
@@ -32,8 +33,9 @@ import io.github.drepfy.vigil.data.PlayerData;
 import io.github.drepfy.vigil.data.PlayerDataManager;
 import io.github.drepfy.vigil.env.BlockTraits;
 import io.github.drepfy.vigil.env.DisturbanceRegistry;
-import io.github.drepfy.vigil.env.StorageHider;
+import io.github.drepfy.vigil.env.BlockHider;
 import io.github.drepfy.vigil.env.WorldProbe;
+import io.github.drepfy.vigil.listener.ClientListener;
 import io.github.drepfy.vigil.listener.CombatListener;
 import io.github.drepfy.vigil.listener.InteractionListener;
 import io.github.drepfy.vigil.listener.LifecycleListener;
@@ -100,7 +102,8 @@ public class VigilPlugin extends JavaPlugin {
     private KillAuraCheck killAura;
     private NoSwingCheck noSwing;
     private ModerationService moderation;
-    private StorageHider storageHider;
+    private BlockHider blockHider;
+    private AutoBanService autoBan;
     private BukkitTask tickTask;
     private boolean started;
 
@@ -138,7 +141,7 @@ public class VigilPlugin extends JavaPlugin {
         pm.registerEvents(moderationListener, this);
 
         alerts = new AlertService(this::settings, getLogger(), io, dataDir.resolve("data").resolve("staff.yml"));
-        AutoBanService autoBan = new AutoBanService(this, this::settings, moderation, moderationListener, alerts,
+        autoBan = new AutoBanService(this, this::settings, moderation, moderationListener, alerts,
                 getLogger(), line -> flagLog.append(line));
         ViolationService violations = new ViolationService(this::settings, alerts, autoBan, flagLog, tps, compat);
         debug = new DebugService(getLogger(), () -> settings.general().debug());
@@ -163,9 +166,10 @@ public class VigilPlugin extends JavaPlugin {
         pm.registerEvents(combat, this);
         InteractionListener interaction = new InteractionListener(checks, new BlockReachCheck(checks),
                 new ChestAuraCheck(checks), new InteractCheck(checks), new FastPlaceCheck(checks),
-                new NukerCheck(checks), new XrayCheck(checks));
+                new NukerCheck(checks), new XrayCheck(checks), new InventoryCheck(checks));
         pm.registerEvents(interaction, this);
         pm.registerEvents(new WorldActivityListener(disturbances), this);
+        pm.registerEvents(new ClientListener(this, this::settings, alerts), this);
         new OptionalHooks(this, checks, lifecycle, combat, interaction, timer).registerAll();
         registerBypassPermissions(pm);
 
@@ -192,11 +196,11 @@ public class VigilPlugin extends JavaPlugin {
 
         setUpAntiXray();
         if (ServerCompat.classExists("io.papermc.paper.event.packet.PlayerChunkLoadEvent")) {
-            storageHider = new StorageHider(this, this::settings, probe);
-            pm.registerEvents(storageHider, this);
-            storageHider.start();
-        } else if (settings.antiEsp().enabled()) {
-            getLogger().info("Hiding storage from ESP needs Paper; it is off on this server.");
+            blockHider = new BlockHider(this, this::settings, probe);
+            pm.registerEvents(blockHider, this);
+            blockHider.start();
+        } else if (settings.antiEsp().hideStorage() || settings.antiEsp().hideOres()) {
+            getLogger().info("Hiding chests and ores from ESP/x-ray needs Paper; it is off on this server.");
         }
 
         // Players already online (e.g. after /reload).
@@ -219,9 +223,9 @@ public class VigilPlugin extends JavaPlugin {
         if (tickTask != null) {
             tickTask.cancel();
         }
-        if (storageHider != null) {
+        if (blockHider != null) {
             try {
-                storageHider.stop();
+                blockHider.stop();
             } catch (Throwable t) {
                 getLogger().log(Level.WARNING, "Could not show hidden storage blocks again", t);
             }
@@ -522,8 +526,12 @@ public class VigilPlugin extends JavaPlugin {
         return moderation;
     }
 
-    /** Anti-ESP storage hiding, or {@code null} when not on Paper. */
-    public StorageHider storageHider() {
-        return storageHider;
+    public AutoBanService autoBan() {
+        return autoBan;
+    }
+
+    /** Anti-ESP / anti-xray block hiding, or {@code null} when not on Paper. */
+    public BlockHider blockHider() {
+        return blockHider;
     }
 }

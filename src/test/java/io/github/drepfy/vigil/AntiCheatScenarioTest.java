@@ -345,7 +345,7 @@ class AntiCheatScenarioTest {
         List<String> staffMessages = messages(staff);
         assertTrue(staffMessages.stream().anyMatch(m -> m.contains("Flyer has been flagged for Flying")),
                 staffMessages.toString());
-        assertTrue(staffMessages.stream().anyMatch(m -> m.contains("Flyer has been banned for Flying")),
+        assertTrue(staffMessages.stream().anyMatch(m -> m.contains("Flyer was caught cheating and banned for Flying")),
                 staffMessages.toString());
 
         // The ban is enforced at login.
@@ -616,23 +616,60 @@ class AntiCheatScenarioTest {
     }
 
     /** The test server cannot list block entities, so scan the few layers the tests build in. */
-    private io.github.drepfy.vigil.env.StorageHider hider() {
-        var hider = plugin.storageHider();
+    private io.github.drepfy.vigil.env.BlockHider hider() {
+        var hider = plugin.blockHider();
         assertNotNull(hider, "Paper API is present in the test server");
-        hider.setTileSource((chunk, types) -> {
-            List<int[]> found = new ArrayList<>();
-            for (int x = 0; x < 16; x++) {
-                for (int z = 0; z < 16; z++) {
-                    for (int y = groundY - 2; y < groundY + 8; y++) {
-                        if (types.contains(chunk.getBlock(x, y, z).getType())) {
-                            found.add(new int[] {(chunk.getX() << 4) + x, y, (chunk.getZ() << 4) + z});
-                        }
+        hider.setTileSource((chunk, types) -> scanLayers(chunk, types, groundY - 4, groundY + 8));
+        hider.setOreSource((chunk, types, minY, maxY, result) ->
+                result.accept(scanLayers(chunk, types, Math.max(minY, groundY - 4), Math.min(maxY, groundY + 8))));
+        return hider;
+    }
+
+    private static List<int[]> scanLayers(org.bukkit.Chunk chunk, java.util.Set<Material> types, int minY, int maxY) {
+        List<int[]> found = new ArrayList<>();
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                for (int y = minY; y <= maxY; y++) {
+                    if (types.contains(chunk.getBlock(x, y, z).getType())) {
+                        found.add(new int[] {(chunk.getX() << 4) + x, y, (chunk.getZ() << 4) + z});
                     }
                 }
             }
-            return found;
-        });
-        return hider;
+        }
+        return found;
+    }
+
+    private void sendChunk(PlayerMock player, int chunkX, int chunkZ) {
+        server.getPluginManager().callEvent(new io.papermc.paper.event.packet.PlayerChunkLoadEvent(
+                world.getChunkAt(chunkX, chunkZ), player));
+    }
+
+    @Test
+    void diamondsAreHiddenUntilSeenAndHiddenAgainWhenOutOfSight() {
+        var hider = hider();
+        // A diamond ore in a small cave pocket 3 blocks under the surface, 40 blocks away.
+        int dx = 40;
+        int dy = groundY - 3;
+        for (int x = dx - 2; x <= dx + 2; x++) {
+            for (int y = dy - 1; y <= dy + 3; y++) {
+                for (int z = -2; z <= 2; z++) {
+                    world.getBlockAt(x, y, z).setType(Material.STONE);
+                }
+            }
+        }
+        world.getBlockAt(dx - 1, dy, 0).setType(Material.AIR); // exposed to a cave: Paper can't hide this one
+        world.getBlockAt(dx, dy, 0).setType(Material.DEEPSLATE_DIAMOND_ORE);
+        PlayerMock looker = join("OreEsp", 0.5, groundY, 0.5);
+        sendChunk(looker, dx >> 4, 0);
+        assertEquals(1, hider.hiddenCount(looker.getUniqueId()), "the cave diamond is hidden from afar");
+
+        looker.teleport(new Location(world, dx - 3.5, groundY, 0.5)); // right above it
+        tick(10);
+        assertEquals(0, hider.hiddenCount(looker.getUniqueId()), "shown once the player is there");
+
+        looker.teleport(new Location(world, 0.5, groundY, 0.5)); // walked away again
+        tick(20);
+        assertEquals(1, hider.hiddenCount(looker.getUniqueId()), "hidden again when out of sight");
     }
 
     @Test
@@ -652,14 +689,26 @@ class AntiCheatScenarioTest {
         world.getBlockAt(cx, cy + 1, 0).setType(Material.AIR);
         world.getBlockAt(cx, cy, 0).setType(Material.CHEST);
         PlayerMock looker = join("Esp", 0.5, groundY, 0.5);
-        server.getPluginManager().callEvent(new io.papermc.paper.event.packet.PlayerChunkLoadEvent(
-                world.getChunkAt(cx >> 4, 0), looker));
+        sendChunk(looker, cx >> 4, 0);
         assertEquals(1, hider.hiddenCount(looker.getUniqueId()), "the chest behind walls is hidden");
 
         // Walking up to it reveals it.
         looker.teleport(new Location(world, cx - 4.5, groundY, 0.5));
         tick(10);
         assertEquals(0, hider.hiddenCount(looker.getUniqueId()), "the chest is shown once the player is close");
+
+        // Walking away again hides it again.
+        looker.teleport(new Location(world, 0.5, groundY, 0.5));
+        tick(20);
+        assertEquals(1, hider.hiddenCount(looker.getUniqueId()), "the chest is hidden again when out of sight");
+
+        // A chest that was broken meanwhile is never faked back.
+        world.getBlockAt(cx, cy, 0).setType(Material.AIR);
+        looker.teleport(new Location(world, cx - 4.5, groundY, 0.5));
+        tick(10);
+        looker.teleport(new Location(world, 0.5, groundY, 0.5));
+        tick(20);
+        assertEquals(0, hider.hiddenCount(looker.getUniqueId()));
     }
 
     @Test
@@ -670,6 +719,79 @@ class AntiCheatScenarioTest {
         server.getPluginManager().callEvent(new io.papermc.paper.event.packet.PlayerChunkLoadEvent(
                 world.getChunkAt(1, 0), looker));
         assertEquals(0, hider.hiddenCount(looker.getUniqueId()));
+    }
+
+    // ---- inventory mods and hacked clients --------------------------------------------------
+
+    private org.bukkit.event.inventory.InventoryClickEvent click(PlayerMock player, int slot) {
+        var top = player.getOpenInventory().getTopInventory();
+        if (top == null || top.getType() != org.bukkit.event.inventory.InventoryType.CHEST) {
+            player.openInventory(server.createInventory(null, 54));
+        }
+        var event = new org.bukkit.event.inventory.InventoryClickEvent(player.getOpenInventory(),
+                org.bukkit.event.inventory.InventoryType.SlotType.CONTAINER, slot,
+                org.bukkit.event.inventory.ClickType.SHIFT_LEFT,
+                org.bukkit.event.inventory.InventoryAction.MOVE_TO_OTHER_INVENTORY);
+        server.getPluginManager().callEvent(event);
+        return event;
+    }
+
+    @Test
+    void inventoryMacrosAreBlockedAndFlagged() {
+        PlayerMock player = join("ItemScroller", 0.5, groundY, 0.5);
+        int cancelled = 0;
+        for (int burst = 0; burst < 3; burst++) {
+            for (int slot = 9; slot < 36; slot++) {
+                if (click(player, slot).isCancelled()) {
+                    cancelled++;
+                }
+            }
+            tick(25);
+        }
+        assertTrue(cancelled >= 3 * 20, "mass moving must be stopped, cancelled " + cancelled);
+        assertTrue(flags(data(player), CheckType.INVENTORY) >= 1, describe(data(player)));
+    }
+
+    @Test
+    void normalInventoryClickingIsNotFlagged() {
+        PlayerMock player = join("Sorter", 0.5, groundY, 0.5);
+        for (int slot = 9; slot < 36; slot++) {
+            assertFalse(click(player, slot).isCancelled());
+            tick(3); // about 7 clicks per second
+        }
+        assertEquals(0, totalFlags(data(player)), describe(data(player)));
+    }
+
+    @Test
+    void worldDownloaderClientsAreKicked() {
+        PlayerMock staff = join("Watcher", 0.5, groundY, 5.5);
+        staff.setOp(true);
+        messages(staff);
+        PlayerMock player = join("Downloader", 0.5, groundY, 0.5);
+        server.getPluginManager().callEvent(new org.bukkit.event.player.PlayerRegisterChannelEvent(player, "wdl:init"));
+        assertFalse(player.isOnline());
+        assertTrue(messages(staff).stream().anyMatch(m -> m.contains("Downloader was kicked")));
+
+        PlayerMock normal = join("Normal", 0.5, groundY, 3.5);
+        server.getPluginManager().callEvent(new org.bukkit.event.player.PlayerRegisterChannelEvent(normal,
+                "minecraft:brand"));
+        assertTrue(normal.isOnline());
+    }
+
+    @Test
+    void cheatersAreHeldInPlaceDuringTheBanAnimation() {
+        PlayerMock flyer = join("Frozen", 0.5, 80, 0.5);
+        PlayerData data = data(flyer);
+        Location at = flyer.getLocation();
+        while (!data.autoBanned) {
+            at = at.clone().add(0.2, 0, 0);
+            move(flyer, at, false);
+        }
+        assertTrue(flyer.isOnline(), "kicked only after the animation");
+        var escape = flyer.simulatePlayerMove(at.clone().add(5, 0, 0));
+        assertTrue(escape.isCancelled(), "cannot move away during the animation");
+        tick(70);
+        assertFalse(flyer.isOnline());
     }
 
     // ---- commands and configuration -----------------------------------------------------------

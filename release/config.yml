@@ -23,6 +23,8 @@ anticheat:
     # Leave empty to use Vigil's own bans. To use another ban plugin instead, e.g.:
     # command: "tempban {player} {duration} {reason}"
     command: ""
+    # Lightning, explosion and a big "BANNED" title before the cheater is kicked.
+    animation: true
   # Creative and spectator players are never checked.
   exempt-creative-and-spectator: true
   # Worlds where nothing is checked.
@@ -33,8 +35,16 @@ anticheat:
   # Backups are made and a restart is needed. If you turn it off afterwards, Vigil leaves it off.
   setup-paper-anti-xray: true
   # Anti ESP / anti freecam: chests, barrels, shulkers, beds... that a player cannot see are shown as stone
-  # to that player until they get close or can see them (Paper).
+  # to that player until they get close or can see them, and hidden again when out of sight (Paper).
   hide-storage-from-esp: true
+  # Anti x-ray in caves: diamonds and ancient debris stay hidden until you are down there and can see them (Paper).
+  hide-ores-from-xray: true
+  client-check:
+    # Kick hacked clients (Meteor, Wurst, LiquidBounce...) that show their name, and world downloaders.
+    enabled: true
+    # Kick EVERY modded client (Fabric/Forge/Quilt). Blocks Freecam, Tweakeroo, Item Scroller and Meteor,
+    # but also harmless mods like Sodium, Iris or minimaps. Lunar/Badlion/vanilla players are not affected.
+    block-all-mods: false
 
   # enabled: turn a check on/off.
   # ban-at: violation level that bans automatically (0 = alert only, never ban; x-ray is a pattern, not proof).
@@ -59,6 +69,7 @@ anticheat:
     nuker:       {enabled: true, ban-at: 8}
     chestaura:   {enabled: true, ban-at: 8}
     xray:        {enabled: true, ban-at: 0}
+    inventory:   {enabled: true, ban-at: 0}
 
 moderation:
   enabled: true
@@ -124,7 +135,22 @@ moderation:
 # Placeholders: {player} {staff} {reason} {duration} {expires} {count} {vl}
 messages:
   flagged: "&f{player} &7has been flagged for &c{reason} &8(VL {vl})"
-  auto-banned: "&c{player} &7has been banned for &c{reason}&7."
+  # Shown to everyone when the anti-cheat bans someone.
+  auto-banned:
+    - "&8&m                                                  "
+    - "&c&l  ⚠ ANTI-CHEAT ⚠"
+    - "&f  {player} &7was caught cheating and banned for &c{reason}&7."
+    - "&8&m                                                  "
+  ban-title: "&c&lBANNED"
+  ban-subtitle: "&7Caught cheating: &c{reason}"
+  client-blocked:
+    - "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ"
+    - ""
+    - "&cYour client or mods are not allowed here."
+    - ""
+    - "&7Detected: &f{client}"
+    - "&7Please join with a normal Minecraft client."
+  client-blocked-alert: "&f{player} &7was kicked for joining with &c{client}&7."
   ban-success: "&7You have banned player &b{player} &7for &b{reason} &7for &b{duration}&7."
   unban-success: "&7You have unbanned player &b{player} &7for &b{reason}&7."
   mute-success: "&7You have muted player &b{player} &7for &b{reason} &7for &b{duration}&7."

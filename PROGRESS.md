@@ -108,6 +108,27 @@ permission silently bypassed everything.
   ESP can't be hidden without tab-list side effects. Freecam can't be seen directly.
 - Tests: 89 (6 new scenarios, 4 setup tests).
 
+## 2.2.0: cave anti-xray, re-hiding, hacked clients, inventory macros, ban animation
+
+- Block hider: diamonds and ancient debris (found by scanning a chunk snapshot off the
+  main thread, cached until a block changes) are hidden like storage. Anything that
+  goes out of sight is hidden again (after two checks without line of sight,
+  with a distance margin), and only if the block is still of a hidden type. The
+  view direction is not used, so turning around never flickers.
+- Paper anti-xray lists now include `air` (fake caves, Paper's recommendation).
+  Lists written by 2.1.0 are upgraded only if still unchanged.
+- Client check: kicks known hacked-client brands and channels, and world
+  downloaders; optionally every modded client. Research: plugins that name
+  individual mods use the sign-translation trick, fixed in Minecraft 26.1 and blocked
+  by cheat clients, so it is not used.
+- Inventory check: click bursts per client tick and per second are refused (1 s
+  pause) and flagged; InvMove is flagged. Drops and number-key swaps are not counted
+  (key repeat is legit).
+- Ban animation: harmless lightning, explosion particles, thunder, a BANNED title and
+  a chat banner. The player is frozen and kicked after 3 s (the ban is stored at
+  once). `/ac preview` shows it without banning.
+- Tests: 95.
+
 ## Remaining / next steps
 
 - Validate on a live server with a hacked client on an alt (see the README

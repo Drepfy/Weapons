@@ -70,6 +70,26 @@ final class YamlLineEditor {
         return unquote(value);
     }
 
+    /** Items of a block-style list under a key line (empty for inline or missing lists). */
+    List<String> list(int index) {
+        Matcher matcher = KEY.matcher(lines.get(index));
+        List<String> items = new ArrayList<>();
+        if (!matcher.matches()) {
+            return items;
+        }
+        int keyIndent = matcher.group(1).length();
+        for (int next = index + 1; next < lines.size(); next++) {
+            String line = lines.get(next);
+            String trimmed = line.trim();
+            int lineIndent = line.length() - line.stripLeading().length();
+            if (trimmed.isEmpty() || !trimmed.startsWith("-") || lineIndent < keyIndent) {
+                break;
+            }
+            items.add(unquote(trimmed.substring(1).trim()));
+        }
+        return items;
+    }
+
     void setScalar(int index, String value) {
         Matcher matcher = KEY.matcher(lines.get(index));
         if (matcher.matches()) {

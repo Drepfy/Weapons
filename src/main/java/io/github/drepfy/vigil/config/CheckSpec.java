@@ -91,6 +91,10 @@ public record CheckSpec(CheckType type, Defaults defaults, List<NumberOption> nu
                 num("max-per-second", 30, 10, 200));
         register(CheckType.XRAY, new Defaults(true, 1, 0, 0.1, 1.0, 4, false),
                 num("max-blocks-per-vein", 30, 5, 500));
+        register(CheckType.INVENTORY, new Defaults(true, 1, 0, 1.0, 1.0, 2, true),
+                num("max-clicks-per-tick", 6, 3, 100),
+                num("max-clicks-per-second", 30, 10, 500),
+                num("invmove-speed", 0.2, 0.1, 2.0));
         SPECS.put(CheckType.CHESTAURA, new CheckSpec(CheckType.CHESTAURA, new Defaults(true, 1, 8, 1.0, 1.0, 3, false),
                 List.of(),
                 List.of(new ListOption("blocks", List.of("CHEST", "TRAPPED_CHEST", "BARREL", "ENDER_CHEST",

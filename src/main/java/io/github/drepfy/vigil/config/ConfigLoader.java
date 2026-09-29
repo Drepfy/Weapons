@@ -36,7 +36,15 @@ public final class ConfigLoader {
         messages.put("prefix", DEFAULT_PREFIX);
         // Anti-cheat. Placeholders: {player} {reason} {check} {vl} {detail}
         messages.put("flagged", "&f{player} &7has been flagged for &c{reason} &8(VL {vl})");
-        messages.put("auto-banned", "&c{player} &7has been banned for &c{reason}&7.");
+        messages.put("auto-banned", "&8&m                                                  \n"
+                + "&c&l  ⚠ ANTI-CHEAT ⚠\n"
+                + "&f  {player} &7was caught cheating and banned for &c{reason}&7.\n"
+                + "&8&m                                                  ");
+        messages.put("ban-title", "&c&lBANNED");
+        messages.put("ban-subtitle", "&7Caught cheating: &c{reason}");
+        messages.put("client-blocked", "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ\n\n&cYour client or mods are not allowed here.\n\n"
+                + "&7Detected: &f{client}\n&7Please join with a normal Minecraft client.");
+        messages.put("client-blocked-alert", "&f{player} &7was kicked for joining with &c{client}&7.");
         messages.put("alerts-enabled", "&aAnti-cheat alerts enabled.");
         messages.put("alerts-disabled", "&eAnti-cheat alerts disabled.");
         messages.put("reloaded", "&aConfiguration reloaded. &7({warnings} warning(s), see console)");
@@ -77,6 +85,18 @@ public final class ConfigLoader {
     static final List<String> DEFAULT_HIDDEN_STORAGE = List.of("CHEST", "TRAPPED_CHEST", "BARREL", "ENDER_CHEST",
             "*SHULKER_BOX", "HOPPER", "DROPPER", "DISPENSER", "CRAFTER", "FURNACE", "BLAST_FURNACE", "SMOKER",
             "BREWING_STAND", "*_BED", "ENCHANTING_TABLE");
+
+    /** Hacked clients that put their name into the client brand. */
+    static final List<String> DEFAULT_BLOCKED_BRANDS = List.of("*meteor*", "*wurst*", "*liquidbounce*",
+            "*aristois*", "*impact*", "*rusherhack*", "*inertia*", "*lambda*", "*kami*", "*salhack*", "*konas*",
+            "*thunderhack*", "*boze*", "*sigma*", "*vape*", "*novoline*", "*astolfo*", "*tenacity*", "*wolfram*");
+
+    /** Plugin channels of hacked clients and world downloaders (base stealing). */
+    static final List<String> DEFAULT_BLOCKED_CHANNELS = List.of("wdl:*", "wdl|*", "*worlddownloader*",
+            "*meteor*", "*wurst*", "*liquidbounce*", "*aristois*", "*rusherhack*", "*baritone*");
+
+    /** Ores worth x-raying for; hidden until seen, also in caves. */
+    static final List<String> DEFAULT_HIDDEN_ORES = List.of("DIAMOND_ORE", "DEEPSLATE_DIAMOND_ORE", "ANCIENT_DEBRIS");
 
     static final List<String> DEFAULT_MUTED_BLOCKED_COMMANDS = List.of("msg", "tell", "w", "whisper", "r", "reply",
             "me", "say", "mail", "m", "t", "pm", "dm", "message", "emsg", "etell", "ewhisper", "er", "ereply");
@@ -218,14 +238,23 @@ public final class ConfigLoader {
                 autoBanDuration,
                 r.string("anticheat.auto-ban.reason", "Cheating ({reason})"),
                 r.bool("anticheat.auto-ban.broadcast", true),
-                stripSlash(r.string("anticheat.auto-ban.command", "").trim()));
+                stripSlash(r.string("anticheat.auto-ban.command", "").trim()),
+                r.bool("anticheat.auto-ban.animation", true));
 
         Settings.AntiXray antiXray = new Settings.AntiXray(r.bool("anticheat.setup-paper-anti-xray", true));
         Settings.AntiEsp antiEsp = new Settings.AntiEsp(
                 r.bool("anticheat.hide-storage-from-esp", true),
+                r.bool("anticheat.hide-ores-from-xray", true),
                 r.number("advanced.anti-esp.reveal-distance", 8.0, 5.0, 64.0),
                 r.number("advanced.anti-esp.look-distance", 48.0, 8.0, 128.0),
-                upper(r.stringList("advanced.anti-esp.blocks", DEFAULT_HIDDEN_STORAGE)));
+                upper(r.stringList("advanced.anti-esp.blocks", DEFAULT_HIDDEN_STORAGE)),
+                upper(r.stringList("advanced.anti-esp.ores", DEFAULT_HIDDEN_ORES)));
+
+        Settings.ClientCheck clientCheck = new Settings.ClientCheck(
+                r.bool("anticheat.client-check.enabled", true),
+                r.stringList("anticheat.client-check.blocked-brands", DEFAULT_BLOCKED_BRANDS),
+                r.stringList("anticheat.client-check.blocked-channels", DEFAULT_BLOCKED_CHANNELS),
+                r.bool("anticheat.client-check.block-all-mods", false));
 
         Settings.Moderation moderation = loadModeration(r);
 
@@ -235,8 +264,8 @@ public final class ConfigLoader {
             checks.put(type, loadCheck(r, type, sections.get(type)));
         }
 
-        return new Settings(general, lag, alerts, violations, autoBan, antiXray, antiEsp, moderation, checks, messages,
-                r.warnings);
+        return new Settings(general, lag, alerts, violations, autoBan, antiXray, antiEsp, clientCheck, moderation,
+                checks, messages, r.warnings);
     }
 
     /** Maps every check to its configuration path, accepting (with a warning) the 1.x check names. */

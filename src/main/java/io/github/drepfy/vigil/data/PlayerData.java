@@ -154,12 +154,23 @@ public final class PlayerData {
     // ---- x-ray -------------------------------------------------------------------------------
     public final XrayTracker xray = new XrayTracker();
 
+    // ---- inventory -----------------------------------------------------------------------------
+    public final RateCounter inventoryClicks = new RateCounter();
+    public long inventoryClickTick = -1;
+    public int inventoryClicksThisTick;
+    /** When the current inventory screen was opened (or first clicked), or -1 when closed. */
+    public long inventorySessionMs = -1;
+    public long lastInventoryFlagMs = NEVER;
+    public long inventoryBlockedUntilMs = NEVER;
+
     // ---- flags, alerts, auto-ban -----------------------------------------------------------
     private final Deque<FlagRecord> recentFlags = new ArrayDeque<>();
     public final Map<CheckType, Long> lastAlertMs = new EnumMap<>(CheckType.class);
     public final Map<CheckType, Integer> suppressedAlerts = new EnumMap<>(CheckType.class);
     /** Set once the player was banned automatically, so it happens only once. */
     public boolean autoBanned;
+    /** The ban animation plays until then; the player cannot move or act meanwhile. */
+    public long frozenUntilMs = NEVER;
 
     /** Persistent record, loaded asynchronously after join (may be null for a moment). */
     public volatile PlayerRecord record;

@@ -11,6 +11,8 @@ import io.github.drepfy.vigil.moderation.Punishment;
 import io.github.drepfy.vigil.util.Text;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
@@ -30,6 +32,8 @@ public final class AutoBanService {
 
     public static final String STAFF_NAME = "Anti-Cheat";
     public static final String PROTECT_PERMISSION = "vigil.protect";
+    /** How long the ban animation plays before the kick. */
+    private static final long ANIMATION_TICKS = 60;
 
     private final Plugin plugin;
     private final Supplier<Settings> settings;
@@ -74,31 +78,100 @@ public final class AutoBanService {
         auditLog.accept("[auto-ban] " + player.getName() + " (" + player.getUniqueId() + ") for " + reason
                 + ", " + Durations.format(autoBan.durationMs(), permanent) + ", " + flag.check().id()
                 + " VL " + Text.num(flag.vl()));
+        long delay = 1L;
+        if (autoBan.animation()) {
+            // Held in place (no moving, hitting or building) while everyone watches the animation.
+            data.frozenUntilMs = io.github.drepfy.vigil.util.Clock.now() + ANIMATION_TICKS * 50L + 1000L;
+            playAnimation(player, flag.check().reason());
+            delay = ANIMATION_TICKS;
+        }
         if (!autoBan.command().isEmpty()) {
             String command = Text.replace(autoBan.command(), "player", player.getName(),
                     "uuid", player.getUniqueId(), "reason", reason,
                     "duration", autoBan.durationMs() == Durations.PERMANENT ? "" : Durations.compact(autoBan.durationMs()));
-            // Run on the next tick: never kick or ban from inside a movement/combat event.
-            Bukkit.getScheduler().runTask(plugin, () -> Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command));
+            // Never kick or ban from inside a movement/combat event.
+            Bukkit.getScheduler().runTaskLater(plugin, () -> Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command),
+                    delay);
         } else {
+            // Recorded now, so leaving during the animation does not help.
             Punishment ban = moderation.ban(player.getUniqueId(), player.getName(), reason, STAFF_NAME,
                     autoBan.durationMs());
             String screen = formatter.screen("ban-screen", ban);
-            Bukkit.getScheduler().runTask(plugin, () -> {
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 if (player.isOnline()) {
                     player.kickPlayer(screen);
                 }
-            });
+            }, delay);
         }
 
-        String announcement = Text.color(prefix + Text.replace(config.messages().get("auto-banned"),
-                "player", player.getName(), "reason", flag.check().reason(), "check", flag.check().displayName(),
-                "duration", Durations.format(autoBan.durationMs(), permanent)));
-        logger.info(ChatColor.stripColor(announcement));
+        String announcement = banner(config, player.getName(), flag.check().reason(), flag.check().displayName(),
+                Durations.format(autoBan.durationMs(), permanent));
+        logger.info(ChatColor.stripColor(announcement.replace("\n", " ")));
         for (Player online : Bukkit.getOnlinePlayers()) {
-            if (!online.equals(player) && (autoBan.broadcast() || online.hasPermission(AlertService.ALERT_PERMISSION))) {
+            if (autoBan.broadcast() || online.hasPermission(AlertService.ALERT_PERMISSION)) {
                 online.sendMessage(announcement);
             }
+        }
+    }
+
+    /** The chat announcement; a one-line message gets the prefix, a multi-line banner stands alone. */
+    public static String banner(Settings config, String player, String reason, String check, String duration) {
+        String template = config.messages().get("auto-banned");
+        String prefix = config.messages().get("prefix");
+        if (!template.contains("{prefix}") && !template.contains("\n")) {
+            template = prefix + template;
+        }
+        return Text.color(Text.replace(template, "prefix", prefix, "player", player, "reason", reason,
+                "check", check, "duration", duration));
+    }
+
+    /**
+     * The "caught cheating" effect: a lightning strike (harmless), an explosion cloud,
+     * thunder, and a big red BANNED title on the cheater's screen.
+     */
+    public void playAnimation(Player player, String reason) {
+        Settings.Messages messages = settings.get().messages();
+        Location at = player.getLocation();
+        World world = at.getWorld();
+        if (world == null) {
+            return;
+        }
+        try {
+            world.strikeLightningEffect(at);
+        } catch (LinkageError | RuntimeException ignored) {
+            // Cosmetic only.
+        }
+        particle(world, at.clone().add(0, 1, 0), 1, 0.0, "EXPLOSION_EMITTER", "EXPLOSION_HUGE");
+        particle(world, at.clone().add(0, 1, 0), 60, 0.6, "LARGE_SMOKE", "SMOKE_LARGE");
+        particle(world, at.clone().add(0, 1, 0), 40, 0.8, "FLAME");
+        sound(world, at, "minecraft:entity.lightning_bolt.thunder", 1.5f, 1.0f);
+        sound(world, at, "minecraft:entity.generic.explode", 1.0f, 0.8f);
+        try {
+            player.sendTitle(Text.color(messages.get("ban-title")),
+                    Text.color(Text.replace(messages.get("ban-subtitle"), "reason", reason)), 5, 60, 15);
+        } catch (LinkageError | RuntimeException ignored) {
+            // Cosmetic only.
+        }
+    }
+
+    /** Particle names changed between versions: the first one that exists is used. */
+    private static void particle(World world, Location at, int count, double spread, String... names) {
+        for (String name : names) {
+            try {
+                org.bukkit.Particle particle = org.bukkit.Particle.valueOf(name);
+                world.spawnParticle(particle, at, count, spread, spread, spread, 0.02);
+                return;
+            } catch (LinkageError | RuntimeException ignored) {
+                // Not on this version (or needs extra data): try the next name.
+            }
+        }
+    }
+
+    private static void sound(World world, Location at, String key, float volume, float pitch) {
+        try {
+            world.playSound(at, key, volume, pitch);
+        } catch (LinkageError | RuntimeException ignored) {
+            // Cosmetic only.
         }
     }
 }

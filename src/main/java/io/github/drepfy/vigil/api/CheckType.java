@@ -27,7 +27,8 @@ public enum CheckType {
     FASTPLACE("fastplace", "FastPlace", "Fast Place", CheckCategory.INTERACTION),
     NUKER("nuker", "Nuker", "Nuker", CheckCategory.INTERACTION),
     CHESTAURA("chestaura", "ChestAura", "Chest Aura", CheckCategory.INTERACTION),
-    XRAY("xray", "XRay", "X-Ray / Ore Finder", CheckCategory.INTERACTION);
+    XRAY("xray", "XRay", "X-Ray / Ore Finder", CheckCategory.INTERACTION),
+    INVENTORY("inventory", "Inventory", "Inventory Hacks", CheckCategory.INTERACTION);
 
     /** Identifiers used by version 1.0/1.1, still accepted everywhere. */
     private static final Map<String, CheckType> LEGACY_IDS = Map.of(

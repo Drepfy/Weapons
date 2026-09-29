@@ -71,6 +71,10 @@ public final class CombatListener implements Listener {
         }
         long now = Clock.now();
         PlayerData data = ctx.players().get(attacker);
+        if (data.frozenUntilMs > now) {
+            event.setCancelled(true);
+            return;
+        }
         if (attacker.getInventory().getItemInMainHand().getType().name().equals("MACE")) {
             if (ctx.settings().general().enabled()) {
                 ctx.run(CheckType.MACE, now, () -> mace.onMaceHit(attacker, data, event, now));

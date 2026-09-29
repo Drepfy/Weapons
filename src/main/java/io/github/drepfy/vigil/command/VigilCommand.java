@@ -36,6 +36,7 @@ import java.util.logging.Level;
  * /ac reset &lt;player&gt; [check]  clear violation levels              vigil.admin
  * /ac debug &lt;player&gt; [check]  stream live check values            vigil.admin
  * /ac reload                  reload config.yml                   vigil.admin
+ * /ac preview                 watch the ban animation (no ban)    vigil.admin
  * </pre>
  */
 public final class VigilCommand implements CommandExecutor, TabCompleter {
@@ -51,7 +52,8 @@ public final class VigilCommand implements CommandExecutor, TabCompleter {
             new SubCommand("check", "vigil.check", "check <player>", "Violations, recent flags and punishments"),
             new SubCommand("reset", "vigil.admin", "reset <player> [check]", "Clear a player's violation levels"),
             new SubCommand("debug", "vigil.admin", "debug <player> [check]", "Show live check values (tuning)"),
-            new SubCommand("reload", "vigil.admin", "reload", "Reload config.yml"));
+            new SubCommand("reload", "vigil.admin", "reload", "Reload config.yml"),
+            new SubCommand("preview", "vigil.admin", "preview", "See the ban animation on yourself (no ban)"));
 
     private final VigilPlugin plugin;
 
@@ -77,6 +79,7 @@ public final class VigilCommand implements CommandExecutor, TabCompleter {
                 case "reset" -> reset(sender, args, label);
                 case "debug" -> debug(sender, args, label);
                 case "reload" -> reload(sender);
+                case "preview" -> preview(sender);
                 default -> help(sender, label);
             }
         } catch (RuntimeException e) {
@@ -279,6 +282,17 @@ public final class VigilCommand implements CommandExecutor, TabCompleter {
         boolean on = plugin.debugService().toggle(viewer.getUniqueId(), target.getUniqueId(), filter);
         send(sender, (on ? "&aShowing" : "&7Stopped showing") + " debug values of &b" + target.getName()
                 + (filter != null ? " &7(" + filter.displayName() + ")" : "") + "&7.");
+    }
+
+    private void preview(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            send(sender, "&7Only players can watch the preview.");
+            return;
+        }
+        plugin.autoBan().playAnimation(player, "Flying");
+        player.sendMessage(io.github.drepfy.vigil.violation.AutoBanService.banner(plugin.settings(), player.getName(),
+                "Flying", "Flight", "30 days"));
+        send(sender, "&7This is what everyone sees when the anti-cheat bans someone. &8(You were not banned.)");
     }
 
     private void reload(CommandSender sender) {

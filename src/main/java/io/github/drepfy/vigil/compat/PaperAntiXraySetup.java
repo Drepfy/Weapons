@@ -18,7 +18,8 @@ import java.util.logging.Logger;
  * they are next to air.
  *
  * <p>Done once, only while Paper's anti-xray is off, with a backup of every changed file:
- * engine-mode 2 with Paper's recommended block lists in
+ * engine-mode 2 with Paper's recommended block lists (including {@code air}, which fills
+ * the underground with fake caves so cave finders see noise) in
  * {@code config/paper-world-defaults.yml}, nether lists in each nether world's
  * {@code paper-world.yml}, and anti-xray off in the end (no ores there). A restart is
  * needed for Paper to pick it up. If an admin turns it off again later, Vigil leaves it off.
@@ -29,13 +30,16 @@ public final class PaperAntiXraySetup {
     public record WorldInfo(String name, Path folder, World.Environment environment) {
     }
 
-    static final List<String> OVERWORLD_HIDDEN = List.of("copper_ore", "deepslate_copper_ore", "raw_copper_block",
+    /** Version of the block lists below; 2 added {@code air} (fake caves). */
+    static final int LISTS_VERSION = 2;
+
+    static final List<String> OVERWORLD_HIDDEN = List.of("air", "copper_ore", "deepslate_copper_ore", "raw_copper_block",
             "diamond_ore", "deepslate_diamond_ore", "gold_ore", "deepslate_gold_ore", "iron_ore", "deepslate_iron_ore",
             "raw_iron_block", "lapis_ore", "deepslate_lapis_ore", "redstone_ore", "deepslate_redstone_ore");
     static final List<String> OVERWORLD_REPLACEMENT = List.of("chest", "amethyst_block", "andesite",
             "budding_amethyst", "calcite", "coal_ore", "deepslate_coal_ore", "deepslate", "diorite", "dirt",
             "emerald_ore", "deepslate_emerald_ore", "granite", "gravel", "oak_planks", "smooth_basalt", "stone", "tuff");
-    static final List<String> NETHER_HIDDEN = List.of("ancient_debris", "bone_block", "glowstone", "magma_block",
+    static final List<String> NETHER_HIDDEN = List.of("air", "ancient_debris", "bone_block", "glowstone", "magma_block",
             "nether_bricks", "nether_gold_ore", "nether_quartz_ore", "polished_blackstone_bricks");
     static final List<String> NETHER_REPLACEMENT = List.of("basalt", "blackstone", "gravel", "netherrack",
             "soul_sand", "soul_soil");
@@ -66,8 +70,12 @@ public final class PaperAntiXraySetup {
                 return;
             }
             if (editor.value(enabled).equalsIgnoreCase("true")) {
+                if (setup && Files.exists(marker) && !Files.readString(marker).contains("lists-version: " + LISTS_VERSION)) {
+                    upgradeLists(defaults, editor, marker, worlds, logger);
+                    return;
+                }
                 logger.info("Anti-xray: Paper anti-xray is on (engine-mode "
-                        + (mode >= 0 ? editor.value(mode) : "?") + "). Ores are hidden from x-ray.");
+                        + (mode >= 0 ? editor.value(mode) : "?") + "). Ores and caves are hidden from x-ray.");
                 return;
             }
             if (Files.exists(marker)) {
@@ -104,15 +112,57 @@ public final class PaperAntiXraySetup {
                             List.of("anticheat:", "  anti-xray:", "    enabled: false"), changed);
                 }
             }
-            Files.createDirectories(marker.getParent());
-            Files.writeString(marker, "# Vigil switched on Paper anti-xray here. Delete this file to let it do so again.\n"
-                    + "configured: " + System.currentTimeMillis() + "\n", StandardCharsets.UTF_8);
+            writeMarker(marker);
             logger.warning("Anti-xray: Paper anti-xray has been switched ON (engine-mode 2) in " + changed.size()
                     + " file(s). RESTART the server (not /reload) to activate it. Backups end in .vigil-backup.");
         } catch (IOException | RuntimeException e) {
             logger.warning("Anti-xray: could not set up Paper anti-xray (" + e.getMessage() + "); nothing was changed "
                     + "that could not be restored from the .vigil-backup files.");
         }
+    }
+
+    private static void writeMarker(Path marker) throws IOException {
+        Files.createDirectories(marker.getParent());
+        Files.writeString(marker, "# Vigil switched on Paper anti-xray here. Delete this file to let it do so again.\n"
+                + "configured: " + System.currentTimeMillis() + "\nlists-version: " + LISTS_VERSION + "\n",
+                StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Brings lists that an older Vigil wrote up to date (adds fake caves), but only where
+     * they are still exactly as Vigil left them: lists an admin edited are never touched.
+     */
+    private static void upgradeLists(Path defaults, YamlLineEditor editor, Path marker, List<WorldInfo> worlds,
+                                     Logger logger) throws IOException {
+        List<Path> changed = new ArrayList<>();
+        int hidden = editor.find("anticheat.anti-xray.hidden-blocks");
+        if (hidden >= 0 && editor.list(hidden).equals(withoutAir(OVERWORLD_HIDDEN))) {
+            editor.setList(hidden, OVERWORLD_HIDDEN);
+            write(defaults, editor.lines(), changed);
+        }
+        for (WorldInfo world : worlds) {
+            Path file = world.folder().resolve("paper-world.yml");
+            if (world.environment() != World.Environment.NETHER || !Files.isRegularFile(file)) {
+                continue;
+            }
+            YamlLineEditor netherEditor = new YamlLineEditor(Files.readAllLines(file, StandardCharsets.UTF_8));
+            int netherHidden = netherEditor.find("anticheat.anti-xray.hidden-blocks");
+            if (netherHidden >= 0 && netherEditor.list(netherHidden).equals(withoutAir(NETHER_HIDDEN))) {
+                netherEditor.setList(netherHidden, NETHER_HIDDEN);
+                write(file, netherEditor.lines(), changed);
+            }
+        }
+        writeMarker(marker);
+        if (changed.isEmpty()) {
+            logger.info("Anti-xray: Paper anti-xray is on; its block lists were customised, so they were kept.");
+        } else {
+            logger.warning("Anti-xray: added fake caves to Paper anti-xray in " + changed.size()
+                    + " file(s), so x-ray can't see caves either. RESTART the server to activate it.");
+        }
+    }
+
+    private static List<String> withoutAir(List<String> blocks) {
+        return blocks.subList(1, blocks.size());
     }
 
     private static List<String> netherSection() {
