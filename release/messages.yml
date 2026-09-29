@@ -1,0 +1,192 @@
+# ---------------------------------------------------------------------------
+#  StaffModeration messages (MiniMessage format: https://docs.advntr.dev/minimessage/format)
+#
+#  Placeholders available in punishment messages:
+#    <player> <staff> <reason> <type> <id> <duration> <expires> <remaining>
+#    <date> <server> <silent>
+#  <prefix> works everywhere. A message can be a single line or a list of lines.
+#  Set a message to "" to disable it.
+#
+#  Text typed by staff or players (reasons, names) is always inserted as
+#  plain text, so it can't inject formatting, click events or fake messages.
+# ---------------------------------------------------------------------------
+
+prefix: "<dark_gray>[<red>Moderation</red>]</dark_gray> "
+staff-prefix: "<dark_gray>[<gold>Staff</gold>]</dark_gray> "
+
+time:
+  permanent: "permanent"
+  never: "never"
+  units:
+    year: "y"
+    month: "mo"
+    week: "w"
+    day: "d"
+    hour: "h"
+    minute: "m"
+    second: "s"
+
+types:
+  ban: "ban"
+  mute: "mute"
+  voicemute: "voice mute"
+  warn: "warning"
+  kick: "kick"
+
+general:
+  no-permission: "<prefix><red>You don't have permission to do that."
+  usage: "<prefix><red>Usage: <white><usage>"
+  player-not-found: "<prefix><red>No player called <white><input></white> could be found."
+  player-not-online: "<prefix><red><white><input></white> isn't online."
+  invalid-duration: "<prefix><red><white><input></white> isn't a valid duration. Try <white>30m</white>, <white>12h</white>, <white>7d</white> or <white>permanent</white>."
+  invalid-id: "<prefix><red><white><input></white> isn't a valid punishment ID."
+  reason-required: "<prefix><red>You need to give a reason for this <type>."
+  cannot-punish-self: "<prefix><red>You can't punish yourself."
+  target-exempt: "<prefix><red><white><player></white> is exempt from punishments."
+  duration-limit: "<prefix><red>You can only issue a <type> for up to <white><limit></white>."
+  silent-no-permission: "<prefix><red>You don't have permission to punish silently."
+  database-error: "<prefix><red>Couldn't reach the punishment database, so nothing was changed. Details are in the console."
+  default-reason: "No reason given"
+  console-name: "Console"
+  automatic-name: "Automatic"
+  silent-tag: "<gray>[silent]</gray> "
+  reloaded: "<prefix><green>Configuration and messages reloaded."
+  reload-failed: "<prefix><red>Reload failed: <white><error></white>. The previous configuration is still active."
+
+status:
+  active: "<red>active</red>"
+  expired: "<gray>expired</gray>"
+  removed: "<green>removed by <removed_by></green>"
+  instant: "<gray>instant</gray>"
+
+login:
+  database-error:
+    - "<red><bold>We couldn't check your account right now."
+    - ""
+    - "<gray>Please try again in a moment."
+
+ban:
+  success: "<prefix><green>Banned <white><player></white> (<white><duration></white>). <dark_gray>#<id>"
+  already: "<prefix><red><white><player></white> is already banned (#<id>, expires <expires>). Unban them first to change it."
+  screen:
+    - "<red><bold>You are banned from this server."
+    - ""
+    - "<gray>Reason: <white><reason>"
+    - "<gray>Expires: <white><expires>"
+    - "<gray>Banned by: <white><staff>"
+    - ""
+    - "<dark_gray>Ban ID: #<id>"
+  broadcast: "<prefix><white><player></white> <gray>was banned by</gray> <white><staff></white><gray>: <reason>"
+  staff: "<staff_prefix><silent><white><staff></white> <gray>banned</gray> <white><player></white> <gray>(<duration>): <reason></gray> <dark_gray>#<id>"
+  login-attempt: "<staff_prefix><white><player></white> <gray>tried to join but is banned (expires <expires>).</gray> <dark_gray>#<id>"
+
+unban:
+  success: "<prefix><green>Unbanned <white><player></white>."
+  not-active: "<prefix><red><white><player></white> isn't banned."
+  target: ""
+  staff: "<staff_prefix><silent><white><staff></white> <gray>unbanned</gray> <white><player></white><gray>: <reason>"
+
+mute:
+  success: "<prefix><green>Muted <white><player></white> (<white><duration></white>). <dark_gray>#<id>"
+  already: "<prefix><red><white><player></white> is already muted (#<id>, expires <expires>). Unmute them first to change it."
+  target:
+    - "<prefix><red>You have been muted."
+    - "<gray>Reason: <white><reason>"
+    - "<gray>Expires: <white><expires>"
+  blocked: "<prefix><red>You are muted (expires <expires>). <gray>Reason: <white><reason>"
+  blocked-command: "<prefix><red>You can't use <white>/<command></white> while muted."
+  blocked-sign: "<prefix><red>You can't write on signs while muted."
+  blocked-book: "<prefix><red>You can't edit books while muted."
+  join-reminder: "<prefix><red>You are muted (expires <expires>). <gray>Reason: <white><reason>"
+  broadcast: "<prefix><white><player></white> <gray>was muted by</gray> <white><staff></white><gray>: <reason>"
+  staff: "<staff_prefix><silent><white><staff></white> <gray>muted</gray> <white><player></white> <gray>(<duration>): <reason></gray> <dark_gray>#<id>"
+
+unmute:
+  success: "<prefix><green>Unmuted <white><player></white>."
+  not-active: "<prefix><red><white><player></white> isn't muted."
+  target: "<prefix><green>You have been unmuted."
+  staff: "<staff_prefix><silent><white><staff></white> <gray>unmuted</gray> <white><player></white><gray>: <reason>"
+
+voicemute:
+  success: "<prefix><green>Voice-muted <white><player></white> (<white><duration></white>). <dark_gray>#<id>"
+  already: "<prefix><red><white><player></white> is already voice-muted (#<id>, expires <expires>). Lift it first to change it."
+  not-enforced: "<prefix><yellow>Simple Voice Chat isn't installed, so this voice mute is recorded but won't take effect until it is."
+  target:
+    - "<prefix><red>You have been muted in voice chat."
+    - "<gray>Reason: <white><reason>"
+    - "<gray>Expires: <white><expires>"
+  # Shown on the action bar while a voice-muted player tries to talk.
+  blocked: "<red>You are muted in voice chat (expires <expires>)"
+  join-reminder: "<prefix><red>You are muted in voice chat (expires <expires>). <gray>Reason: <white><reason>"
+  broadcast: "<prefix><white><player></white> <gray>was muted in voice chat by</gray> <white><staff></white><gray>: <reason>"
+  staff: "<staff_prefix><silent><white><staff></white> <gray>voice-muted</gray> <white><player></white> <gray>(<duration>): <reason></gray> <dark_gray>#<id>"
+
+unvoicemute:
+  success: "<prefix><green>Lifted the voice mute on <white><player></white>."
+  not-active: "<prefix><red><white><player></white> isn't voice-muted."
+  target: "<prefix><green>You can speak in voice chat again."
+  staff: "<staff_prefix><silent><white><staff></white> <gray>lifted the voice mute on</gray> <white><player></white><gray>: <reason>"
+
+warn:
+  success: "<prefix><green>Warned <white><player></white>. <dark_gray>#<id>"
+  target:
+    - "<prefix><red>You have been warned."
+    - "<gray>Reason: <white><reason>"
+  broadcast: "<prefix><white><player></white> <gray>was warned by</gray> <white><staff></white><gray>: <reason>"
+  staff: "<staff_prefix><silent><white><staff></white> <gray>warned</gray> <white><player></white><gray>: <reason></gray> <dark_gray>#<id>"
+  offline-header: "<prefix><red>You were warned while you were offline:"
+  offline-entry: "<dark_gray> • <gray><date></gray> <white><reason></white> <dark_gray>(by <staff>)"
+  escalation-reason: "Automatic: reached <count> active warnings"
+  escalation-staff: "<staff_prefix><white><player></white> <gray>reached <count> active warnings, so an automatic <type> was issued.</gray>"
+
+unwarn:
+  success: "<prefix><green>Removed warning <white>#<id></white> from <white><player></white>."
+  not-active: "<prefix><red>There's no active warning with ID <white>#<input></white>."
+  target: ""
+  staff: "<staff_prefix><silent><white><staff></white> <gray>removed warning #<id> from</gray> <white><player></white><gray>: <reason>"
+
+kick:
+  success: "<prefix><green>Kicked <white><player></white>. <dark_gray>#<id>"
+  screen:
+    - "<red><bold>You were kicked from the server."
+    - ""
+    - "<gray>Reason: <white><reason>"
+    - "<gray>Kicked by: <white><staff>"
+  broadcast: "<prefix><white><player></white> <gray>was kicked by</gray> <white><staff></white><gray>: <reason>"
+  staff: "<staff_prefix><silent><white><staff></white> <gray>kicked</gray> <white><player></white><gray>: <reason></gray> <dark_gray>#<id>"
+
+history:
+  header: "<prefix><gray>History of <white><player></white> <dark_gray>(page <page>/<pages>, <total> total)"
+  entry:
+    - "<dark_gray>#<id></dark_gray> <white><type></white> <dark_gray>·</dark_gray> <gray><date></gray> <dark_gray>·</dark_gray> <gray><duration></gray> <dark_gray>·</dark_gray> <status>"
+    - "   <gray>by <white><staff></white>: <reason>"
+  empty: "<prefix><white><player></white> <gray>has a clean record."
+  next-page: "<gray>More: <white>/history <player> <next>"
+
+warnings:
+  header: "<prefix><gray>Active warnings of <white><player></white> <dark_gray>(<count>)"
+  entry:
+    - "<dark_gray>#<id></dark_gray> <gray><date> by <white><staff></white> <dark_gray>·</dark_gray> expires <expires>"
+    - "   <white><reason>"
+  empty: "<prefix><white><player></white> <gray>has no active warnings."
+
+check:
+  lines:
+    - "<prefix><gray>Status of <white><player></white> <dark_gray>(<uuid>)"
+    - "<gray>Banned: <ban>"
+    - "<gray>Muted: <mute>"
+    - "<gray>Voice-muted: <voicemute>"
+    - "<gray>Active warnings: <white><warnings>"
+    - "<gray>History entries: <white><total>"
+    - "<gray>Last seen: <white><last_seen>"
+  active: "<red>yes</red> <gray>(#<id>, expires <expires>, by <staff>: <reason>)"
+  inactive: "<green>no"
+  online: "online now"
+  unknown: "never on this server"
+
+admin:
+  info:
+    - "<prefix><gray>StaffModeration <white><version>"
+    - "<gray>Storage: <white><storage>"
+    - "<gray>Voice chat: <white><voice>"
+    - "<gray>Cached players: <white><cached>"
