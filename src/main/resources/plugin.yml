@@ -12,6 +12,44 @@ commands:
     usage: /<command> help
     aliases: [vgl]
     permission: vigil.command
+  ban:
+    description: Ban a player (permanently, for a duration, or with a preset reason's duration).
+    usage: /<command> <player> [duration] [reason]
+    permission: vigil.moderation.ban
+  tempban:
+    description: Ban a player for a duration.
+    usage: /<command> <player> <duration> [reason]
+    permission: vigil.moderation.ban
+  unban:
+    description: Unban a player.
+    usage: /<command> <player> [reason]
+    aliases: [pardon]
+    permission: vigil.moderation.unban
+  mute:
+    description: Mute a player (permanently, for a duration, or with a preset reason's duration).
+    usage: /<command> <player> [duration] [reason]
+    permission: vigil.moderation.mute
+  tempmute:
+    description: Mute a player for a duration.
+    usage: /<command> <player> <duration> [reason]
+    permission: vigil.moderation.mute
+  unmute:
+    description: Unmute a player.
+    usage: /<command> <player> [reason]
+    permission: vigil.moderation.unmute
+  warn:
+    description: Warn a player.
+    usage: /<command> <player> [reason]
+    permission: vigil.moderation.warn
+  kick:
+    description: Kick a player.
+    usage: /<command> <player> [reason]
+    permission: vigil.moderation.kick
+  punishments:
+    description: Show a player's bans, mutes, warnings and kicks.
+    usage: /<command> <player> [page]
+    aliases: [phistory, modlog]
+    permission: vigil.moderation.history
 
 permissions:
   vigil.*:
@@ -28,6 +66,46 @@ permissions:
       vigil.status: true
       vigil.reload: true
       vigil.debug: true
+      vigil.moderation.*: true
+  vigil.moderation.*:
+    description: All moderation commands and broadcasts (does NOT include exempt).
+    default: op
+    children:
+      vigil.moderation.ban: true
+      vigil.moderation.unban: true
+      vigil.moderation.mute: true
+      vigil.moderation.unmute: true
+      vigil.moderation.warn: true
+      vigil.moderation.kick: true
+      vigil.moderation.history: true
+      vigil.moderation.notify: true
+  vigil.moderation.ban:
+    description: Use /ban and /tempban.
+    default: op
+  vigil.moderation.unban:
+    description: Use /unban.
+    default: op
+  vigil.moderation.mute:
+    description: Use /mute and /tempmute.
+    default: op
+  vigil.moderation.unmute:
+    description: Use /unmute.
+    default: op
+  vigil.moderation.warn:
+    description: Use /warn.
+    default: op
+  vigil.moderation.kick:
+    description: Use /kick.
+    default: op
+  vigil.moderation.history:
+    description: Use /punishments.
+    default: op
+  vigil.moderation.notify:
+    description: See punishments issued by other staff (when moderation.broadcast is staff).
+    default: op
+  vigil.moderation.exempt:
+    description: Cannot be banned, muted, warned or kicked by other players (console still can).
+    default: false
   vigil.command:
     description: Use the /vigil command (sub-commands have their own nodes).
     default: op

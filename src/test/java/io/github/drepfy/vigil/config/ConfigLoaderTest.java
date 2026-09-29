@@ -68,6 +68,48 @@ class ConfigLoaderTest {
     }
 
     @Test
+    void bundledModerationAndMessagesMatchBuiltInDefaults() throws Exception {
+        Settings settings = ConfigLoader.load(bundled());
+        for (io.github.drepfy.vigil.moderation.PunishmentType type
+                : io.github.drepfy.vigil.moderation.PunishmentType.values()) {
+            assertEquals(ConfigLoader.DEFAULT_REASONS.get(type), settings.moderation().reasons(type), type.key());
+        }
+        for (java.util.Map.Entry<String, String> entry : ConfigLoader.DEFAULT_MESSAGES.entrySet()) {
+            assertEquals(entry.getValue(), settings.messages().get(entry.getKey()), "messages." + entry.getKey());
+        }
+        assertEquals(ConfigLoader.DEFAULT_ALERT_FORMAT, settings.alerts().format());
+        assertEquals(io.github.drepfy.vigil.moderation.Durations.PERMANENT, settings.moderation().defaultBanMs());
+        assertTrue(settings.moderation().mutedBlockedCommands().contains("msg"));
+        assertTrue(settings.messages().get("prefix").contains("ᴠᴀɴɪʟʟᴀ sᴍᴘ"));
+    }
+
+    @Test
+    void invalidModerationValuesAreReported() throws Exception {
+        Settings settings = ConfigLoader.load(yaml("""
+                moderation:
+                  broadcast: everyone
+                  default-duration:
+                    ban: forever-ish
+                  reasons:
+                    ban:
+                      Cheating: 30d
+                      Weird: 5x
+                    kick: [AFK, Spam]
+                """));
+        assertEquals("staff", settings.moderation().broadcast());
+        assertEquals(io.github.drepfy.vigil.moderation.Durations.PERMANENT, settings.moderation().defaultBanMs());
+        var ban = settings.moderation().reasons(io.github.drepfy.vigil.moderation.PunishmentType.BAN);
+        assertEquals(2, ban.size());
+        assertEquals(30L * 24 * 3600 * 1000, ban.get(0).defaultDuration());
+        assertEquals(null, ban.get(1).defaultDuration());
+        assertEquals(2, settings.moderation().reasons(io.github.drepfy.vigil.moderation.PunishmentType.KICK).size());
+        // Types without a section keep their defaults.
+        assertEquals(ConfigLoader.DEFAULT_REASONS.get(io.github.drepfy.vigil.moderation.PunishmentType.MUTE),
+                settings.moderation().reasons(io.github.drepfy.vigil.moderation.PunishmentType.MUTE));
+        assertEquals(3, settings.warnings().size(), settings.warnings().toString());
+    }
+
+    @Test
     void emptyConfigUsesDefaults() throws Exception {
         Settings settings = ConfigLoader.load(yaml(""));
         assertEquals(List.of(), settings.warnings());

@@ -66,7 +66,9 @@ public final class AlertService {
         Integer suppressed = data.suppressedAlerts.remove(flag.check());
 
         String message = Text.color(Text.replace(config.format(),
+                "prefix", settings.get().messages().get("prefix"),
                 "player", player.getName(),
+                "reason", flag.check().reason(),
                 "check", flag.check().displayName(),
                 "vl", Text.num(flag.vl()),
                 "detail", flag.detail(),
@@ -76,7 +78,7 @@ public final class AlertService {
 
         List<String> hover = List.of(
                 "&7Player: &f" + player.getName(),
-                "&7Check: &f" + flag.check().displayName() + " &8(" + flag.check().category() + ")",
+                "&7Flagged for: &f" + flag.check().reason() + " &8(" + flag.check().displayName() + " check)",
                 "&7VL: &f" + Text.num(flag.vl()) + " &8(alert at " + Text.num(check.alertVl())
                         + ", review at " + Text.num(check.reviewVl()) + ")",
                 "&7Evidence: &f" + flag.detail(),
@@ -88,7 +90,7 @@ public final class AlertService {
 
         broadcast(message, String.join("\n", hover), "/vigil info " + player.getName(), config.clickable());
         if (config.console()) {
-            logger.info(org.bukkit.ChatColor.stripColor(message));
+            logger.info(org.bukkit.ChatColor.stripColor(message) + " - " + flag.detail());
         }
     }
 

@@ -29,6 +29,9 @@ import io.github.drepfy.vigil.listener.LifecycleListener;
 import io.github.drepfy.vigil.listener.MovementListener;
 import io.github.drepfy.vigil.listener.OptionalHooks;
 import io.github.drepfy.vigil.listener.WorldActivityListener;
+import io.github.drepfy.vigil.moderation.ModerationCommand;
+import io.github.drepfy.vigil.moderation.ModerationListener;
+import io.github.drepfy.vigil.moderation.ModerationService;
 import io.github.drepfy.vigil.review.ReviewService;
 import io.github.drepfy.vigil.storage.FlagLogWriter;
 import io.github.drepfy.vigil.storage.IoExecutor;
@@ -84,6 +87,7 @@ public final class VigilPlugin extends JavaPlugin {
     private CheckContext checks;
     private LifecycleListener lifecycle;
     private HitAngleCheck hitAngle;
+    private ModerationService moderation;
     private BukkitTask tickTask;
     private boolean started;
 
@@ -144,6 +148,20 @@ public final class VigilPlugin extends JavaPlugin {
         new OptionalHooks(this, checks, lifecycle, timer).registerAll();
         registerBypassPermissions(pm);
 
+        moderation = new ModerationService(getLogger(), io, dataDir.resolve("data").resolve("punishments.yml"));
+        ModerationListener moderationListener = new ModerationListener(this::settings, moderation);
+        pm.registerEvents(moderationListener, this);
+        ModerationCommand moderationCommand = new ModerationCommand(this::settings, moderation, moderationListener,
+                getLogger());
+        for (String name : List.of("ban", "tempban", "unban", "mute", "tempmute", "unmute", "warn", "kick",
+                "punishments")) {
+            PluginCommand moderationPluginCommand = getCommand(name);
+            if (moderationPluginCommand != null) {
+                moderationPluginCommand.setExecutor(moderationCommand);
+                moderationPluginCommand.setTabCompleter(moderationCommand);
+            }
+        }
+
         PluginCommand command = getCommand("vigil");
         if (command != null) {
             VigilCommand executor = new VigilCommand(this);
@@ -160,7 +178,10 @@ public final class VigilPlugin extends JavaPlugin {
             handleJoin(player);
         }
         tickTask = Bukkit.getScheduler().runTaskTimer(this,
-                new TickTask(checks, flight, hitAngle, disturbances, review::saveIfDirty, this::saveDirtyRecords), 1L, 1L);
+                new TickTask(checks, flight, hitAngle, disturbances, () -> {
+                    review.saveIfDirty();
+                    moderation.saveIfDirty();
+                }, this::saveDirtyRecords), 1L, 1L);
 
         getLogger().info("Vigil enabled: " + enabledChecks() + " of " + CheckType.values().length + " checks active"
                 + (settings.general().passiveMode() ? " (passive mode)" : "")
@@ -193,6 +214,7 @@ public final class VigilPlugin extends JavaPlugin {
             // The IO thread has stopped: write whatever is still dirty synchronously.
             records.saveAllNow(pending);
             review.saveNow();
+            moderation.saveNow();
             hitAngle.clear();
             players.clear();
         } catch (Throwable t) {
@@ -364,5 +386,9 @@ public final class VigilPlugin extends JavaPlugin {
 
     public IoExecutor io() {
         return io;
+    }
+
+    public ModerationService moderation() {
+        return moderation;
     }
 }

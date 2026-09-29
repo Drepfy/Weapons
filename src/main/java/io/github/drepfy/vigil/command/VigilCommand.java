@@ -139,7 +139,7 @@ public final class VigilCommand implements CommandExecutor, TabCompleter {
         long now = Clock.now();
         Settings settings = plugin.settings();
         int ping = plugin.checks().recentPing(target, data, now);
-        sender.sendMessage(Text.color("&8&m----&r &fVigil: &e" + target.getName() + " &8&m----"));
+        send(sender, "&fPlayer info: &b" + target.getName());
         sender.sendMessage(Text.color("&7Ping (recent max): &f" + ping + "ms &7TPS: &f" + Text.num(plugin.tpsMonitor().tps())
                 + " &7Mode: &f" + target.getGameMode().name().toLowerCase(Locale.ROOT)));
 
@@ -189,8 +189,7 @@ public final class VigilCommand implements CommandExecutor, TabCompleter {
             List<String> lines = record.recentFlags();
             int pages = Math.max(1, (lines.size() + PAGE_SIZE - 1) / PAGE_SIZE);
             int current = Math.min(page, pages);
-            sender.sendMessage(Text.color("&8&m----&r &fHistory: &e" + record.name() + " &7(page " + current + "/" + pages
-                    + ") &8&m----"));
+            send(sender, "&fFlag history: &b" + record.name() + " &7(page " + current + "/" + pages + ")");
             StringBuilder counts = new StringBuilder();
             for (Map.Entry<CheckType, Integer> entry : record.lifetimeFlags().entrySet()) {
                 counts.append(counts.length() == 0 ? "" : ", ").append(entry.getKey().displayName()).append(' ')
@@ -243,8 +242,7 @@ public final class VigilCommand implements CommandExecutor, TabCompleter {
         List<ReviewCase> cases = plugin.review().list(!all);
         int pages = Math.max(1, (cases.size() + PAGE_SIZE - 1) / PAGE_SIZE);
         int current = Math.min(page, pages);
-        sender.sendMessage(Text.color("&8&m----&r &fReview queue &7(" + (all ? "all" : "open") + ", page " + current + "/"
-                + pages + ") &8&m----"));
+        send(sender, "&fReview queue &7(" + (all ? "all" : "open") + ", page " + current + "/" + pages + ")");
         if (cases.isEmpty()) {
             sender.sendMessage(Text.color(all ? "&aNo cases." : "&aNo open cases."));
             return;
@@ -264,7 +262,7 @@ public final class VigilCommand implements CommandExecutor, TabCompleter {
         if (reviewCase == null) {
             return;
         }
-        sender.sendMessage(Text.color("&8&m----&r &fCase #" + reviewCase.id() + ": &e" + reviewCase.name() + " &8&m----"));
+        send(sender, "&fCase #" + reviewCase.id() + ": &b" + reviewCase.name());
         sender.sendMessage(Text.color("&7Reason: &f" + reviewCase.reason()));
         sender.sendMessage(Text.color("&7Opened: &f" + age(reviewCase.openedEpochMs()) + " ago &7Updated: &f"
                 + age(reviewCase.updatedEpochMs()) + " ago"));
@@ -319,6 +317,9 @@ public final class VigilCommand implements CommandExecutor, TabCompleter {
         reviewCase.resolve(verdict, sender.getName(), note);
         plugin.review().markDirty();
         send(sender, "&aCase #" + reviewCase.id() + " resolved as " + verdict.name().toLowerCase(Locale.ROOT) + ".");
+        if (verdict == ReviewCase.Verdict.CHEATING) {
+            send(sender, "&7To punish: &f/ban " + reviewCase.name() + " Cheating &7(30 days) or choose another reason.");
+        }
         if (verdict == ReviewCase.Verdict.LEGIT) {
             send(sender, "&7Tip: if a check misjudged this player, share the evidence so thresholds can be tuned; "
                     + "&f/vigil reset " + reviewCase.name() + " &7clears their current VL.");
@@ -464,7 +465,7 @@ public final class VigilCommand implements CommandExecutor, TabCompleter {
     private void status(CommandSender sender) {
         Settings settings = plugin.settings();
         long now = Clock.now();
-        sender.sendMessage(Text.color("&8&m----&r &fVigil " + plugin.getDescription().getVersion() + " status &8&m----"));
+        send(sender, "&fVigil " + plugin.getDescription().getVersion() + " status");
         sender.sendMessage(Text.color("&7Checks: " + (settings.general().enabled() ? "&aenabled" : "&cdisabled")
                 + (settings.general().passiveMode() ? " &e(passive mode)" : "")
                 + " &7Automatic commands: " + (settings.punishments().enabled()

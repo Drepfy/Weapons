@@ -11,6 +11,8 @@ automatically.
   interaction through walls.
 - Violation levels (VL) with decay, rate-limited clickable staff alerts, a
   persistent per-player history, and a review queue with verdicts.
+- Moderation commands with preset reasons: `/ban`, `/tempban`, `/unban`,
+  `/mute`, `/tempmute`, `/unmute`, `/warn`, `/kick`, `/punishments`.
 - Automatic commands are available but **off by default** and heavily guarded.
 - No packet libraries, no client mods, no invasive methods: only the Bukkit
   API, plus optional Paper features detected at runtime.
@@ -30,13 +32,14 @@ automatically.
 7. [Commands](#commands)
 8. [Permissions](#permissions)
 9. [Staff workflow](#staff-workflow)
-10. [Automatic commands (optional)](#automatic-commands-optional)
-11. [Developer API](#developer-api)
-12. [Files and fail-safe behaviour](#files-and-fail-safe-behaviour)
-13. [Performance](#performance)
-14. [Testing checklist](#testing-checklist)
-15. [Known limitations](#known-limitations)
-16. [Project structure](#project-structure)
+10. [Moderation: bans, mutes, warnings, kicks](#moderation-bans-mutes-warnings-kicks)
+11. [Automatic commands (optional)](#automatic-commands-optional)
+12. [Developer API](#developer-api)
+13. [Files and fail-safe behaviour](#files-and-fail-safe-behaviour)
+14. [Performance](#performance)
+15. [Testing checklist](#testing-checklist)
+16. [Known limitations](#known-limitations)
+17. [Project structure](#project-structure)
 
 ---
 
@@ -74,7 +77,11 @@ The console prints what was detected:
    server.
 
 Updating: replace the jar. Your `config.yml` is never overwritten. Options added
-in newer versions use their defaults until you add them.
+in newer versions use their defaults until you add them. **Upgrading from 1.0.0:**
+messages and the alert format you already have in `config.yml` stay as they are.
+To get the new `ᴠᴀɴɪʟʟᴀ sᴍᴘ »` prefix, the "has been flagged for" alerts and the
+moderation settings, replace your file with `release/config.yml` (or delete
+`plugins/Vigil/config.yml` and restart), then `/vigil reload`.
 
 ## Building from source
 
@@ -157,7 +164,7 @@ their defaults. All durations are in milliseconds.
 | `lag-protection.disturbance-radius` / `disturbance-grace-ms` | `8` / `3000` | Players near recent pistons, explosions and wind charges are not flagged. |
 | `alerts.enabled` / `console` | `true` / `true` | Staff chat alerts / console copy. |
 | `alerts.cooldown-ms` | `5000` | Min time between alerts per player+check (suppressed ones are counted). |
-| `alerts.format` | see file | Placeholders `{player} {check} {vl} {detail} {ping} {tps} {suppressed}`. |
+| `alerts.format` | see file | Default: `{prefix}{player} has been flagged for {reason} (VL {vl})`. Placeholders `{prefix} {player} {reason} {check} {vl} {detail} {ping} {tps} {suppressed}` (`{reason}` is e.g. "Kill Aura"). |
 | `alerts.clickable` | `true` | Hover for evidence, click for `/vigil info`. |
 | `violations.history-size` | `50` | Recent flags kept per player. |
 | `violations.log-to-file` | `true` | Daily `logs/flags-YYYY-MM-DD.log`. |
@@ -165,7 +172,12 @@ their defaults. All durations are in milliseconds.
 | `review.enabled` / `notify` | `true` / `true` | Open cases at `review-vl` / notify `vigil.review` staff. |
 | `review.max-evidence` / `max-cases` | `25` / `1000` | Evidence lines per case / cases kept (oldest *resolved* cases are archived, never open ones). |
 | `punishments.*` | disabled | See [Automatic commands](#automatic-commands-optional). |
-| `messages.*` | see file | Command/staff messages (`&` colour codes). |
+| `moderation.enabled` | `true` | Moderation commands on/off. |
+| `moderation.broadcast` | `staff` | Who is told about punishments: `staff`, `all`, `none`. |
+| `moderation.default-duration.ban` / `.mute` | `perm` / `perm` | Used without a typed duration or preset duration. |
+| `moderation.muted-blocked-commands` | msg, tell, r, me, ... | Commands muted players cannot use. |
+| `moderation.reasons.<ban\|mute\|warn\|kick\|unban\|unmute>` | many | Preset reasons (`Name: duration` map, or a list). |
+| `messages.*` | see file | Every message incl. `prefix`, `ban-success`, `ban-screen` (list = lines), ... (`&` colour codes). |
 
 ### Options every check has
 
@@ -211,6 +223,25 @@ anything it would not also flag.
 
 ## Commands
 
+Every message starts with the configurable prefix (`messages.prefix`, default
+`&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ » `).
+
+### Moderation
+
+| Command | Permission | Description |
+|---|---|---|
+| `/ban <player> [duration] [reason]` | `vigil.moderation.ban` | Ban. Without a duration: the preset's duration, else `moderation.default-duration.ban` (permanent). |
+| `/tempban <player> <duration> [reason]` | `vigil.moderation.ban` | Ban for a duration. |
+| `/unban <player> [reason]` (alias `/pardon`) | `vigil.moderation.unban` | Lift a ban. |
+| `/mute <player> [duration] [reason]` | `vigil.moderation.mute` | Mute chat and private messages. |
+| `/tempmute <player> <duration> [reason]` | `vigil.moderation.mute` | Mute for a duration. |
+| `/unmute <player> [reason]` | `vigil.moderation.unmute` | Lift a mute. |
+| `/warn <player> [reason]` | `vigil.moderation.warn` | Warn (the player sees their warning count). |
+| `/kick <player> [reason]` | `vigil.moderation.kick` | Kick. |
+| `/punishments <player> [page]` (aliases `/phistory`, `/modlog`) | `vigil.moderation.history` | All bans, mutes, warnings and kicks. |
+
+### Anti-cheat
+
 Main command `/vigil` (alias `/vgl`). Every sub-command has its own permission.
 
 | Command | Permission | Description |
@@ -236,7 +267,11 @@ Main command `/vigil` (alias `/vgl`). Every sub-command has its own permission.
 
 | Node | Default | Description |
 |---|---|---|
-| `vigil.*` | op | All staff permissions below. **Does not include bypass.** |
+| `vigil.*` | op | All staff permissions below, including `vigil.moderation.*`. **Does not include bypass or moderation exempt.** |
+| `vigil.moderation.*` | op | All moderation commands and notifications. |
+| `vigil.moderation.ban` / `unban` / `mute` / `unmute` / `warn` / `kick` / `history` | op | The matching command (`ban` also covers `/tempban`, `mute` covers `/tempmute`). |
+| `vigil.moderation.notify` | op | See punishments issued by other staff (`moderation.broadcast: staff`). |
+| `vigil.moderation.exempt` | **false** | Cannot be punished by other players (console still can). Give it to senior staff. |
 | `vigil.command` | op | Use `/vigil`. |
 | `vigil.alerts` | op | Receive and toggle alerts. |
 | `vigil.info`, `vigil.history` | op | Inspect players. |
@@ -263,6 +298,48 @@ Bypass permissions are cached per player for 5 seconds.
 4. **Tune**: if you resolve cases as `legit`, look at the evidence lines to
    see which check misjudged, raise its leniency or threshold, then
    `/vigil reload`. `/vigil reset <player>` clears their VL.
+
+## Moderation: bans, mutes, warnings, kicks
+
+Staff type a player and a reason; tab completion suggests the preset reasons for
+each command. A preset carries a default duration, so
+
+```
+/ban Steve Cheating              -> banned 30 days, reason "Cheating"
+/ban Steve 7d Cheating           -> banned 7 days (a typed duration always wins)
+/ban Steve Cheating kill aura    -> 30 days (first word matches), reason "Cheating kill aura"
+/ban Steve                       -> permanent, reason "No Reason"
+/mute Alex Spam                  -> muted 30 minutes
+/unban Steve Appeal_Accepted     -> "You have unbanned player Steve for Appeal Accepted."
+/unmute Alex                     -> "You have unmuted player Alex for No Reason."
+```
+
+What staff see:
+
+```
+ᴠᴀɴɪʟʟᴀ sᴍᴘ » You have banned player Steve for Cheating for 30 days.
+ᴠᴀɴɪʟʟᴀ sᴍᴘ » You have unbanned player Steve for Appeal Accepted.
+ᴠᴀɴɪʟʟᴀ sᴍᴘ » Steve has been flagged for Kill Aura (VL 3)        <- anti-cheat alert
+```
+
+- Durations: `30s`, `15m`, `12h`, `7d`, `2w`, `1mo`, `1y`, `perm`, and combinations like `1d12h`.
+- Preset reasons live in `moderation.reasons` (27 ban, 15 mute, 17 warn, 9 kick,
+  plus unban/unmute reasons by default). Add, remove or rename them and change
+  their durations freely. Underscores are shown as spaces.
+- Banned players are refused at login with the `ban-screen` message (reason,
+  duration, time left, staff). Online players are kicked immediately.
+- Muted players cannot chat or use the commands in `moderation.muted-blocked-commands` (`/msg`, `/r`, `/me`, ...).
+- Other staff (`vigil.moderation.notify`) are told about every punishment
+  (`moderation.broadcast: staff`, or `all` / `none`). The console always logs it.
+- Punishments are stored in `plugins/Vigil/data/punishments.yml` and survive
+  restarts. `/punishments <player>` shows the history.
+- These commands take over vanilla `/ban`, `/kick` and `/pardon`. If another
+  plugin (e.g. EssentialsX) also provides them, the plugin that loads first
+  keeps the plain name; the other is still reachable as `/vigil:ban` or
+  `/essentials:ban`. Set `moderation.enabled: false` to switch Vigil's
+  moderation off.
+- The anti-cheat never bans on its own. Resolving a review case as `cheating`
+  suggests the matching `/ban` command.
 
 ## Automatic commands (optional)
 
@@ -293,7 +370,9 @@ checks:
 ```
 
 Placeholders: `{player} {uuid} {check} {vl}`. Every executed (or dry-run)
-command is written to the console and the flag log.
+command is written to the console and the flag log. Commands run as the console,
+so Vigil's own moderation commands work too, e.g.
+`commands: ["tempban {player} 7d Cheating"]`.
 
 ## Developer API
 
@@ -333,6 +412,7 @@ plugins/Vigil/
 ├── data/
 │   ├── players/<uuid>.yml          # lifetime counts, recent evidence, staff notes
 │   ├── cases.yml                   # review queue
+│   ├── punishments.yml             # bans, mutes, warnings, kicks
 │   ├── cases-archive.log           # resolved cases archived beyond review.max-cases
 │   └── staff.yml                   # who turned alerts off
 └── logs/flags-YYYY-MM-DD.log       # every flag, one line each
@@ -368,7 +448,7 @@ plugins/Vigil/
 
 ## Testing checklist
 
-Automated: `mvn test` runs 50 unit tests. They include physics simulations of
+Automated: `mvn test` runs 59 unit tests. They include physics simulations of
 legitimate movement (sprint-jumping, head-hitters, ice/blue ice, slime, Speed
 II, Jump Boost up to level 21, cliff falls, knockback launches, slime bounces,
 frozen clients, clients waiting for chunks) under random network jitter,
@@ -399,6 +479,7 @@ In-game (recommended before relying on the plugin; use a test server and
 - [ ] Corrupt `config.yml` (bad YAML), run `/vigil reload`: old config kept, error shown.
 - [ ] Corrupt `data/cases.yml`, restart: file moved aside, plugin works.
 - [ ] Automatic commands: enable with `dry-run: true`, confirm the log line, and that nothing runs before `min-flags-in-window`.
+- [ ] `/ban <alt> Cheating`: success message, 30-day ban screen on rejoin; `/unban <alt>` says "for No Reason"; `/tempban`, `/mute` + chatting + `/msg`, `/unmute`, `/warn` (count), `/kick`, `/punishments`; tab completion shows the preset reasons; a player with `vigil.moderation.exempt` cannot be punished by staff.
 - [ ] `/reload` or restart with players online: no errors, data saved.
 
 ## Known limitations
@@ -438,6 +519,7 @@ src/main/java/io/github/drepfy/vigil/
 ├── data/                       # PlayerData, PlayerDataManager, FlagRecord
 ├── env/                        # WorldProbe (collision/fluid scans, voxel traces), BlockTraits, DisturbanceRegistry
 ├── listener/                   # movement, combat, interaction, lifecycle, world activity, optional hooks
+├── moderation/                 # /ban /mute /warn /kick ..., durations, preset reasons, punishments.yml
 ├── model/                      # pure logic, unit tested: SpeedBudget, TimerBalance, FlightTracker, Physics, geometry
 ├── review/                     # ReviewService, ReviewCase
 ├── storage/                    # IoExecutor, atomic files, flag log, player records

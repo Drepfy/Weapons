@@ -71,8 +71,10 @@ alerts:
   # Minimum time between two alerts for the same player and check.
   # Suppressed alerts are counted and shown on the next one.
   cooldown-ms: 5000
-  # Placeholders: {player} {check} {vl} {detail} {ping} {tps} {suppressed}
-  format: "&8[&cVigil&8] &f{player} &7flagged &c{check} &8(&7VL &f{vl}&8) &7{detail}{suppressed}"
+  # Placeholders: {prefix} {player} {reason} (e.g. Kill Aura) {check} (e.g. HitAngle)
+  #               {vl} {detail} {ping} {tps} {suppressed}
+  # The evidence ({detail}) is also shown when hovering the alert.
+  format: "{prefix}&f{player} &7has been flagged for &c{reason} &8(VL {vl}){suppressed}"
   # Hovering an alert shows details; clicking runs /vigil info <player>.
   clickable: true
 
@@ -104,6 +106,78 @@ punishments:
   window-ms: 600000
   # Minimum time between automatic commands for the same player and check.
   cooldown-ms: 1800000
+
+# ---------------------------------------------------------------------
+#  Moderation commands: /ban /tempban /unban /mute /tempmute /unmute
+#  /warn /kick /punishments. Typing a preset reason (tab completes) uses
+#  its default duration unless you type a duration yourself:
+#    /ban Steve Cheating        -> banned for 30 days, reason "Cheating"
+#    /ban Steve 7d Griefing     -> banned for 7 days
+#    /ban Steve                 -> permanent, reason "No Reason"
+#  Durations: 30s 15m 12h 7d 2w 1mo 1y perm (can be combined: 1d12h)
+# ---------------------------------------------------------------------
+moderation:
+  enabled: true
+  # Who else is told about a punishment: staff (vigil.moderation.notify),
+  # all (every player) or none. The console always logs it.
+  broadcast: staff
+  # Used when neither a duration nor a preset with a duration is given.
+  default-duration:
+    ban: perm
+    mute: perm
+  # Commands muted players cannot use (besides chat).
+  muted-blocked-commands: [msg, tell, w, whisper, r, reply, me, say, mail, m, t, pm, dm, message, emsg, etell, ewhisper, er, ereply]
+  # Preset reasons per command. "Name: duration" (leave the duration empty for
+  # none). Underscores are shown as spaces. Add, remove or rename freely.
+  reasons:
+    ban:
+      Cheating: 30d
+      Hacked_Client: 30d
+      Kill_Aura: 30d
+      Fly_Hacks: 14d
+      Speed_Hacks: 14d
+      X-Ray: 14d
+      Reach: 14d
+      Auto_Clicker: 7d
+      Duping: 30d
+      Exploiting: 14d
+      Griefing: 7d
+      Stealing: 3d
+      Scamming: 7d
+      Harassment: 7d
+      Hate_Speech: 30d
+      Threats: 30d
+      Doxxing: perm
+      Advertising: 7d
+      Spam: 1d
+      Inappropriate_Build: 3d
+      Inappropriate_Skin: 1d
+      Inappropriate_Name: perm
+      Lag_Machine: 7d
+      Staff_Disrespect: 3d
+      Ban_Evasion: perm
+      Alt_Account: perm
+      Chargeback: perm
+    mute:
+      Spam: 30m
+      Chat_Flood: 30m
+      Excessive_Caps: 15m
+      Swearing: 30m
+      Toxicity: 1h
+      Harassment: 6h
+      Hate_Speech: 7d
+      Threats: 7d
+      Advertising: 1d
+      Inappropriate_Language: 1h
+      Arguing_With_Staff: 30m
+      Spoilers: 15m
+      Begging: 30m
+      Impersonation: 1d
+      Politics_Or_Religion: 1h
+    warn: [Spam, Excessive_Caps, Swearing, Toxicity, Harassment, Advertising, Inappropriate_Language, Arguing_With_Staff, Begging, Griefing, Stealing, Minor_Exploit, Inappropriate_Build, Unfair_PvP, Trapping, Ignoring_Staff, Build_Too_Close]
+    kick: [AFK, Spam, Toxicity, Glitching, Inappropriate_Skin, Inappropriate_Name, Suspicious_Activity, Staff_Request, Server_Maintenance]
+    unban: [Appeal_Accepted, False_Ban, Served_Time, Staff_Decision]
+    unmute: [Appeal_Accepted, False_Mute, Served_Time, Staff_Decision]
 
 # ---------------------------------------------------------------------
 #  Checks. Common options for every check:
@@ -279,8 +353,10 @@ checks:
     # Only these blocks are checked (suffix * matches any prefix/suffix).
     blocks: [CHEST, TRAPPED_CHEST, BARREL, ENDER_CHEST, "*SHULKER_BOX", FURNACE, BLAST_FURNACE, SMOKER, HOPPER, DROPPER, DISPENSER, BREWING_STAND]
 
+# Every message starts with the prefix. Colour codes use &.
+# Moderation placeholders: {player} {staff} {reason} {duration} {expires} {count} {id}
 messages:
-  prefix: "&8[&cVigil&8] &r"
+  prefix: "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ » &r"
   no-permission: "&cYou do not have permission to do that."
   player-not-found: "&cPlayer not found: &f{player}"
   alerts-enabled: "&aStaff alerts enabled."
@@ -288,3 +364,42 @@ messages:
   reloaded: "&aConfiguration reloaded. &7({warnings} warning(s))"
   reload-failed: "&cReload failed, previous configuration kept: &f{error}"
   case-opened: "&eReview case &f#{id} &eopened for &f{player}&e: {reason}"
+  no-reason: "No Reason"
+  permanent: "Permanent"
+  ban-success: "&7You have banned player &b{player} &7for &b{reason} &7for &b{duration}&7."
+  unban-success: "&7You have unbanned player &b{player} &7for &b{reason}&7."
+  mute-success: "&7You have muted player &b{player} &7for &b{reason} &7for &b{duration}&7."
+  unmute-success: "&7You have unmuted player &b{player} &7for &b{reason}&7."
+  warn-success: "&7You have warned player &b{player} &7for &b{reason}&7. &8(warning #{count})"
+  kick-success: "&7You have kicked player &b{player} &7for &b{reason}&7."
+  ban-broadcast: "&b{staff} &7banned &b{player} &7for &b{reason} &7for &b{duration}&7."
+  unban-broadcast: "&b{staff} &7unbanned &b{player} &7for &b{reason}&7."
+  mute-broadcast: "&b{staff} &7muted &b{player} &7for &b{reason} &7for &b{duration}&7."
+  unmute-broadcast: "&b{staff} &7unmuted &b{player} &7for &b{reason}&7."
+  warn-broadcast: "&b{staff} &7warned &b{player} &7for &b{reason}&7."
+  kick-broadcast: "&b{staff} &7kicked &b{player} &7for &b{reason}&7."
+  # Shown on the disconnect screen (one entry per line).
+  ban-screen:
+    - "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ"
+    - ""
+    - "&cYou are banned from this server."
+    - ""
+    - "&7Reason: &f{reason}"
+    - "&7Duration: &f{duration}"
+    - "&7Expires in: &f{expires}"
+    - "&7Banned by: &f{staff}"
+  kick-screen:
+    - "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ"
+    - ""
+    - "&cYou were kicked from this server."
+    - ""
+    - "&7Reason: &f{reason}"
+    - "&7Kicked by: &f{staff}"
+  mute-notify: "&cYou have been muted for &f{reason}&c. &7Duration: &f{duration}"
+  muted-chat: "&cYou are muted for &f{reason}&c. &7Expires in: &f{expires}"
+  unmute-notify: "&aYou have been unmuted."
+  warn-notify: "&cYou have been warned for &f{reason}&c. &7(warning #{count})"
+  not-banned: "&c{player} is not banned."
+  not-muted: "&c{player} is not muted."
+  cannot-punish: "&cYou cannot punish {player}."
+  moderation-disabled: "&cModeration commands are disabled in the configuration."

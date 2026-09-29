@@ -37,6 +37,20 @@
   flight tracker when flight is disabled; flight sampler reordered so
   grounded players cost one block lookup; surroundings cache ages out.
 
+## 1.1.0: moderation and branding
+
+- `/ban`, `/tempban`, `/unban`, `/mute`, `/tempmute`, `/unmute`, `/warn`,
+  `/kick` and `/punishments`, with preset reasons per command (tab completion),
+  preset default durations, "No Reason" when none is given, login/chat/private
+  message enforcement, staff broadcasts, and persistent `data/punishments.yml`.
+- Requested messages: "You have banned player X for Reason for Time",
+  "You have unbanned player X for Reason / No Reason", and anti-cheat alerts as
+  "Player has been flagged for Reason" (each check has a readable reason such as
+  "Kill Aura").
+- Every message uses the `ᴠᴀɴɪʟʟᴀ sᴍᴘ »` prefix (configurable).
+- 9 new tests (durations, presets, expiry, persistence across restarts, corrupt
+  file handling, config consistency). 59 in total.
+
 ## Remaining / next steps
 
 - Validate on a live test server (see the checklist in README) and tune
@@ -49,3 +63,5 @@
   instant breaks per second), boat/vehicle fly, jesus (liquid walking).
 - Optional per-world threshold overrides and localisation files.
 - Optional SQL storage for networks with several servers.
+- Moderation ideas: IP bans, warning escalation (auto-mute after N warnings),
+  a GUI for choosing reasons, Discord webhook for punishments.

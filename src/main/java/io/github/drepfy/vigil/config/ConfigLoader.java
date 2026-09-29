@@ -1,6 +1,9 @@
 package io.github.drepfy.vigil.config;
 
 import io.github.drepfy.vigil.api.CheckType;
+import io.github.drepfy.vigil.moderation.Durations;
+import io.github.drepfy.vigil.moderation.PunishmentType;
+import io.github.drepfy.vigil.moderation.ReasonPreset;
 import org.bukkit.configuration.ConfigurationSection;
 
 import java.util.ArrayList;
@@ -24,11 +27,15 @@ public final class ConfigLoader {
 
     public static final int SUPPORTED_CONFIG_VERSION = 1;
 
+    public static final String DEFAULT_PREFIX = "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ » &r";
+    public static final String DEFAULT_ALERT_FORMAT =
+            "{prefix}&f{player} &7has been flagged for &c{reason} &8(VL {vl}){suppressed}";
+
     static final Map<String, String> DEFAULT_MESSAGES;
 
     static {
         Map<String, String> messages = new LinkedHashMap<>();
-        messages.put("prefix", "&8[&cVigil&8] &r");
+        messages.put("prefix", DEFAULT_PREFIX);
         messages.put("no-permission", "&cYou do not have permission to do that.");
         messages.put("player-not-found", "&cPlayer not found: &f{player}");
         messages.put("alerts-enabled", "&aStaff alerts enabled.");
@@ -36,7 +43,78 @@ public final class ConfigLoader {
         messages.put("reloaded", "&aConfiguration reloaded. &7({warnings} warning(s))");
         messages.put("reload-failed", "&cReload failed, previous configuration kept: &f{error}");
         messages.put("case-opened", "&eReview case &f#{id} &eopened for &f{player}&e: {reason}");
+        // Moderation. Placeholders: {player} {staff} {reason} {duration} {expires} {count} {id}
+        messages.put("no-reason", "No Reason");
+        messages.put("permanent", "Permanent");
+        messages.put("ban-success", "&7You have banned player &b{player} &7for &b{reason} &7for &b{duration}&7.");
+        messages.put("unban-success", "&7You have unbanned player &b{player} &7for &b{reason}&7.");
+        messages.put("mute-success", "&7You have muted player &b{player} &7for &b{reason} &7for &b{duration}&7.");
+        messages.put("unmute-success", "&7You have unmuted player &b{player} &7for &b{reason}&7.");
+        messages.put("warn-success", "&7You have warned player &b{player} &7for &b{reason}&7. &8(warning #{count})");
+        messages.put("kick-success", "&7You have kicked player &b{player} &7for &b{reason}&7.");
+        messages.put("ban-broadcast", "&b{staff} &7banned &b{player} &7for &b{reason} &7for &b{duration}&7.");
+        messages.put("unban-broadcast", "&b{staff} &7unbanned &b{player} &7for &b{reason}&7.");
+        messages.put("mute-broadcast", "&b{staff} &7muted &b{player} &7for &b{reason} &7for &b{duration}&7.");
+        messages.put("unmute-broadcast", "&b{staff} &7unmuted &b{player} &7for &b{reason}&7.");
+        messages.put("warn-broadcast", "&b{staff} &7warned &b{player} &7for &b{reason}&7.");
+        messages.put("kick-broadcast", "&b{staff} &7kicked &b{player} &7for &b{reason}&7.");
+        messages.put("ban-screen", "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ\n\n&cYou are banned from this server.\n\n"
+                + "&7Reason: &f{reason}\n&7Duration: &f{duration}\n&7Expires in: &f{expires}\n&7Banned by: &f{staff}");
+        messages.put("kick-screen", "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ\n\n&cYou were kicked from this server.\n\n"
+                + "&7Reason: &f{reason}\n&7Kicked by: &f{staff}");
+        messages.put("mute-notify", "&cYou have been muted for &f{reason}&c. &7Duration: &f{duration}");
+        messages.put("muted-chat", "&cYou are muted for &f{reason}&c. &7Expires in: &f{expires}");
+        messages.put("unmute-notify", "&aYou have been unmuted.");
+        messages.put("warn-notify", "&cYou have been warned for &f{reason}&c. &7(warning #{count})");
+        messages.put("not-banned", "&c{player} is not banned.");
+        messages.put("not-muted", "&c{player} is not muted.");
+        messages.put("cannot-punish", "&cYou cannot punish {player}.");
+        messages.put("moderation-disabled", "&cModeration commands are disabled in the configuration.");
         DEFAULT_MESSAGES = Map.copyOf(messages);
+    }
+
+    static final List<String> DEFAULT_MUTED_BLOCKED_COMMANDS = List.of("msg", "tell", "w", "whisper", "r", "reply",
+            "me", "say", "mail", "m", "t", "pm", "dm", "message", "emsg", "etell", "ewhisper", "er", "ereply");
+
+    /** Default preset reasons; underscores are shown as spaces. */
+    static final Map<PunishmentType, List<ReasonPreset>> DEFAULT_REASONS;
+
+    static {
+        Map<PunishmentType, List<ReasonPreset>> reasons = new EnumMap<>(PunishmentType.class);
+        reasons.put(PunishmentType.BAN, presets(
+                "Cheating", "30d", "Hacked_Client", "30d", "Kill_Aura", "30d", "Fly_Hacks", "14d",
+                "Speed_Hacks", "14d", "X-Ray", "14d", "Reach", "14d", "Auto_Clicker", "7d", "Duping", "30d",
+                "Exploiting", "14d", "Griefing", "7d", "Stealing", "3d", "Scamming", "7d", "Harassment", "7d",
+                "Hate_Speech", "30d", "Threats", "30d", "Doxxing", "perm", "Advertising", "7d", "Spam", "1d",
+                "Inappropriate_Build", "3d", "Inappropriate_Skin", "1d", "Inappropriate_Name", "perm",
+                "Lag_Machine", "7d", "Staff_Disrespect", "3d", "Ban_Evasion", "perm", "Alt_Account", "perm",
+                "Chargeback", "perm"));
+        reasons.put(PunishmentType.MUTE, presets(
+                "Spam", "30m", "Chat_Flood", "30m", "Excessive_Caps", "15m", "Swearing", "30m", "Toxicity", "1h",
+                "Harassment", "6h", "Hate_Speech", "7d", "Threats", "7d", "Advertising", "1d",
+                "Inappropriate_Language", "1h", "Arguing_With_Staff", "30m", "Spoilers", "15m", "Begging", "30m",
+                "Impersonation", "1d", "Politics_Or_Religion", "1h"));
+        reasons.put(PunishmentType.WARN, presets(
+                "Spam", "", "Excessive_Caps", "", "Swearing", "", "Toxicity", "", "Harassment", "",
+                "Advertising", "", "Inappropriate_Language", "", "Arguing_With_Staff", "", "Begging", "",
+                "Griefing", "", "Stealing", "", "Minor_Exploit", "", "Inappropriate_Build", "", "Unfair_PvP", "",
+                "Trapping", "", "Ignoring_Staff", "", "Build_Too_Close", ""));
+        reasons.put(PunishmentType.KICK, presets(
+                "AFK", "", "Spam", "", "Toxicity", "", "Glitching", "", "Inappropriate_Skin", "",
+                "Inappropriate_Name", "", "Suspicious_Activity", "", "Staff_Request", "", "Server_Maintenance", ""));
+        reasons.put(PunishmentType.UNBAN, presets(
+                "Appeal_Accepted", "", "False_Ban", "", "Served_Time", "", "Staff_Decision", ""));
+        reasons.put(PunishmentType.UNMUTE, presets(
+                "Appeal_Accepted", "", "False_Mute", "", "Served_Time", "", "Staff_Decision", ""));
+        DEFAULT_REASONS = java.util.Collections.unmodifiableMap(reasons);
+    }
+
+    private static List<ReasonPreset> presets(String... pairs) {
+        List<ReasonPreset> result = new ArrayList<>();
+        for (int i = 0; i + 1 < pairs.length; i += 2) {
+            result.add(new ReasonPreset(pairs[i], pairs[i + 1].isEmpty() ? null : Durations.parse(pairs[i + 1])));
+        }
+        return List.copyOf(result);
     }
 
     private static final Set<String> COMMON_CHECK_KEYS = Set.of("enabled", "alert-vl", "review-vl",
@@ -94,8 +172,7 @@ public final class ConfigLoader {
                 r.bool("alerts.enabled", true),
                 r.bool("alerts.console", true),
                 r.millis("alerts.cooldown-ms", 5000, 0, 3_600_000),
-                r.string("alerts.format",
-                        "&8[&cVigil&8] &f{player} &7flagged &c{check} &8(&7VL &f{vl}&8) &7{detail}{suppressed}"),
+                r.string("alerts.format", DEFAULT_ALERT_FORMAT),
                 r.bool("alerts.clickable", true));
 
         Settings.Violations violations = new Settings.Violations(
@@ -116,6 +193,8 @@ public final class ConfigLoader {
                 r.millis("punishments.window-ms", 600_000, 1000, 86_400_000L),
                 r.millis("punishments.cooldown-ms", 1_800_000, 0, 86_400_000L));
 
+        Settings.Moderation moderation = loadModeration(r);
+
         Map<CheckType, CheckSettings> checks = new EnumMap<>(CheckType.class);
         for (CheckType type : CheckType.values()) {
             checks.put(type, loadCheck(r, type));
@@ -131,11 +210,70 @@ public final class ConfigLoader {
 
         Map<String, String> messageValues = new HashMap<>();
         for (Map.Entry<String, String> entry : DEFAULT_MESSAGES.entrySet()) {
-            messageValues.put(entry.getKey(), r.string("messages." + entry.getKey(), entry.getValue()));
+            messageValues.put(entry.getKey(), r.text("messages." + entry.getKey(), entry.getValue()));
         }
 
-        return new Settings(general, lag, alerts, violations, review, punishments, checks,
+        return new Settings(general, lag, alerts, violations, review, punishments, moderation, checks,
                 new Settings.Messages(messageValues), r.warnings);
+    }
+
+    private static Settings.Moderation loadModeration(Reader r) {
+        String broadcast = r.string("moderation.broadcast", "staff").trim().toLowerCase(Locale.ROOT);
+        if (!broadcast.equals("staff") && !broadcast.equals("all") && !broadcast.equals("none")) {
+            r.warn("moderation.broadcast must be staff, all or none (got '" + broadcast + "'); using staff.");
+            broadcast = "staff";
+        }
+        Map<PunishmentType, List<ReasonPreset>> reasons = new EnumMap<>(PunishmentType.class);
+        for (PunishmentType type : PunishmentType.values()) {
+            reasons.put(type, loadReasons(r, type));
+        }
+        Set<String> blocked = new HashSet<>();
+        for (String command : r.stringList("moderation.muted-blocked-commands", DEFAULT_MUTED_BLOCKED_COMMANDS)) {
+            String cleaned = command.trim().toLowerCase(Locale.ROOT);
+            blocked.add(cleaned.startsWith("/") ? cleaned.substring(1) : cleaned);
+        }
+        return new Settings.Moderation(
+                r.bool("moderation.enabled", true),
+                broadcast,
+                r.duration("moderation.default-duration.ban", Durations.PERMANENT),
+                r.duration("moderation.default-duration.mute", Durations.PERMANENT),
+                blocked,
+                reasons);
+    }
+
+    /** Reads {@code moderation.reasons.<type>}: a map of name to duration, or a plain list of names. */
+    private static List<ReasonPreset> loadReasons(Reader r, PunishmentType type) {
+        String path = "moderation.reasons." + type.key();
+        Object raw = r.root.get(path);
+        if (raw == null) {
+            return DEFAULT_REASONS.get(type);
+        }
+        List<ReasonPreset> presets = new ArrayList<>();
+        if (raw instanceof ConfigurationSection section) {
+            for (String name : section.getKeys(false)) {
+                Object value = section.get(name);
+                String text = value == null ? "" : value.toString().trim();
+                Long duration = null;
+                if (!text.isEmpty() && !text.equalsIgnoreCase("none")) {
+                    duration = Durations.parse(text);
+                    if (duration == null) {
+                        r.warn(path + "." + name + " has an invalid duration '" + text
+                                + "' (use e.g. 30m, 12h, 7d, perm); the reason is kept without a default duration.");
+                    }
+                }
+                presets.add(new ReasonPreset(name, duration));
+            }
+        } else if (raw instanceof List<?> list) {
+            for (Object element : list) {
+                if (element != null && !element.toString().isBlank()) {
+                    presets.add(new ReasonPreset(element.toString().trim(), null));
+                }
+            }
+        } else {
+            r.warn(path + " must be a list or a map of reason: duration; using the defaults.");
+            return DEFAULT_REASONS.get(type);
+        }
+        return presets;
     }
 
     private static CheckSettings loadCheck(Reader r, CheckType type) {
@@ -302,6 +440,32 @@ public final class ConfigLoader {
                 return def;
             }
             return value.toString();
+        }
+
+        /** Like {@link #string} but also accepts a list of lines; a literal {@code \n} starts a new line. */
+        String text(String path, String def) {
+            Object value = root.get(path);
+            if (value instanceof List<?> lines) {
+                List<String> parts = new ArrayList<>();
+                for (Object line : lines) {
+                    parts.add(line == null ? "" : line.toString());
+                }
+                return String.join("\n", parts);
+            }
+            return string(path, def).replace("\\n", "\n");
+        }
+
+        long duration(String path, long def) {
+            Object value = root.get(path);
+            if (value == null) {
+                return def;
+            }
+            Long parsed = Durations.parse(value.toString());
+            if (parsed == null) {
+                warn(path + " must be a duration such as 30m, 12h, 7d or perm (got '" + value + "'); using the default.");
+                return def;
+            }
+            return parsed;
         }
 
         List<String> stringList(String path, List<String> def) {

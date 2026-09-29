@@ -1,6 +1,8 @@
 package io.github.drepfy.vigil.config;
 
 import io.github.drepfy.vigil.api.CheckType;
+import io.github.drepfy.vigil.moderation.PunishmentType;
+import io.github.drepfy.vigil.moderation.ReasonPreset;
 
 import java.util.EnumMap;
 import java.util.List;
@@ -17,6 +19,7 @@ public record Settings(General general,
                        Violations violations,
                        Review review,
                        Punishments punishments,
+                       Moderation moderation,
                        Map<CheckType, CheckSettings> checks,
                        Messages messages,
                        List<String> warnings) {
@@ -75,6 +78,35 @@ public record Settings(General general,
     }
 
     public record Punishments(boolean enabled, boolean dryRun, int minFlagsInWindow, long windowMs, long cooldownMs) {
+    }
+
+    /**
+     * Manual moderation (/ban, /mute, /warn, /kick ...).
+     *
+     * @param broadcast      who else hears about a punishment: {@code staff}, {@code all} or {@code none}
+     * @param defaultBanMs   duration of a ban without a duration or preset ({@code -1} = permanent)
+     * @param defaultMuteMs  duration of a mute without a duration or preset ({@code -1} = permanent)
+     * @param mutedBlockedCommands commands (without slash, lower case) muted players cannot use
+     * @param reasons        preset reasons per punishment type
+     */
+    public record Moderation(boolean enabled,
+                             String broadcast,
+                             long defaultBanMs,
+                             long defaultMuteMs,
+                             Set<String> mutedBlockedCommands,
+                             Map<PunishmentType, List<ReasonPreset>> reasons) {
+        public Moderation {
+            mutedBlockedCommands = Set.copyOf(mutedBlockedCommands);
+            EnumMap<PunishmentType, List<ReasonPreset>> copy = new EnumMap<>(PunishmentType.class);
+            for (PunishmentType type : PunishmentType.values()) {
+                copy.put(type, List.copyOf(reasons.getOrDefault(type, List.of())));
+            }
+            reasons = java.util.Collections.unmodifiableMap(copy);
+        }
+
+        public List<ReasonPreset> reasons(PunishmentType type) {
+            return reasons.get(type);
+        }
     }
 
     public record Messages(Map<String, String> values) {
