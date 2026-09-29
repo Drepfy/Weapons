@@ -1,0 +1,290 @@
+# =====================================================================
+#  Vigil - server-side anti-cheat for SMPs
+# =====================================================================
+#  Design principles:
+#   * Extremely low false positives. Every check is lenient by default
+#     and suppresses itself whenever the situation is uncertain
+#     (server lag, high ping, knockback, pistons, explosions, ice, ...).
+#   * Nobody is punished automatically by default. Detections raise a
+#     violation level (VL), alert online staff, and open review cases
+#     for a human to judge. Automatic commands exist but are OFF.
+#   * Fail safe. Invalid values fall back to their defaults and are
+#     reported in the console and in /vigil status. Vigil never rewrites
+#     or deletes this file.
+#
+#  All times are in milliseconds (ms) unless the key says otherwise.
+# =====================================================================
+
+config-version: 1
+
+general:
+  # Master switch for every check. Commands, history and reviews keep working.
+  enabled: true
+  # When true, no check ever cancels an action or sets a player back,
+  # regardless of each check's "mitigate" option. Detection still works.
+  passive-mode: false
+  # Players in creative or spectator mode are never checked.
+  exempt-creative-and-spectator: true
+  # Worlds (by name) in which no checks run.
+  disabled-worlds: []
+  # Use Paper's client-tick event when the server provides it. This lets the
+  # flight check notice stationary hovering while ignoring frozen/lagging
+  # clients. Harmless on Spigot (the event simply does not exist there).
+  use-client-tick-events: true
+  # Entity types a player can stand on. A player near one of these is never
+  # considered airborne. Matched against the entity type name (contains).
+  platform-entities: [BOAT, RAFT, MINECART, SHULKER, HAPPY_GHAST]
+  # Extra console output for tuning. Very noisy - leave off in production.
+  debug: false
+
+lag-protection:
+  # No violations are recorded while the server TPS is below this.
+  min-tps: 17.0
+  # A single server tick longer than this is treated as a lag spike...
+  lag-spike-threshold-ms: 400
+  # ...and all flags are suppressed for this long afterwards.
+  lag-spike-grace-ms: 3000
+  # Players whose recent maximum ping exceeds this are not flagged at all.
+  # Ping is only ever used to make checks MORE lenient, never as evidence.
+  max-ping-ms: 400
+  # Grace periods during which movement checks do not flag.
+  join-grace-ms: 5000
+  respawn-grace-ms: 3000
+  teleport-grace-ms: 1500
+  world-change-grace-ms: 3000
+  gamemode-change-grace-ms: 2000
+  # After knockback, velocity changes, explosions or damage.
+  velocity-grace-ms: 1500
+  # After leaving a vehicle, stopping elytra flight or a riptide.
+  vehicle-exit-grace-ms: 1500
+  elytra-grace-ms: 2500
+  riptide-grace-ms: 3000
+  # Radius (blocks) and duration for "disturbances" such as pistons,
+  # explosions and wind charges. Nearby players are not flagged.
+  disturbance-radius: 8
+  disturbance-grace-ms: 3000
+
+alerts:
+  enabled: true
+  # Also print alerts to the server console.
+  console: true
+  # Minimum time between two alerts for the same player and check.
+  # Suppressed alerts are counted and shown on the next one.
+  cooldown-ms: 5000
+  # Placeholders: {player} {check} {vl} {detail} {ping} {tps} {suppressed}
+  format: "&8[&cVigil&8] &f{player} &7flagged &c{check} &8(&7VL &f{vl}&8) &7{detail}{suppressed}"
+  # Hovering an alert shows details; clicking runs /vigil info <player>.
+  clickable: true
+
+violations:
+  # Recent flags kept per player (in memory and in the player's record).
+  history-size: 50
+  # Append every flag to plugins/Vigil/logs/flags-YYYY-MM-DD.log
+  log-to-file: true
+  # Delete flag logs older than this many days. 0 = keep forever (default).
+  log-retention-days: 0
+
+review:
+  enabled: true
+  # Evidence lines stored per case.
+  max-evidence: 25
+  # Staff with vigil.review are told when a case is opened.
+  notify: true
+  # Upper bound on open cases; the oldest resolved cases are archived first.
+  max-cases: 1000
+
+punishments:
+  # Automatic commands. OFF by default: Vigil is built for staff review.
+  enabled: false
+  # When true, commands are only written to the console/log, never run.
+  dry-run: true
+  # A command only runs when the player was flagged by that check at least
+  # this many times within the window. Protects against one-off detections.
+  min-flags-in-window: 5
+  window-ms: 600000
+  # Minimum time between automatic commands for the same player and check.
+  cooldown-ms: 1800000
+
+# ---------------------------------------------------------------------
+#  Checks. Common options for every check:
+#    enabled           turn the check on/off
+#    alert-vl          VL at which staff alerts start (0 = alert on every flag)
+#    review-vl         VL at which a review case is opened (0 = never)
+#    decay-per-minute  VL removed per minute without new flags
+#    vl-per-flag       VL added by one flag
+#    buffer-threshold  suspicious events needed before a single flag
+#    mitigate          cancel/set back the action (off for movement checks)
+#    actions           optional automatic commands, see README (requires
+#                      punishments.enabled). Example:
+#                        actions:
+#                          - vl: 40
+#                            commands: ["kick {player} Please disable your cheats"]
+# ---------------------------------------------------------------------
+checks:
+  speed:
+    enabled: true
+    alert-vl: 3
+    review-vl: 10
+    decay-per-minute: 1.0
+    vl-per-flag: 1.0
+    buffer-threshold: 1
+    # Set the player back to their last legitimate position on flag.
+    mitigate: false
+    # Multiplier on the computed maximum legitimate speed.
+    leniency: 1.25
+    # How much over-speed distance can be absorbed, in ticks of max speed.
+    burst-ticks: 20
+    # Constant extra distance (blocks) tolerated on top of the burst.
+    extra-blocks: 2.0
+    # Speed multipliers for special surfaces (the largest applicable wins).
+    ice-multiplier: 3.2
+    ceiling-multiplier: 1.8
+    slime-multiplier: 2.0
+    soul-speed-multiplier: 1.8
+    # How long a surface keeps affecting the limit after leaving it.
+    surface-memory-ms: 2000
+    # Distance credit granted per block/tick of received velocity.
+    velocity-credit: 15.0
+
+  flight:
+    enabled: true
+    alert-vl: 2
+    review-vl: 6
+    decay-per-minute: 1.0
+    vl-per-flag: 1.0
+    buffer-threshold: 1
+    mitigate: false
+    # Once a player stops rising, gravity must pull them down. Over every
+    # window of this much client time they must descend at least min-descent
+    # blocks. Vanilla free fall covers ~14 blocks in the first second; a
+    # client waiting for chunks sinks at ~2 blocks/second.
+    hover-window-ms: 1000
+    min-descent: 1.0
+    # Blocks of rise tolerated above the highest possible jump.
+    ascend-tolerance: 1.0
+    # A suspicion must persist this long after Vigil resynchronises the
+    # blocks around the player (removes "ghost block" false positives).
+    confirm-ms: 1000
+    # Longest rise accepted after knockback/velocity before normal rules apply.
+    impulse-max-rise-ms: 4000
+
+  vertical:
+    enabled: true
+    alert-vl: 2
+    review-vl: 6
+    decay-per-minute: 1.0
+    vl-per-flag: 1.0
+    buffer-threshold: 2
+    mitigate: false
+    # Extra blocks tolerated above the highest possible single-tick ascent.
+    tolerance: 0.1
+
+  ground-spoof:
+    enabled: true
+    alert-vl: 3
+    review-vl: 8
+    decay-per-minute: 1.0
+    vl-per-flag: 1.0
+    buffer-threshold: 8
+    mitigate: false
+    # How far below the feet (blocks) a supporting block may be.
+    vertical-tolerance: 0.5
+    # How far beyond the player's hitbox (blocks) a supporting block may be.
+    horizontal-tolerance: 0.3
+
+  timer:
+    enabled: true
+    alert-vl: 3
+    review-vl: 10
+    decay-per-minute: 1.0
+    vl-per-flag: 1.0
+    buffer-threshold: 1
+    mitigate: false
+    # Flag once the player has sent this much more movement time than
+    # has actually passed (ms of "debt").
+    max-debt-ms: 600
+    # Unused time a player can bank while idle.
+    max-credit-ms: 1000
+    # Time that passes during a connection stall is kept as credit for the
+    # burst of queued packets that follows (only packets arriving in a burst
+    # can use it). It expires after this much normal packet flow.
+    stall-forgiveness-ms: 2500
+
+  reach:
+    enabled: true
+    alert-vl: 3
+    review-vl: 10
+    decay-per-minute: 1.0
+    vl-per-flag: 1.0
+    buffer-threshold: 3
+    # Cancel hits that are far beyond any legitimate reach (see cancel-leniency).
+    mitigate: true
+    # Blocks tolerated beyond the attacker's interaction range (3.0 in survival)
+    # after lag compensation.
+    leniency: 0.5
+    # Hits beyond range + cancel-leniency are cancelled when mitigate is on.
+    cancel-leniency: 2.0
+    # Lag compensation window = ping + this (ms), capped by max-lag-window-ms.
+    lag-window-extra-ms: 250
+    max-lag-window-ms: 1000
+    # Additional tolerance for non-player targets (their history is not tracked).
+    mob-leniency: 0.6
+
+  hit-angle:
+    enabled: true
+    alert-vl: 3
+    review-vl: 8
+    decay-per-minute: 1.0
+    vl-per-flag: 1.0
+    buffer-threshold: 4
+    mitigate: false
+    # Degrees between the player's view and the target, taking the whole
+    # rotation of the attack tick into account.
+    max-angle: 70.0
+    # Targets closer than this (blocks) are ignored.
+    min-distance: 1.2
+
+  wall-hit:
+    enabled: true
+    alert-vl: 3
+    review-vl: 8
+    decay-per-minute: 1.0
+    vl-per-flag: 1.0
+    buffer-threshold: 3
+    mitigate: false
+    # Performance guard: at most this many line-of-sight traces per player/second.
+    max-traces-per-second: 10
+
+  block-reach:
+    enabled: true
+    alert-vl: 2
+    review-vl: 6
+    decay-per-minute: 1.0
+    vl-per-flag: 1.0
+    buffer-threshold: 2
+    mitigate: true
+    # Blocks tolerated beyond the block interaction range (4.5 in survival).
+    leniency: 1.0
+    # Break/place beyond range + cancel-leniency is cancelled when mitigate is on.
+    cancel-leniency: 1.5
+
+  wall-interact:
+    enabled: true
+    alert-vl: 3
+    review-vl: 8
+    decay-per-minute: 1.0
+    vl-per-flag: 1.0
+    buffer-threshold: 3
+    mitigate: false
+    # Only these blocks are checked (suffix * matches any prefix/suffix).
+    blocks: [CHEST, TRAPPED_CHEST, BARREL, ENDER_CHEST, "*SHULKER_BOX", FURNACE, BLAST_FURNACE, SMOKER, HOPPER, DROPPER, DISPENSER, BREWING_STAND]
+
+messages:
+  prefix: "&8[&cVigil&8] &r"
+  no-permission: "&cYou do not have permission to do that."
+  player-not-found: "&cPlayer not found: &f{player}"
+  alerts-enabled: "&aStaff alerts enabled."
+  alerts-disabled: "&eStaff alerts disabled."
+  reloaded: "&aConfiguration reloaded. &7({warnings} warning(s))"
+  reload-failed: "&cReload failed, previous configuration kept: &f{error}"
+  case-opened: "&eReview case &f#{id} &eopened for &f{player}&e: {reason}"
