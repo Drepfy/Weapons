@@ -23,6 +23,21 @@ on load:
     # Money taken from the player who died in PvP (0 = off)
     set {cfg::player-death-penalty} to 0
 
+    # --- Teleports (/tpa /rtp /spawn) ---
+    # Seconds to stand still before teleporting (0 = instant). Staff with smp.tp.bypass skip it.
+    set {cfg::tp-warmup} to 3
+    # Seconds a /tpa request stays valid
+    set {cfg::tpa-expire} to 60
+    # Cooldowns in seconds
+    set {cfg::tpa-cooldown} to 10
+    set {cfg::rtp-cooldown} to 300
+    set {cfg::spawn-cooldown} to 5
+    # /rtp picks a spot this far from 0,0 (blocks)
+    set {cfg::rtp-min} to 500
+    set {cfg::rtp-max} to 5000
+    # World used for /rtp
+    set {cfg::rtp-world} to "world"
+
     # --- Ranks (shown in /ranks, NOT buyable with in-game money) ---
     # Give a rank with /setrank <player> <id> or the permission smp.rank.<id>.
     # Multiply the money you get from mob and player kills.

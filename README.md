@@ -9,6 +9,7 @@ Skript add-ons for the server, one file per feature:
 | `scripts/scoreboard.sk` | Sidebar: money, playtime, kills, deaths, server IP |
 | `scripts/killrewards.sk` | Money for mob / player kills, kill & death tracking |
 | `scripts/baltop.sk` | `/baltop` GUI with player heads, ranks and pages |
+| `scripts/teleport.sk` | `/tpa`, `/tpahere`, `/tpaccept`, `/tpdeny`, `/tpacancel`, `/tptoggle`, `/rtp`, `/spawn`, `/setspawn` |
 | `scripts/market.sk` | `/market` 6-row GUI shop with stock that resets every hour (countdown on the clock), `/marketadmin` |
 
 **Requires:** Paper/Spigot 1.20+, [Skript](https://github.com/SkriptLang/Skript) 2.7+, [SkBee](https://github.com/ShaneBeee/SkBee) (for the sidebar).
