@@ -7,8 +7,13 @@ import com.drepfy.staffvanish.listener.ProtectionListener;
 import com.drepfy.staffvanish.listener.ServerListListener;
 import com.drepfy.staffvanish.selector.SelectorItem;
 import com.drepfy.staffvanish.selector.SelectorListener;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import org.bukkit.command.Command;
 import org.bukkit.command.PluginCommand;
+import org.bukkit.command.PluginIdentifiableCommand;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.PluginManager;
@@ -60,6 +65,38 @@ public final class VanishModule {
             manager.restore(player);
         }
         scheduleRefresh();
+        // Runs once every plugin is enabled, so plugins loaded after this one can't take the command back.
+        plugin.getServer().getScheduler().runTask(plugin, () -> claimCommand(command));
+    }
+
+    /**
+     * Makes {@code /vanish} and {@code /v} run this plugin's command, even when another plugin with its own vanish
+     * (EssentialsX, for example) registered them first. Otherwise typing /vanish could run the other plugin's vanish.
+     */
+    private void claimCommand(PluginCommand command) {
+        Map<String, Command> knownCommands = plugin.getServer().getCommandMap().getKnownCommands();
+        List<String> labels = new ArrayList<>();
+        labels.add(command.getName());
+        labels.addAll(command.getAliases());
+        boolean changed = false;
+        for (String label : labels) {
+            Command current = knownCommands.get(label);
+            if (current == command) {
+                continue;
+            }
+            knownCommands.put(label, command);
+            changed = true;
+            if (current instanceof PluginIdentifiableCommand other) {
+                plugin.getLogger().info("Took over /" + label + " from " + other.getPlugin().getName() + ".");
+            }
+        }
+        if (changed) {
+            for (Player player : plugin.getServer().getOnlinePlayers()) {
+                player.updateCommands();
+            }
+        }
+        plugin.getLogger().info("Vanish is ready: /" + String.join(" and /", labels) + " are handled by "
+                + plugin.getName() + ".");
     }
 
     public void disable() {

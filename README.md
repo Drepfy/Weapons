@@ -38,7 +38,8 @@ The plugin jar is written to `build/libs/`. Put it in your server's `plugins/` f
   hidden before other players are told they joined, so nothing flickers. Staff who lose permission to vanish
   reappear, within a couple of seconds if they're online or when they next join.
 - **Other plugins.** Vanished players carry the `vanished` metadata that many plugins (EssentialsX, DiscordSRV,
-  TAB, ...) check.
+  TAB, ...) check. If another plugin such as EssentialsX also has a `/vanish` command, StaffVanish takes over
+  `/vanish` and `/v` once the server has started, and says so in the console.
 
 ### Vanish Stick
 
@@ -89,6 +90,17 @@ Permission changes made while players are online (for example with LuckPerms) ta
 Every option is described in [`config.yml`](src/main/resources/config.yml). Text can use colour codes such as
 `&b` (aqua) and `&l` (bold), or [MiniMessage](https://docs.papermc.io/adventure/minimessage/format), and any message
 can be turned off by setting it to `""`. Who is vanished is stored in `plugins/StaffVanish/vanish-data.yml`.
+
+### Troubleshooting
+
+If `/vanish` gives you an invisibility potion effect and nobody sees a "left the game" message, a different plugin's
+vanish (usually EssentialsX) is running instead of StaffVanish, which means StaffVanish didn't load:
+
+- `/plugins` should list **StaffVanish** in green. If it's red or missing, the server console shows why.
+- The server must run **Paper** (or a Paper fork such as Purpur) **1.21.4 or newer**. Spigot and older versions
+  can't load it.
+- On startup the console should say `Vanish is ready: /vanish and /v are handled by StaffVanish.`
+- Only keep one copy of the plugin in `plugins/`.
 
 ### Limitations
 

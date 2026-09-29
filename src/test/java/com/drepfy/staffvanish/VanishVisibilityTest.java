@@ -119,12 +119,12 @@ class VanishVisibilityTest extends VanishTestBase {
         vanish.vanish(mod, mod);
         assertEquals(List.of("Mod left the game"), messages(alice));
         assertEquals(List.of("Mod left the game"), messages(mod));
-        assertEquals(List.of("Mod left the game", "ᴠᴀɴɪsʜ » Mod vanished."), messages(admin));
+        assertEquals(List.of("Mod left the game", "ᴠᴀɴɪʟʟᴀ sᴍᴘ » Mod vanished."), messages(admin));
 
         vanish.unvanish(mod, mod);
         assertEquals(List.of("Mod joined the game"), messages(alice));
         assertEquals(List.of("Mod joined the game"), messages(mod));
-        assertEquals(List.of("Mod joined the game", "ᴠᴀɴɪsʜ » Mod reappeared."), messages(admin));
+        assertEquals(List.of("Mod joined the game", "ᴠᴀɴɪʟʟᴀ sᴍᴘ » Mod reappeared."), messages(admin));
     }
 
     @Test
@@ -140,7 +140,7 @@ class VanishVisibilityTest extends VanishTestBase {
         mod.disconnect();
         assertFalse(vanish.isVanished(mod));
         assertTrue(vanish.isMarkedVanished(mod.getUniqueId()));
-        assertEquals(List.of("ᴠᴀɴɪsʜ » Mod left silently."), messages(admin));
+        assertEquals(List.of("ᴠᴀɴɪʟʟᴀ sᴍᴘ » Mod left silently."), messages(admin));
 
         mod.reconnect();
         assertTrue(vanish.isVanished(mod));
@@ -149,7 +149,7 @@ class VanishVisibilityTest extends VanishTestBase {
         assertFalse(admin.isListed(mod));
         assertFalse(mod.isListed(mod));
         assertTrue(mod.getAllowFlight());
-        assertEquals(List.of("ᴠᴀɴɪsʜ » Mod joined silently."), messages(admin));
+        assertEquals(List.of("ᴠᴀɴɪʟʟᴀ sᴍᴘ » Mod joined silently."), messages(admin));
 
         List<Component> expected = new ArrayList<>();
         expected.add(null);
@@ -172,7 +172,7 @@ class VanishVisibilityTest extends VanishTestBase {
         assertTrue(alice.canSee(mod));
         assertFalse(mod.getAllowFlight());
         assertTrue(messages(mod).contains(
-                "ᴠᴀɴɪsʜ » You're visible again because you no longer have permission to vanish."));
+                "ᴠᴀɴɪʟʟᴀ sᴍᴘ » You're visible again because you no longer have permission to vanish."));
     }
 
     @Test

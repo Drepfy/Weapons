@@ -189,7 +189,7 @@ class SelectorTest extends VanishTestBase {
         server.getPluginManager().callEvent(event);
 
         assertTrue(event.isCancelled());
-        assertTrue(messages(mod).getFirst().startsWith("ᴠᴀɴɪsʜ » Inspecting Alice"));
+        assertTrue(messages(mod).getFirst().startsWith("ᴠᴀɴɪʟʟᴀ sᴍᴘ » Inspecting Alice"));
     }
 
     @Test
@@ -202,7 +202,7 @@ class SelectorTest extends VanishTestBase {
         PlayerInteractEvent event = interact(mod, Action.RIGHT_CLICK_AIR);
 
         assertEquals(Event.Result.DENY, event.useItemInHand());
-        assertEquals(List.of("ᴠᴀɴɪsʜ » You need to be vanished to do that."), messages(mod));
+        assertEquals(List.of("ᴠᴀɴɪʟʟᴀ sᴍᴘ » You need to be vanished to do that."), messages(mod));
     }
 
     @Test

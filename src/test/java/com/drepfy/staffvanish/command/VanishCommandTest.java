@@ -3,6 +3,7 @@ package com.drepfy.staffvanish.command;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.drepfy.staffvanish.VanishPermissions;
@@ -10,8 +11,11 @@ import com.drepfy.staffvanish.VanishTestBase;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Location;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.command.TabCompleter;
 import org.junit.jupiter.api.Test;
@@ -25,12 +29,34 @@ class VanishCommandTest extends VanishTestBase {
 
         mod.performCommand("vanish");
         assertTrue(vanish.isVanished(mod));
-        assertEquals(List.of("Mod left the game", "ᴠᴀɴɪsʜ » You are now vanished. Only staff can see you."),
+        assertEquals(List.of("Mod left the game", "ᴠᴀɴɪʟʟᴀ sᴍᴘ » You are now vanished. Only staff can see you."),
                 messages(mod));
 
         mod.performCommand("v");
         assertFalse(vanish.isVanished(mod));
-        assertEquals(List.of("Mod joined the game", "ᴠᴀɴɪsʜ » You are now visible to everyone."), messages(mod));
+        assertEquals(List.of("Mod joined the game", "ᴠᴀɴɪʟʟᴀ sᴍᴘ » You are now visible to everyone."), messages(mod));
+    }
+
+    @Test
+    void takesOverVanishFromOtherPlugins() {
+        Map<String, Command> knownCommands = server.getCommandMap().getKnownCommands();
+        Command otherVanish = new Command("vanish") {
+            @Override
+            public boolean execute(CommandSender sender, String label, String[] args) {
+                sender.sendMessage("the other plugin's vanish");
+                return true;
+            }
+        };
+        knownCommands.put("vanish", otherVanish);
+        knownCommands.put("v", otherVanish);
+
+        server.getScheduler().performOneTick();
+
+        assertSame(plugin.getCommand("vanish"), knownCommands.get("vanish"));
+        assertSame(plugin.getCommand("vanish"), knownCommands.get("v"));
+        TestPlayer mod = staff("Mod");
+        mod.performCommand("v");
+        assertTrue(vanish.isVanished(mod));
     }
 
     @Test
@@ -41,7 +67,7 @@ class VanishCommandTest extends VanishTestBase {
 
         mod.performCommand("vanish on");
         assertTrue(vanish.isVanished(mod));
-        assertEquals(List.of("ᴠᴀɴɪsʜ » Mod is already vanished."), messages(mod));
+        assertEquals(List.of("ᴠᴀɴɪʟʟᴀ sᴍᴘ » Mod is already vanished."), messages(mod));
 
         mod.performCommand("vanish off");
         mod.performCommand("vanish off");
@@ -58,13 +84,13 @@ class VanishCommandTest extends VanishTestBase {
 
         mod.performCommand("vanish Admin");
         assertTrue(vanish.isVanished(admin));
-        assertEquals(List.of("Admin left the game", "ᴠᴀɴɪsʜ » Vanished Admin."), messages(mod));
-        assertEquals(List.of("Admin left the game", "ᴠᴀɴɪsʜ » You are now vanished. Only staff can see you.",
-                "ᴠᴀɴɪsʜ » Mod vanished you."), messages(admin));
+        assertEquals(List.of("Admin left the game", "ᴠᴀɴɪʟʟᴀ sᴍᴘ » Vanished Admin."), messages(mod));
+        assertEquals(List.of("Admin left the game", "ᴠᴀɴɪʟʟᴀ sᴍᴘ » You are now vanished. Only staff can see you.",
+                "ᴠᴀɴɪʟʟᴀ sᴍᴘ » Mod vanished you."), messages(admin));
 
         mod.performCommand("vanish on Alice");
         assertFalse(vanish.isVanished(alice));
-        assertEquals(List.of("ᴠᴀɴɪsʜ » Alice doesn't have permission to vanish."), messages(mod));
+        assertEquals(List.of("ᴠᴀɴɪʟʟᴀ sᴍᴘ » Alice doesn't have permission to vanish."), messages(mod));
     }
 
     @Test
@@ -77,7 +103,7 @@ class VanishCommandTest extends VanishTestBase {
         mod.performCommand("vanish Admin");
 
         assertFalse(vanish.isVanished(admin));
-        assertEquals(List.of("ᴠᴀɴɪsʜ » You don't have permission to do that."), messages(mod));
+        assertEquals(List.of("ᴠᴀɴɪʟʟᴀ sᴍᴘ » You don't have permission to do that."), messages(mod));
     }
 
     @Test
@@ -92,7 +118,7 @@ class VanishCommandTest extends VanishTestBase {
         mod.performCommand("vanish list");
 
         String list = messages(mod).getFirst();
-        assertTrue(list.startsWith("ᴠᴀɴɪsʜ » Vanished (2): "), list);
+        assertTrue(list.startsWith("ᴠᴀɴɪʟʟᴀ sᴍᴘ » Vanished (2): "), list);
         assertTrue(list.contains("Mod"), list);
         assertTrue(list.contains("Admin (offline)"), list);
     }
@@ -105,13 +131,13 @@ class VanishCommandTest extends VanishTestBase {
         messages(mod);
 
         mod.performCommand("vanish tp Alice");
-        assertEquals(List.of("ᴠᴀɴɪsʜ » You need to be vanished to do that."), messages(mod));
+        assertEquals(List.of("ᴠᴀɴɪʟʟᴀ sᴍᴘ » You need to be vanished to do that."), messages(mod));
 
         mod.performCommand("vanish");
         messages(mod);
         mod.performCommand("vanish tp Alice");
         assertEquals(alice.getLocation(), mod.getLocation());
-        assertEquals(List.of("ᴠᴀɴɪsʜ » Teleported to Alice."), messages(mod));
+        assertEquals(List.of("ᴠᴀɴɪʟʟᴀ sᴍᴘ » Teleported to Alice."), messages(mod));
     }
 
     @Test
@@ -124,7 +150,7 @@ class VanishCommandTest extends VanishTestBase {
         mod.performCommand("vanish stick");
 
         assertTrue(hasSelector(mod));
-        assertEquals(List.of("ᴠᴀɴɪsʜ » You received the ᴠᴀɴɪsʜ sᴛɪᴄᴋ."), messages(mod));
+        assertEquals(List.of("ᴠᴀɴɪʟʟᴀ sᴍᴘ » You received the ᴠᴀɴɪsʜ sᴛɪᴄᴋ."), messages(mod));
     }
 
     @Test
@@ -158,7 +184,7 @@ class VanishCommandTest extends VanishTestBase {
 
         mod.performCommand("vanish reload");
 
-        assertEquals(List.of("ᴠᴀɴɪsʜ » Configuration reloaded."), messages(mod));
+        assertEquals(List.of("ᴠᴀɴɪʟʟᴀ sᴍᴘ » Configuration reloaded."), messages(mod));
         assertEquals("Mod hidden", PlainTextComponentSerializer.plainText().serialize(mod.playerListName()));
     }
 
@@ -173,7 +199,7 @@ class VanishCommandTest extends VanishTestBase {
 
         mod.performCommand("vanish");
 
-        assertEquals(List.of("Mod left the game", "ᴠᴀɴɪsʜ » You are now vanished. Only staff can see you."),
+        assertEquals(List.of("Mod left the game", "ᴠᴀɴɪʟʟᴀ sᴍᴘ » You are now vanished. Only staff can see you."),
                 messages(mod));
         assertEquals("ᴠᴀɴɪsʜ sᴛɪᴄᴋ", PlainTextComponentSerializer.plainText()
                 .serialize(mod.getInventory().getItem(8).getItemMeta().customName()));

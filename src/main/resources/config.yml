@@ -128,7 +128,7 @@ selector:
     page-info: "&7Page &f<page> &7of &f<pages>"
 
 messages:
-  prefix: "&b&lᴠᴀɴɪsʜ &8» "
+  prefix: "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ &8» "
 
   # Shown to everyone, so it looks like the player really left or joined.
   # These use Minecraft's own wording, e.g. "IV10nesy left the game".
