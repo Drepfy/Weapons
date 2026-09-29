@@ -38,6 +38,8 @@ on load:
     set {cfg::rtp-max} to 5000
     # World used for /rtp
     set {cfg::rtp-world} to "world"
+    # /rtp never lands within this many blocks of another player
+    set {cfg::rtp-player-distance} to 250
 
     # --- Ranks (shown in /ranks, NOT buyable with in-game money) ---
     # Give a rank with /setrank <player> <id> or the permission smp.rank.<id>.

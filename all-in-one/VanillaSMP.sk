@@ -45,6 +45,8 @@ on load:
     set {cfg::rtp-max} to 5000
     # World used for /rtp
     set {cfg::rtp-world} to "world"
+    # /rtp never lands within this many blocks of another player
+    set {cfg::rtp-player-distance} to 250
 
     # --- Ranks (shown in /ranks, NOT buyable with in-game money) ---
     # Give a rank with /setrank <player> <id> or the permission smp.rank.<id>.
@@ -994,7 +996,7 @@ command /rtp:
         set {_min} to {cfg::rtp-min} ? 500
         set {_max} to {cfg::rtp-max} ? 5000
         send action bar "&eFinding a safe spot..."
-        loop 15 times:
+        loop 30 times:
             set {_r} to random number between {_min} and {_max}
             set {_a} to random number between 0 and 360
             set {_x} to round({_r} * cos({_a}))
@@ -1004,6 +1006,13 @@ command /rtp:
                 set {_bad} to false
                 if type of {_b} is water or lava or magma block or cactus or powder snow or fire or campfire:
                     set {_bad} to true
+                # stay away from other players so nobody lands next to someone
+                if {_bad} is false:
+                    set {_spot} to location({_x}, 64, {_z}, {_w})
+                    loop all players:
+                        if world of loop-player is {_w}:
+                            if distance between location of loop-player and {_spot} < ({cfg::rtp-player-distance} ? 250):
+                                set {_bad} to true
                 if {_bad} is false:
                     set {_dest} to location({_x} + 0.5, y-coordinate of {_b} + 1, {_z} + 0.5, {_w})
                     exit loop
