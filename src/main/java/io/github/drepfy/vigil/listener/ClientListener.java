@@ -59,9 +59,19 @@ public final class ClientListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onChannel(PlayerRegisterChannelEvent event) {
         Player player = event.getPlayer();
-        if (player.isOnline()) {
-            check(player, null, Set.of(event.getChannel()));
+        Set<String> channel = Set.of(event.getChannel());
+        if (Bukkit.isPrimaryThread()) {
+            if (player.isOnline()) {
+                check(player, null, channel);
+            }
+            return;
         }
+        // Some versions register channels from the network thread; kicking must happen on the main thread.
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (player.isOnline()) {
+                check(player, null, channel);
+            }
+        });
     }
 
     /**

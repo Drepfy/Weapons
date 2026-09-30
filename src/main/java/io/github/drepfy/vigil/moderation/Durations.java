@@ -58,6 +58,9 @@ public final class Durations {
                 case "m" -> MINUTE;
                 default -> SECOND;
             };
+            if (amount > MAX / unit) {
+                return MAX; // Also keeps amount * unit from overflowing.
+            }
             total += amount * unit;
             if (total > MAX) {
                 return MAX;

@@ -57,6 +57,37 @@ public record ReasonPreset(String name, List<Long> durations) {
         return String.join(", ", parts);
     }
 
+    /**
+     * Whether a stored reason was given with this preset: the preset itself ("Cheating",
+     * "xray" for X-Ray) or the preset followed by details ("Cheating fly hacks").
+     */
+    public boolean matches(String reason) {
+        if (reason == null) {
+            return false;
+        }
+        String text = reason.trim().toLowerCase(Locale.ROOT);
+        String wanted = display().toLowerCase(Locale.ROOT);
+        if (text.equals(wanted) || text.startsWith(wanted + " ")) {
+            return true;
+        }
+        String key = normalize(name);
+        if (normalize(text).equals(key)) {
+            return true;
+        }
+        int space = text.indexOf(' ');
+        return space > 0 && normalize(text.substring(0, space)).equals(key);
+    }
+
+    /** The first preset that {@link #matches(String) matches} a stored reason, or {@code null}. */
+    public static ReasonPreset matching(Collection<ReasonPreset> presets, String reason) {
+        for (ReasonPreset preset : presets) {
+            if (preset.matches(reason)) {
+                return preset;
+            }
+        }
+        return null;
+    }
+
     /** Finds a preset by name, ignoring case, spaces, underscores and dashes. */
     public static ReasonPreset find(Collection<ReasonPreset> presets, String input) {
         if (input == null || input.isBlank()) {

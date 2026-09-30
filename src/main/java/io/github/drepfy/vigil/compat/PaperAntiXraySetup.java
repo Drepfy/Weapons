@@ -200,7 +200,11 @@ public final class PaperAntiXraySetup {
         }
         Path temp = file.resolveSibling(file.getFileName() + ".vigil-tmp");
         Files.write(temp, lines, StandardCharsets.UTF_8);
-        Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        try {
+            Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+            Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING);
+        }
         changed.add(file);
     }
 }

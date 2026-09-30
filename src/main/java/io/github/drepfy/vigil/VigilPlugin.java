@@ -493,7 +493,8 @@ public class VigilPlugin extends JavaPlugin {
     }
 
     private void attachRecord(Player player, PlayerData data, PlayerRecord record) {
-        if (!isEnabled()) {
+        if (!isEnabled() || data.record != null) {
+            // A quick relog can load the record twice: keep the first one, which already has the flags.
             return;
         }
         record.seen(player.getName());

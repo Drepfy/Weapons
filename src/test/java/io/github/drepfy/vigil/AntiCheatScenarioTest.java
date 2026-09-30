@@ -3,6 +3,7 @@ package io.github.drepfy.vigil;
 import io.github.drepfy.vigil.api.CheckType;
 import io.github.drepfy.vigil.data.PlayerData;
 import io.github.drepfy.vigil.model.Physics;
+import io.github.drepfy.vigil.moderation.Durations;
 import io.github.drepfy.vigil.moderation.Punishment;
 import io.github.drepfy.vigil.util.Clock;
 import io.papermc.paper.event.packet.ClientTickEndEvent;
@@ -945,6 +946,35 @@ class AntiCheatScenarioTest {
         assertEquals("A warning has been removed", next);
         staff.performCommand("unwarn Loud");
         assertTrue(messages(staff).stream().anyMatch(m -> m.contains("Loud has no active warnings")));
+    }
+
+    @Test
+    void bannedPlayersAreRefusedEvenIfTheScreenFails() {
+        java.util.UUID uuid = java.util.UUID.randomUUID();
+        plugin.moderation().ban(uuid, "Evader", "Cheating", "Admin", Durations.PERMANENT);
+        // Settings that throw: building the ban screen fails, the ban must still hold.
+        var listener = new io.github.drepfy.vigil.moderation.ModerationListener(() -> {
+            throw new IllegalStateException("broken");
+        }, plugin.moderation());
+        var event = new org.bukkit.event.player.AsyncPlayerPreLoginEvent("Evader",
+                java.net.InetAddress.getLoopbackAddress(), uuid);
+        listener.onPreLogin(event);
+        assertEquals(org.bukkit.event.player.AsyncPlayerPreLoginEvent.Result.KICK_BANNED, event.getLoginResult());
+        assertTrue(event.getKickMessage().contains("banned"), event.getKickMessage());
+    }
+
+    @Test
+    void replacedBansAreLabelledInTheHistory() {
+        PlayerMock staff = join("Admin", 0.5, groundY, 0.5);
+        staff.setOp(true);
+        PlayerMock target = join("Twice", 3.5, groundY, 0.5);
+        plugin.moderation().ban(target.getUniqueId(), "Twice", "Griefing", "Admin", 3L * 24 * 3600 * 1000);
+        plugin.moderation().ban(target.getUniqueId(), "Twice", "Cheating", "Admin", Durations.PERMANENT);
+        messages(staff);
+        staff.performCommand("ac check Twice");
+        List<String> lines = messages(staff);
+        assertTrue(lines.stream().anyMatch(m -> m.contains("Griefing") && m.contains("[replaced]")), lines.toString());
+        assertTrue(lines.stream().anyMatch(m -> m.contains("Cheating") && m.contains("[active]")), lines.toString());
     }
 
     @Test

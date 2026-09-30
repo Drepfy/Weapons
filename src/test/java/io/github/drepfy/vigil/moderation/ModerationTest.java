@@ -42,6 +42,11 @@ class ModerationTest {
         assertNull(Durations.parse("0d"));
         assertNull(Durations.parse("d7"));
         assertNull(Durations.parse(""));
+        // Huge numbers are capped at 100 years instead of overflowing.
+        long hundredYears = 100L * 365 * DAY;
+        assertEquals(hundredYears, Durations.parse("999999999y"));
+        assertEquals(hundredYears, Durations.parse("999999999mo"));
+        assertEquals(hundredYears, Durations.parse("200y1d"));
     }
 
     @Test
@@ -155,6 +160,42 @@ class ModerationTest {
     }
 
     @Test
+    void presetsRecogniseTheReasonsTheyGave() {
+        ReasonPreset cheating = new ReasonPreset("Cheating", List.of(7 * DAY));
+        ReasonPreset xray = new ReasonPreset("X-Ray", List.of(7 * DAY));
+        ReasonPreset hacked = new ReasonPreset("Hacked_Client", List.of(7 * DAY));
+        assertTrue(cheating.matches("Cheating"));
+        assertTrue(cheating.matches("cheating fly hacks"));
+        assertTrue(cheating.matches("Cheating (Flying)"), "automatic bans count for the Cheating preset");
+        assertFalse(cheating.matches("Cheater"));
+        assertFalse(cheating.matches("Anti Cheating"));
+        assertTrue(xray.matches("X-Ray"));
+        assertTrue(xray.matches("xray"));
+        assertTrue(xray.matches("xray found diamonds"));
+        assertTrue(hacked.matches("Hacked Client"));
+        assertTrue(hacked.matches("hacked_client wurst"));
+        assertFalse(hacked.matches("Hacked"));
+        assertEquals(xray, ReasonPreset.matching(List.of(cheating, xray), "xray at spawn"));
+        assertNull(ReasonPreset.matching(List.of(cheating, xray), "Griefing"));
+    }
+
+    @Test
+    void offenceNumberMatchesThePresetUsedForTheLength(@TempDir Path dir) {
+        IoExecutor io = new IoExecutor(LOGGER);
+        ModerationService service = new ModerationService(LOGGER, io, dir.resolve("punishments.yml"));
+        Settings settings = ConfigLoader.defaults(new ArrayList<>());
+        ModerationListener listener = new ModerationListener(() -> settings, service);
+        UUID steve = UUID.randomUUID();
+        service.ban(steve, "Steve", "Cheating", "Mod", 7 * DAY);
+        service.unban(steve, "Mod", "Served Time");
+        // "/ban Steve Cheating fly" uses the Cheating times (2nd offence), and says so.
+        Punishment second = service.ban(steve, "Steve", "Cheating fly", "Mod", 30 * DAY);
+        String screen = ChatColor.stripColor(listener.banScreen(second));
+        assertTrue(screen.contains("Reason: Cheating fly (2nd offence)"), screen);
+        io.shutdown(1000);
+    }
+
+    @Test
     void banScreensFitTheBan(@TempDir Path dir) {
         IoExecutor io = new IoExecutor(LOGGER);
         ModerationService service = new ModerationService(LOGGER, io, dir.resolve("punishments.yml"));
@@ -262,6 +303,21 @@ class ModerationTest {
         assertNull(reloaded.unban(steve, "Admin", "again"));
         assertNotNull(reloaded.activeMuteByName("alex"));
         io2.shutdown(5000);
+
+        // Timed warnings are "in effect" but must never be enforced as a mute after a restart.
+        Path other = dir.resolve("warnings.yml");
+        UUID sam = UUID.randomUUID();
+        IoExecutor io3 = new IoExecutor(LOGGER);
+        ModerationService warned = new ModerationService(LOGGER, io3, other);
+        warned.warn(sam, "Sam", "Spam", "Mod", 7 * DAY);
+        io3.shutdown(5000);
+        IoExecutor io4 = new IoExecutor(LOGGER);
+        ModerationService afterRestart = new ModerationService(LOGGER, io4, other);
+        assertNull(afterRestart.activeMute(sam), "a warned player is not muted after a restart");
+        assertNull(afterRestart.activeBan(sam));
+        assertEquals(List.of(), afterRestart.mutedNames());
+        assertEquals(1, afterRestart.activeWarnings(sam, 30 * DAY).size(), "the warning still counts");
+        io4.shutdown(5000);
     }
 
     @Test

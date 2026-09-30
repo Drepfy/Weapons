@@ -136,7 +136,7 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
     /** The preset's time for this player's next offence, or the configured default. */
     private long presetDuration(UUID uuid, PunishmentType type, ReasonPreset preset) {
         if (preset != null && !preset.durations().isEmpty()) {
-            return preset.durationFor(service.previousOffences(uuid, type, preset.display(), Integer.MAX_VALUE));
+            return preset.durationFor(service.previousOffences(uuid, type, preset::matches, Integer.MAX_VALUE));
         }
         Settings.Moderation moderation = settings.get().moderation();
         return type == PunishmentType.BAN ? moderation.defaultBanMs() : moderation.defaultMuteMs();

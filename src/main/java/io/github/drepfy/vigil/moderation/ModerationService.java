@@ -13,25 +13,27 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.function.Predicate;
 import java.util.logging.Logger;
 
 /**
  * Stores bans, mutes, warnings and kicks in {@code data/punishments.yml}.
  *
- * <p>Changes happen on the server thread; the active ban/mute indexes are
- * concurrent maps because logins and chat are handled on other threads.
+ * <p>Changes happen on the server thread. Every map is concurrent because logins and
+ * chat (ban screens, mute messages) read them from other threads.
  */
 public final class ModerationService {
 
     private final Logger logger;
     private final IoExecutor io;
     private final Path file;
-    private final Map<Integer, Punishment> all = new LinkedHashMap<>();
+    /** Every punishment by id, oldest first. */
+    private final Map<Integer, Punishment> all = new ConcurrentSkipListMap<>();
     private final Map<UUID, Punishment> activeBans = new ConcurrentHashMap<>();
     private final Map<UUID, Punishment> activeMutes = new ConcurrentHashMap<>();
     private int nextId = 1;
@@ -183,13 +185,24 @@ public final class ModerationService {
      */
     public int previousOffences(UUID uuid, PunishmentType type, String reason, int beforeId) {
         String wanted = reason.toLowerCase(java.util.Locale.ROOT);
+        return previousOffences(uuid, type, text -> {
+            String lower = text.toLowerCase(java.util.Locale.ROOT);
+            return lower.equals(wanted) || lower.startsWith(wanted + " ");
+        }, beforeId);
+    }
+
+    /**
+     * Earlier punishments of this type whose reason passes {@code sameReason}.
+     *
+     * @param beforeId only punishments older than this id count ({@code Integer.MAX_VALUE} = all)
+     */
+    public int previousOffences(UUID uuid, PunishmentType type, Predicate<String> sameReason, int beforeId) {
         int count = 0;
         for (Punishment punishment : all.values()) {
             if (punishment.type() != type || !punishment.uuid().equals(uuid) || punishment.id() >= beforeId) {
                 continue;
             }
-            String text = punishment.reason().toLowerCase(java.util.Locale.ROOT);
-            if (!text.equals(wanted) && !text.startsWith(wanted + " ")) {
+            if (!sameReason.test(punishment.reason())) {
                 continue;
             }
             if (punishment.revoked() && isExcuse(punishment.revokeReason())) {
@@ -238,13 +251,16 @@ public final class ModerationService {
         }
         String snapshot = serialize();
         dirty = false;
-        io.execute("save punishments", () -> {
+        boolean queued = io.execute("save punishments", () -> {
             try {
                 AtomicFiles.write(file, snapshot);
             } catch (IOException e) {
                 logger.warning("Could not save punishments: " + e.getMessage());
             }
         });
+        if (!queued) {
+            dirty = true; // Try again on the next tick (or synchronously at shutdown).
+        }
     }
 
     public void saveNow() {
@@ -376,7 +392,9 @@ public final class ModerationService {
                 Punishment punishment = Punishment.load(id, entry);
                 all.put(id, punishment);
                 nextId = Math.max(nextId, id + 1);
-                if (punishment.isInEffect(now)) {
+                boolean banOrMute = punishment.type() == PunishmentType.BAN || punishment.type() == PunishmentType.MUTE;
+                if (banOrMute && punishment.isInEffect(now)) {
+                    // Only bans and mutes are enforced; timed warnings are also "in effect" but just count.
                     Map<UUID, Punishment> index = punishment.type() == PunishmentType.BAN ? activeBans : activeMutes;
                     Punishment existing = index.get(punishment.uuid());
                     if (existing == null || existing.id() < punishment.id()) {

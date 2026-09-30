@@ -6,9 +6,32 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class UtilTest {
+
+    @Test
+    void droppedIoWorkIsReported() throws Exception {
+        java.util.logging.Logger logger = java.util.logging.Logger.getLogger("test");
+        io.github.drepfy.vigil.storage.IoExecutor io = new io.github.drepfy.vigil.storage.IoExecutor(logger);
+        assertTrue(io.execute("ok", () -> { }));
+        io.shutdown(1000);
+        assertFalse(io.execute("late", () -> { }), "work after shutdown is reported as dropped");
+        // A record load that cannot be queued still completes, so joins never hang, and it keeps the
+        // player's history instead of starting a fresh record that would overwrite it.
+        java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("vigil");
+        java.util.UUID uuid = java.util.UUID.randomUUID();
+        java.nio.file.Files.writeString(dir.resolve(uuid + ".yml"), "name: Steve\nlifetime-flags:\n  speed: 7\n");
+        var store = new io.github.drepfy.vigil.storage.PlayerRecordStore(dir, io, logger);
+        var record = store.loadOrCreate(uuid, "Steve").get(1, java.util.concurrent.TimeUnit.SECONDS);
+        assertEquals(uuid, record.uuid());
+        assertEquals(7, record.totalLifetimeFlags(), "existing history is kept");
+        java.util.UUID fresh = java.util.UUID.randomUUID();
+        assertEquals(0, store.loadOrCreate(fresh, "Alex").get(1, java.util.concurrent.TimeUnit.SECONDS)
+                .totalLifetimeFlags());
+        assertNull(store.loadExisting(fresh).get(1, java.util.concurrent.TimeUnit.SECONDS));
+    }
 
     @Test
     void globMatching() {

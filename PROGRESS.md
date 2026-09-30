@@ -176,6 +176,28 @@ permission silently bypassed everything.
   README has LuckPerms group commands.
 - Tests: 113.
 
+## 2.4.1: full review, bug fixes
+
+Every source file was read again. Fixed:
+- After a restart, players with an active (timed) warning were loaded as muted.
+- Ban screens and chat mute messages are built on login/chat threads and read the
+  punishment list while the server thread could change it; a rare error there could
+  let a banned player in. The punishment list is now a concurrent map, the date
+  formatter cache is thread-safe, and the login is refused before the screen is built.
+- "{offence}" counted by the typed reason ("Cheating fly" = 1st offence) while the
+  length used the preset ("Cheating", 2nd step). Both now use the preset
+  (`ReasonPreset.matches`: the preset, "xray" for X-Ray, or the preset plus details).
+- `Durations.parse` overflowed on huge numbers (e.g. 999999999y) instead of capping.
+- The action bar called Paper's Adventure API directly, which could stop the class
+  from loading on Spigot and break /mute, /warn, /unmute and /unwarn there.
+- Mod channels registered off the main thread could not be kicked.
+- IO work dropped by a full queue left record loads (joins, /ac check) waiting forever,
+  and a dropped punishment save was forgotten; now they complete/retry.
+- A quick relog while the player record was loading could attach two records.
+- Paper anti-xray setup failed on filesystems without atomic moves.
+- /ac check labels bans replaced by a newer ban as "[replaced]" instead of "[lifted]".
+- Tests: 118 (each fix has a test that fails without it).
+
 ## Remaining / next steps
 
 - Validate on a live server with a hacked client on an alt (see the README

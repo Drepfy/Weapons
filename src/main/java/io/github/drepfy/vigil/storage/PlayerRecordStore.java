@@ -32,17 +32,25 @@ public final class PlayerRecordStore {
     /** Loads (or creates) the record of an online player. Never completes exceptionally. */
     public CompletableFuture<PlayerRecord> loadOrCreate(UUID uuid, String name) {
         CompletableFuture<PlayerRecord> future = new CompletableFuture<>();
-        io.execute("load player record " + uuid, () -> {
+        boolean queued = io.execute("load player record " + uuid, () -> {
             PlayerRecord record = read(uuid, name);
             future.complete(record != null ? record : new PlayerRecord(uuid, name));
         });
+        if (!queued) {
+            // The IO queue is full (very rare): read this one small file right away. Starting with a
+            // fresh record instead would overwrite the player's history on the next save.
+            PlayerRecord record = read(uuid, name);
+            future.complete(record != null ? record : new PlayerRecord(uuid, name));
+        }
         return future;
     }
 
     /** Loads the record of a possibly offline player; completes with {@code null} if none exists. */
     public CompletableFuture<PlayerRecord> loadExisting(UUID uuid) {
         CompletableFuture<PlayerRecord> future = new CompletableFuture<>();
-        io.execute("load offline record " + uuid, () -> future.complete(read(uuid, "unknown")));
+        if (!io.execute("load offline record " + uuid, () -> future.complete(read(uuid, "unknown")))) {
+            future.complete(null);
+        }
         return future;
     }
 

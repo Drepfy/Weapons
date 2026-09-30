@@ -482,7 +482,7 @@ Maven tab → **Lifecycle → package**. GitHub Actions builds every push.
 
 ## Testing
 
-`mvn test` runs 113 tests. 37 of them are end-to-end scenarios on a simulated
+`mvn test` runs 118 tests. 39 of them are end-to-end scenarios on a simulated
 server (MockBukkit). They check that legit sprint-jumping, wall jumps, stairs,
 bridging, knockback, falls with damage, normal fights, fights against a strafing
 target, real mace smashes and normal branch mining are **never** flagged, and that

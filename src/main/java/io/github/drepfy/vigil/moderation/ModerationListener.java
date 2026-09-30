@@ -34,8 +34,15 @@ public final class ModerationListener implements Listener {
     public void onPreLogin(AsyncPlayerPreLoginEvent event) {
         // Always enforced: automatic bans are stored here even when the commands are disabled.
         Punishment ban = service.activeBan(event.getUniqueId());
-        if (ban != null) {
+        if (ban == null) {
+            return;
+        }
+        // Refused first, so a problem with the screen text can never let a banned player in.
+        event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_BANNED, "You are banned from this server.");
+        try {
             event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_BANNED, banScreen(ban));
+        } catch (RuntimeException e) {
+            // Keep the plain message.
         }
     }
 
@@ -110,10 +117,7 @@ public final class ModerationListener implements Listener {
         java.time.format.DateTimeFormatter dates = dateFormatter(config.moderation().dateFormat());
         String expiresDate = punishment.isPermanent() ? messages.get("never")
                 : dates.format(java.time.Instant.ofEpochMilli(punishment.expiresEpochMs()));
-        // Automatic bans escalate on any earlier automatic ban, staff punishments per reason.
-        int offence = 1 + (ANTI_CHEAT_STAFF.equals(punishment.staff()) && punishment.type() == PunishmentType.BAN
-                ? service.previousAutoBans(punishment.uuid(), ANTI_CHEAT_STAFF, punishment.id())
-                : service.previousOffences(punishment.uuid(), punishment.type(), punishment.reason(), punishment.id()));
+        int offence = 1 + previousOffences(config, punishment);
         return Text.replace(template,
                 "player", punishment.name(),
                 "staff", punishment.staff(),
@@ -127,15 +131,34 @@ public final class ModerationListener implements Listener {
                 "appeal", config.moderation().appeal());
     }
 
-    private java.time.format.DateTimeFormatter cachedFormatter;
-    private String cachedPattern;
+    /**
+     * Offences before this one, counted the same way the length was chosen: automatic bans
+     * on any earlier automatic ban, staff punishments per preset reason.
+     */
+    private int previousOffences(Settings config, Punishment punishment) {
+        if (ANTI_CHEAT_STAFF.equals(punishment.staff()) && punishment.type() == PunishmentType.BAN) {
+            return service.previousAutoBans(punishment.uuid(), ANTI_CHEAT_STAFF, punishment.id());
+        }
+        ReasonPreset preset = ReasonPreset.matching(config.moderation().reasons(punishment.type()), punishment.reason());
+        if (preset != null) {
+            return service.previousOffences(punishment.uuid(), punishment.type(), preset::matches, punishment.id());
+        }
+        return service.previousOffences(punishment.uuid(), punishment.type(), punishment.reason(), punishment.id());
+    }
+
+    /** Pattern and formatter together, so login and chat threads always see a matching pair. */
+    private record CachedFormat(String pattern, java.time.format.DateTimeFormatter formatter) {
+    }
+
+    private volatile CachedFormat cachedFormat;
 
     private java.time.format.DateTimeFormatter dateFormatter(String pattern) {
-        if (!pattern.equals(cachedPattern)) {
-            cachedFormatter = java.time.format.DateTimeFormatter.ofPattern(pattern, java.util.Locale.ENGLISH)
-                    .withZone(java.time.ZoneId.systemDefault());
-            cachedPattern = pattern;
+        CachedFormat cached = cachedFormat;
+        if (cached == null || !cached.pattern().equals(pattern)) {
+            cached = new CachedFormat(pattern, java.time.format.DateTimeFormatter.ofPattern(pattern,
+                    java.util.Locale.ENGLISH).withZone(java.time.ZoneId.systemDefault()));
+            cachedFormat = cached;
         }
-        return cachedFormatter;
+        return cached.formatter();
     }
 }

@@ -1,6 +1,7 @@
 package io.github.drepfy.vigil.storage;
 
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -32,21 +33,31 @@ public final class IoExecutor {
                     if (dropped.incrementAndGet() % 1000 == 1) {
                         logger.warning("IO queue full, dropped " + dropped.get() + " write(s) so far.");
                     }
+                    throw new RejectedExecutionException("IO queue full");
                 });
     }
 
-    /** Runs a task on the IO thread; exceptions are logged, never propagated. */
-    public void execute(String description, Runnable task) {
+    /**
+     * Runs a task on the IO thread; exceptions are logged, never propagated.
+     *
+     * @return false if the task was dropped (queue full or shutting down)
+     */
+    public boolean execute(String description, Runnable task) {
         if (executor.isShutdown()) {
-            return;
+            return false;
         }
-        executor.execute(() -> {
-            try {
-                task.run();
-            } catch (Throwable t) {
-                logger.log(Level.WARNING, "IO task failed: " + description, t);
-            }
-        });
+        try {
+            executor.execute(() -> {
+                try {
+                    task.run();
+                } catch (Throwable t) {
+                    logger.log(Level.WARNING, "IO task failed: " + description, t);
+                }
+            });
+            return true;
+        } catch (RejectedExecutionException e) {
+            return false;
+        }
     }
 
     public int queued() {

@@ -221,7 +221,9 @@ public final class VigilCommand implements CommandExecutor, TabCompleter {
             if (p.type() == PunishmentType.BAN || p.type() == PunishmentType.MUTE
                     || (p.type() == PunishmentType.WARN && p.durationMs() != 0L)) {
                 text.append(" &7(").append(Durations.format(p.durationMs(), permanent)).append(')');
-                text.append(p.revoked() ? " &a[lifted]" : p.isInEffect(now) ? " &c[active]" : " &8[expired]");
+                boolean replaced = p.revoked() && p.revokeReason() != null && p.revokeReason().startsWith("Replaced by");
+                text.append(replaced ? " &8[replaced]" : p.revoked() ? " &a[lifted]"
+                        : p.isInEffect(now) ? " &c[active]" : " &8[expired]");
             }
             text.append(" &7by &f").append(p.staff()).append(" &8").append(Text.duration(now - p.createdEpochMs()))
                     .append(" ago");
