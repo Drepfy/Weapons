@@ -1,6 +1,6 @@
 # ============================================================
 #  Vigil - anti-cheat and moderation for Vanilla SMP
-#  Commands: /ac  /ban  /unban  /mute  /unmute  /warn  /kick
+#  Commands: /ac  /punish  /ban  /unban  /mute  /unmute  /warn  /kick
 #  After editing, run /ac reload.
 # ============================================================
 config-version: 2
