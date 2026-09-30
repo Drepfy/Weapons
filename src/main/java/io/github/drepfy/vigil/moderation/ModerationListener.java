@@ -19,6 +19,9 @@ import java.util.function.Supplier;
  */
 public final class ModerationListener implements Listener {
 
+    /** Staff name of automatic anti-cheat bans (they get their own ban screen). */
+    public static final String ANTI_CHEAT_STAFF = "Anti-Cheat";
+
     private final Supplier<Settings> settings;
     private final ModerationService service;
 
@@ -32,7 +35,7 @@ public final class ModerationListener implements Listener {
         // Always enforced: automatic bans are stored here even when the commands are disabled.
         Punishment ban = service.activeBan(event.getUniqueId());
         if (ban != null) {
-            event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_BANNED, screen("ban-screen", ban));
+            event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_BANNED, banScreen(ban));
         }
     }
 
@@ -84,18 +87,55 @@ public final class ModerationListener implements Listener {
         return Text.color(fill(settings.get().messages().get(key), punishment));
     }
 
-    /** Replaces the punishment placeholders in a message. */
+    /** The ban screen that fits the ban: anti-cheat, permanent or temporary. */
+    public String banScreen(Punishment ban) {
+        String key = ANTI_CHEAT_STAFF.equals(ban.staff()) ? "ban-screen-anticheat"
+                : ban.isPermanent() ? "ban-screen-permanent" : "ban-screen";
+        return screen(key, ban);
+    }
+
+    /**
+     * Replaces the punishment placeholders in a message: {@code {player} {staff} {reason}
+     * {duration} {expires} {expires-date} {date} {id} {offence} {appeal}}.
+     */
     public String fill(String template, Punishment punishment) {
-        Settings.Messages messages = settings.get().messages();
+        Settings config = settings.get();
+        Settings.Messages messages = config.messages();
         String permanent = messages.get("permanent");
+        long now = System.currentTimeMillis();
+        // Rounded up so a fresh 7 day ban reads "7 days", not "6 days 23 hours".
+        long left = Math.max(0L, punishment.expiresEpochMs() - now);
         String expires = punishment.isPermanent() ? permanent
-                : Durations.format(punishment.expiresEpochMs() - System.currentTimeMillis(), permanent);
+                : Durations.format((left + 999) / 1000 * 1000, permanent);
+        java.time.format.DateTimeFormatter dates = dateFormatter(config.moderation().dateFormat());
+        String expiresDate = punishment.isPermanent() ? messages.get("never")
+                : dates.format(java.time.Instant.ofEpochMilli(punishment.expiresEpochMs()));
+        // Automatic bans escalate on any earlier automatic ban, staff punishments per reason.
+        int offence = 1 + (ANTI_CHEAT_STAFF.equals(punishment.staff()) && punishment.type() == PunishmentType.BAN
+                ? service.previousAutoBans(punishment.uuid(), ANTI_CHEAT_STAFF, punishment.id())
+                : service.previousOffences(punishment.uuid(), punishment.type(), punishment.reason(), punishment.id()));
         return Text.replace(template,
                 "player", punishment.name(),
                 "staff", punishment.staff(),
                 "reason", punishment.reason(),
                 "duration", Durations.format(punishment.durationMs(), permanent),
+                "expires-date", expiresDate,
                 "expires", expires,
-                "id", punishment.id());
+                "date", dates.format(java.time.Instant.ofEpochMilli(punishment.createdEpochMs())),
+                "id", punishment.id(),
+                "offence", ReasonPreset.ordinal(offence),
+                "appeal", config.moderation().appeal());
+    }
+
+    private java.time.format.DateTimeFormatter cachedFormatter;
+    private String cachedPattern;
+
+    private java.time.format.DateTimeFormatter dateFormatter(String pattern) {
+        if (!pattern.equals(cachedPattern)) {
+            cachedFormatter = java.time.format.DateTimeFormatter.ofPattern(pattern, java.util.Locale.ENGLISH)
+                    .withZone(java.time.ZoneId.systemDefault());
+            cachedPattern = pattern;
+        }
+        return cachedFormatter;
     }
 }

@@ -11,6 +11,10 @@ commands:
     description: Anti-cheat staff command (alerts, check, reset, debug, reload).
     usage: /<command> [alerts|check|reset|debug|reload]
     aliases: [anticheat, vigil]
+  punish:
+    description: Open the punish menu for a player (preset reasons with their times).
+    usage: /<command> <player>
+    aliases: [punishmenu]
   ban:
     description: Ban a player (optionally for a duration, e.g. 7d).
     usage: /<command> <player> [duration] [reason]

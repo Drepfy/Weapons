@@ -27,6 +27,7 @@ import io.github.drepfy.vigil.command.VigilCommand;
 import io.github.drepfy.vigil.compat.PaperAntiXraySetup;
 import io.github.drepfy.vigil.compat.ServerCompat;
 import io.github.drepfy.vigil.config.ConfigLoader;
+import io.github.drepfy.vigil.config.ConfigUpgrader;
 import io.github.drepfy.vigil.config.Settings;
 import io.github.drepfy.vigil.data.FlagRecord;
 import io.github.drepfy.vigil.data.PlayerData;
@@ -42,9 +43,11 @@ import io.github.drepfy.vigil.listener.LifecycleListener;
 import io.github.drepfy.vigil.listener.MovementListener;
 import io.github.drepfy.vigil.listener.OptionalHooks;
 import io.github.drepfy.vigil.listener.WorldActivityListener;
+import io.github.drepfy.vigil.moderation.DiscordNotifier;
 import io.github.drepfy.vigil.moderation.ModerationCommand;
 import io.github.drepfy.vigil.moderation.ModerationListener;
 import io.github.drepfy.vigil.moderation.ModerationService;
+import io.github.drepfy.vigil.moderation.PunishMenu;
 import io.github.drepfy.vigil.storage.FlagLogWriter;
 import io.github.drepfy.vigil.storage.IoExecutor;
 import io.github.drepfy.vigil.storage.PlayerRecord;
@@ -104,6 +107,7 @@ public class VigilPlugin extends JavaPlugin {
     private ModerationService moderation;
     private BlockHider blockHider;
     private AutoBanService autoBan;
+    private DiscordNotifier discord;
     private BukkitTask tickTask;
     private boolean started;
 
@@ -121,6 +125,7 @@ public class VigilPlugin extends JavaPlugin {
     private void start() {
         migrateLegacyConfig();
         saveDefaultConfig();
+        upgradeConfig();
         settings = readSettings(null);
         logWarnings(settings.warnings());
 
@@ -137,12 +142,14 @@ public class VigilPlugin extends JavaPlugin {
         PluginManager pm = getServer().getPluginManager();
 
         moderation = new ModerationService(getLogger(), io, dataDir.resolve("data").resolve("punishments.yml"));
+        discord = new DiscordNotifier(this::settings, getLogger());
         ModerationListener moderationListener = new ModerationListener(this::settings, moderation);
         pm.registerEvents(moderationListener, this);
 
-        alerts = new AlertService(this::settings, getLogger(), io, dataDir.resolve("data").resolve("staff.yml"));
+        alerts = new AlertService(this::settings, getLogger(), io, dataDir.resolve("data").resolve("staff.yml"),
+                discord);
         autoBan = new AutoBanService(this, this::settings, moderation, moderationListener, alerts,
-                getLogger(), line -> flagLog.append(line));
+                getLogger(), line -> flagLog.append(line), discord);
         ViolationService violations = new ViolationService(this::settings, alerts, autoBan, flagLog, tps, compat);
         debug = new DebugService(getLogger(), () -> settings.general().debug());
         checks = new CheckContext(this::settings, getLogger(), compat, probe, disturbances, tps, violations, debug,
@@ -174,7 +181,14 @@ public class VigilPlugin extends JavaPlugin {
         registerBypassPermissions(pm);
 
         ModerationCommand moderationCommand = new ModerationCommand(this::settings, moderation, moderationListener,
-                getLogger());
+                getLogger(), discord::punishment);
+        PunishMenu punishMenu = new PunishMenu(this, this::settings, moderation);
+        pm.registerEvents(punishMenu, this);
+        PluginCommand punishCommand = getCommand("punish");
+        if (punishCommand != null) {
+            punishCommand.setExecutor(punishMenu);
+            punishCommand.setTabCompleter(punishMenu);
+        }
         for (String name : List.of("ban", "unban", "mute", "unmute", "warn", "kick")) {
             PluginCommand moderationPluginCommand = getCommand(name);
             if (moderationPluginCommand != null) {
@@ -215,7 +229,7 @@ public class VigilPlugin extends JavaPlugin {
         getLogger().info("Enabled: " + enabledChecks() + " of " + CheckType.values().length + " checks active"
                 + (settings.general().passiveMode() ? " (passive mode: no setbacks, no bans)" : "")
                 + ", auto-ban " + (autoBanSettings.enabled() && !settings.general().passiveMode() ? "ON" : "off")
-                + ". Staff commands: /ac, /ban, /mute, /warn, /kick.");
+                + ". Staff commands: /ac, /punish, /ban, /mute, /warn, /kick.");
     }
 
     @Override
@@ -246,6 +260,7 @@ public class VigilPlugin extends JavaPlugin {
                 }
             }
             flagLog.close();
+            discord.shutdown();
             io.shutdown(5000);
             // The IO thread has stopped: write whatever is still dirty synchronously.
             records.saveAllNow(pending);
@@ -358,6 +373,40 @@ public class VigilPlugin extends JavaPlugin {
                     + " moderation/message settings kept). Auto-ban is now ON; see the anticheat section.");
         } catch (IOException | InvalidConfigurationException | RuntimeException e) {
             getLogger().warning("Could not carry old settings into the new config.yml: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Updates a config.yml from an older 2.x version: values still at an old default (ban
+     * screen, preset times...) get the new default and new options are added. Anything
+     * the owner changed stays. The previous file is kept as a backup.
+     */
+    private void upgradeConfig() {
+        File file = new File(getDataFolder(), "config.yml");
+        YamlConfiguration current = new YamlConfiguration();
+        YamlConfiguration defaults = new YamlConfiguration();
+        try (Reader reader = new InputStreamReader(getResource("config.yml"), StandardCharsets.UTF_8)) {
+            current.load(file);
+            defaults.load(reader);
+        } catch (IOException | InvalidConfigurationException | RuntimeException e) {
+            return; // An unreadable file is reported by readSettings and never rewritten.
+        }
+        List<String> changes = ConfigUpgrader.upgrade(current, defaults);
+        if (changes.isEmpty()) {
+            return;
+        }
+        String version = getDescription().getVersion();
+        File backup = new File(getDataFolder(), "config-before-" + version + ".yml");
+        try {
+            if (!backup.exists()) {
+                Files.copy(file.toPath(), backup.toPath());
+            }
+            current.save(file);
+            getLogger().warning("config.yml was upgraded to " + version + " (" + changes.size() + " changes: new ban "
+                    + "screens, escalating preset times, new options). Your settings were kept; the old file is "
+                    + backup.getName() + ".");
+        } catch (IOException | RuntimeException e) {
+            getLogger().warning("Could not upgrade config.yml (" + e.getMessage() + "); it was left as it was.");
         }
     }
 

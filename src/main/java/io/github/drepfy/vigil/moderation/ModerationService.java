@@ -118,13 +118,73 @@ public final class ModerationService {
     }
 
     public int warningCount(UUID uuid) {
+        return warningCount(uuid, 0L);
+    }
+
+    /** Warnings given within the last {@code withinMs} (0 = all of them). */
+    public int warningCount(UUID uuid, long withinMs) {
+        long since = withinMs > 0 ? System.currentTimeMillis() - withinMs : Long.MIN_VALUE;
         int count = 0;
         for (Punishment punishment : all.values()) {
-            if (punishment.type() == PunishmentType.WARN && punishment.uuid().equals(uuid)) {
+            if (punishment.type() == PunishmentType.WARN && punishment.uuid().equals(uuid)
+                    && punishment.createdEpochMs() >= since) {
                 count++;
             }
         }
         return count;
+    }
+
+    /**
+     * Earlier punishments of this type for this reason, used to pick the next step of an
+     * escalating preset. Punishments lifted as a mistake or after an accepted appeal do
+     * not count.
+     *
+     * @param reason   the preset's display name; reasons starting with it count too
+     * @param beforeId only punishments older than this id count ({@code Integer.MAX_VALUE} = all)
+     */
+    public int previousOffences(UUID uuid, PunishmentType type, String reason, int beforeId) {
+        String wanted = reason.toLowerCase(java.util.Locale.ROOT);
+        int count = 0;
+        for (Punishment punishment : all.values()) {
+            if (punishment.type() != type || !punishment.uuid().equals(uuid) || punishment.id() >= beforeId) {
+                continue;
+            }
+            String text = punishment.reason().toLowerCase(java.util.Locale.ROOT);
+            if (!text.equals(wanted) && !text.startsWith(wanted + " ")) {
+                continue;
+            }
+            if (punishment.revoked() && isExcuse(punishment.revokeReason())) {
+                continue;
+            }
+            count++;
+        }
+        return count;
+    }
+
+    /** Earlier automatic anti-cheat bans (for the auto-ban length ladder). */
+    public int previousAutoBans(UUID uuid, String staffName) {
+        return previousAutoBans(uuid, staffName, Integer.MAX_VALUE);
+    }
+
+    /** Earlier automatic bans older than {@code beforeId}. */
+    public int previousAutoBans(UUID uuid, String staffName, int beforeId) {
+        int count = 0;
+        for (Punishment punishment : all.values()) {
+            if (punishment.type() == PunishmentType.BAN && punishment.uuid().equals(uuid)
+                    && staffName.equals(punishment.staff()) && punishment.id() < beforeId
+                    && !(punishment.revoked() && isExcuse(punishment.revokeReason()))) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static boolean isExcuse(String revokeReason) {
+        if (revokeReason == null) {
+            return false;
+        }
+        String text = revokeReason.toLowerCase(java.util.Locale.ROOT);
+        return text.contains("false") || text.contains("appeal") || text.contains("mistake");
     }
 
     public boolean isReadOnly() {

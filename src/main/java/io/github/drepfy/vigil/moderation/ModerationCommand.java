@@ -26,9 +26,11 @@ import java.util.logging.Logger;
  * /mute &lt;player&gt; [duration] [reason]     /unmute &lt;player&gt; [reason]
  * /warn &lt;player&gt; [reason]                /kick &lt;player&gt; [reason]
  * </pre>
- * A reason that matches a preset (e.g. {@code Cheating}) uses the preset's default
- * duration unless a duration is given. Without a reason, "No Reason" is used. A
- * player's punishment history is part of {@code /ac check}.
+ * A reason that matches a preset (e.g. {@code Cheating}) uses the preset's time for the
+ * player's next offence (7 days, then 30 days, then permanent...) unless a time is
+ * given. Without a reason, "No Reason" is used. Typing a command without arguments
+ * lists its presets. Reaching a number of warnings can mute or ban automatically
+ * ({@code moderation.warn-escalation}).
  */
 public final class ModerationCommand implements CommandExecutor, TabCompleter {
 
@@ -46,13 +48,15 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
     private final ModerationService service;
     private final ModerationListener formatter;
     private final Logger logger;
+    private final java.util.function.Consumer<Punishment> discord;
 
     public ModerationCommand(Supplier<Settings> settings, ModerationService service, ModerationListener formatter,
-                             Logger logger) {
+                             Logger logger, java.util.function.Consumer<Punishment> discord) {
         this.settings = settings;
         this.service = service;
         this.formatter = formatter;
         this.logger = logger;
+        this.discord = discord;
     }
 
     @Override
@@ -84,7 +88,8 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
 
     private void punish(CommandSender sender, PunishmentType type, String[] args, String label) {
         if (args.length < 1) {
-            usage(sender, label + " <player> [duration] [reason]");
+            usage(sender, label + " <player> [time] [reason]");
+            showPresets(sender, type);
             return;
         }
         Target target = resolve(args[0]);
@@ -108,31 +113,64 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
         ReasonPreset preset = ReasonPreset.find(presets, input);
         String reason = reasonText(preset, input);
         if (preset == null && reasonStart < args.length) {
-            // "/ban Steve Cheating with kill aura": keep the full text, use the Cheating duration.
+            // "/ban Steve Cheating with kill aura": keep the full text, use the Cheating times.
             preset = ReasonPreset.find(presets, args[reasonStart]);
         }
         if (duration == null) {
-            Settings.Moderation moderation = settings.get().moderation();
-            duration = preset != null && preset.defaultDuration() != null ? preset.defaultDuration()
-                    : type == PunishmentType.BAN ? moderation.defaultBanMs() : moderation.defaultMuteMs();
+            duration = presetDuration(target.uuid(), type, preset);
         }
+        execute(sender, target, type, reason, duration);
+    }
 
+    /** The preset's time for this player's next offence, or the configured default. */
+    private long presetDuration(UUID uuid, PunishmentType type, ReasonPreset preset) {
+        if (preset != null && !preset.durations().isEmpty()) {
+            return preset.durationFor(service.previousOffences(uuid, type, preset.display(), Integer.MAX_VALUE));
+        }
+        Settings.Moderation moderation = settings.get().moderation();
+        return type == PunishmentType.BAN ? moderation.defaultBanMs() : moderation.defaultMuteMs();
+    }
+
+    /** Bans or mutes, tells the player, the staff member and whoever should know. */
+    private Punishment execute(CommandSender sender, Target target, PunishmentType type, String reason, long duration) {
         String staff = staffName(sender);
         Punishment punishment = type == PunishmentType.BAN
                 ? service.ban(target.uuid(), target.name(), reason, staff, duration)
                 : service.mute(target.uuid(), target.name(), reason, staff, duration);
-
-        if (target.online() != null) {
+        Player online = Bukkit.getPlayer(target.uuid());
+        if (online != null) {
             if (type == PunishmentType.BAN) {
-                target.online().kickPlayer(formatter.screen("ban-screen", punishment));
+                online.kickPlayer(formatter.banScreen(punishment));
             } else {
-                target.online().sendMessage(Text.color(message("prefix")
-                        + formatter.fill(message("mute-notify"), punishment)));
+                online.sendMessage(Text.color(message("prefix") + formatter.fill(message("mute-notify"), punishment)));
             }
         }
         String key = type.key();
         send(sender, formatter.fill(message(key + "-success"), punishment));
         broadcast(sender, formatter.fill(message(key + "-broadcast"), punishment));
+        discord.accept(punishment);
+        return punishment;
+    }
+
+    /** Lists the preset reasons of a command with their time per offence. */
+    private void showPresets(CommandSender sender, PunishmentType type) {
+        List<ReasonPreset> presets = settings.get().moderation().reasons(type);
+        if (presets.isEmpty()) {
+            return;
+        }
+        sender.sendMessage(Text.color(message("presets-header")));
+        for (ReasonPreset preset : presets) {
+            String times = preset.durations().isEmpty() ? "" : " &8» &f" + compactLadder(preset);
+            sender.sendMessage(Text.color("  &b" + preset.display() + times));
+        }
+    }
+
+    private static String compactLadder(ReasonPreset preset) {
+        List<String> parts = new ArrayList<>();
+        for (Long duration : preset.durations()) {
+            parts.add(duration == Durations.PERMANENT ? "perm" : Durations.compact(duration));
+        }
+        return String.join(" &8→ &f", parts);
     }
 
     // ---- unban / unmute --------------------------------------------------------------------------
@@ -167,6 +205,7 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
         String broadcastText = Text.replace(message(type.key() + "-broadcast"), "reason", reason, "staff", staff);
         send(sender, formatter.fill(text, lifted));
         broadcast(sender, formatter.fill(broadcastText, lifted));
+        discord.accept(lifted);
         Player online = Bukkit.getPlayer(lifted.uuid());
         if (!ban && online != null) {
             online.sendMessage(Text.color(message("prefix") + message("unmute-notify")));
@@ -178,6 +217,7 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
     private void warnOrKick(CommandSender sender, PunishmentType type, String[] args, String label) {
         if (args.length < 1) {
             usage(sender, label + " <player> [reason]");
+            showPresets(sender, type);
             return;
         }
         Target target = resolve(args[0]);
@@ -193,9 +233,11 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
         String staff = staffName(sender);
         Punishment punishment;
         String count = "";
+        int warnings = 0;
         if (type == PunishmentType.WARN) {
             punishment = service.warn(target.uuid(), target.name(), reason, staff);
-            count = String.valueOf(service.warningCount(target.uuid()));
+            warnings = activeWarnings(target.uuid());
+            count = String.valueOf(warnings);
             if (target.online() != null) {
                 target.online().sendMessage(Text.color(message("prefix")
                         + Text.replace(formatter.fill(message("warn-notify"), punishment), "count", count)));
@@ -207,6 +249,59 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
         String key = type.key();
         send(sender, Text.replace(formatter.fill(message(key + "-success"), punishment), "count", count));
         broadcast(sender, Text.replace(formatter.fill(message(key + "-broadcast"), punishment), "count", count));
+        discord.accept(punishment);
+        if (type == PunishmentType.WARN) {
+            escalate(sender, target, warnings);
+        }
+    }
+
+    /** Warnings that still count (younger than moderation.warnings-expire-after). */
+    private int activeWarnings(UUID uuid) {
+        long expire = settings.get().moderation().warningsExpireMs();
+        return service.warningCount(uuid, expire == Durations.PERMANENT ? 0L : expire);
+    }
+
+    /** Applies moderation.warn-escalation when a player reaches a number of warnings. */
+    private void escalate(CommandSender sender, Target target, int warnings) {
+        Settings.WarnStep step = settings.get().moderation().warnStep(warnings);
+        if (step == null) {
+            return;
+        }
+        String reason = Text.replace(message("warn-escalation-reason"), "count", warnings);
+        switch (step.type()) {
+            case BAN, MUTE -> {
+                Punishment current = step.type() == PunishmentType.BAN
+                        ? service.activeBan(target.uuid()) : service.activeMute(target.uuid());
+                if (!outlasts(current, step.durationMs())) {
+                    execute(sender, target, step.type(), reason, step.durationMs());
+                }
+            }
+            case KICK -> {
+                Player online = Bukkit.getPlayer(target.uuid());
+                if (online != null) {
+                    Punishment kick = service.kick(target.uuid(), target.name(), reason, staffName(sender));
+                    online.kickPlayer(formatter.screen("kick-screen", kick));
+                    send(sender, formatter.fill(message("kick-success"), kick));
+                    broadcast(sender, formatter.fill(message("kick-broadcast"), kick));
+                    discord.accept(kick);
+                }
+            }
+            default -> {
+                // Only bans, mutes and kicks can be configured.
+            }
+        }
+    }
+
+    /** Whether an active punishment already lasts at least as long as a new one would (never shorten it). */
+    private static boolean outlasts(Punishment current, long durationMs) {
+        if (current == null) {
+            return false;
+        }
+        if (current.isPermanent()) {
+            return true;
+        }
+        return durationMs != Durations.PERMANENT
+                && current.expiresEpochMs() >= System.currentTimeMillis() + durationMs;
     }
 
     // ---- helpers -----------------------------------------------------------------------------------

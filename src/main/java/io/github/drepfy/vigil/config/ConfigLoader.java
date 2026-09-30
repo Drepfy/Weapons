@@ -29,6 +29,24 @@ public final class ConfigLoader {
 
     public static final String DEFAULT_PREFIX = "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ » &r";
 
+    private static final String OLD_BAN_SCREEN = "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ\n\n&cYou are banned from this server.\n\n"
+                + "&7Reason: &f{reason}\n&7Duration: &f{duration}\n&7Expires in: &f{expires}\n&7Banned by: &f{staff}";
+    private static final String OLD_KICK_SCREEN = "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ\n\n&cYou were kicked from this server.\n\n"
+                + "&7Reason: &f{reason}\n&7Kicked by: &f{staff}";
+    private static final String OLD_BAN_SUCCESS = "&7You have banned player &b{player} &7for &b{reason} &7for &b{duration}&7.";
+    private static final String OLD_MUTE_SUCCESS = "&7You have muted player &b{player} &7for &b{reason} &7for &b{duration}&7.";
+    private static final String OLD_MUTE_NOTIFY = "&cYou have been muted for &f{reason}&c. &7Duration: &f{duration}";
+    private static final String OLD_MUTED_CHAT = "&cYou are muted for &f{reason}&c. &7Expires in: &f{expires}";
+
+    /** Message values of older versions that are upgraded to the current defaults automatically. */
+    static final Map<String, String> OLD_DEFAULT_MESSAGES = Map.of(
+            "ban-screen", OLD_BAN_SCREEN,
+            "kick-screen", OLD_KICK_SCREEN,
+            "ban-success", OLD_BAN_SUCCESS,
+            "mute-success", OLD_MUTE_SUCCESS,
+            "mute-notify", OLD_MUTE_NOTIFY,
+            "muted-chat", OLD_MUTED_CHAT);
+
     static final Map<String, String> DEFAULT_MESSAGES;
 
     static {
@@ -54,9 +72,9 @@ public final class ConfigLoader {
         // Moderation. Placeholders: {player} {staff} {reason} {duration} {expires} {count}
         messages.put("no-reason", "No Reason");
         messages.put("permanent", "Permanent");
-        messages.put("ban-success", "&7You have banned player &b{player} &7for &b{reason} &7for &b{duration}&7.");
+        messages.put("ban-success", "&7You have banned player &b{player} &7for &b{reason} &7for &b{duration}&7. &8({offence} offence, #{id})");
         messages.put("unban-success", "&7You have unbanned player &b{player} &7for &b{reason}&7.");
-        messages.put("mute-success", "&7You have muted player &b{player} &7for &b{reason} &7for &b{duration}&7.");
+        messages.put("mute-success", "&7You have muted player &b{player} &7for &b{reason} &7for &b{duration}&7. &8({offence} offence, #{id})");
         messages.put("unmute-success", "&7You have unmuted player &b{player} &7for &b{reason}&7.");
         messages.put("warn-success", "&7You have warned player &b{player} &7for &b{reason}&7. &8(warning #{count})");
         messages.put("kick-success", "&7You have kicked player &b{player} &7for &b{reason}&7.");
@@ -66,18 +84,66 @@ public final class ConfigLoader {
         messages.put("unmute-broadcast", "&b{staff} &7unmuted &b{player} &7for &b{reason}&7.");
         messages.put("warn-broadcast", "&b{staff} &7warned &b{player} &7for &b{reason}&7.");
         messages.put("kick-broadcast", "&b{staff} &7kicked &b{player} &7for &b{reason}&7.");
-        messages.put("ban-screen", "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ\n\n&cYou are banned from this server.\n\n"
-                + "&7Reason: &f{reason}\n&7Duration: &f{duration}\n&7Expires in: &f{expires}\n&7Banned by: &f{staff}");
-        messages.put("kick-screen", "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ\n\n&cYou were kicked from this server.\n\n"
-                + "&7Reason: &f{reason}\n&7Kicked by: &f{staff}");
-        messages.put("mute-notify", "&cYou have been muted for &f{reason}&c. &7Duration: &f{duration}");
-        messages.put("muted-chat", "&cYou are muted for &f{reason}&c. &7Expires in: &f{expires}");
+        messages.put("ban-screen", String.join("\n",
+                "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ",
+                "&8&m                                    ",
+                "&c&lYOU ARE BANNED",
+                "&7for another &f{expires}",
+                "",
+                "&7Reason: &f{reason} &8({offence} offence)",
+                "&7Banned by: &f{staff}",
+                "&7Banned on: &f{date}",
+                "&7Unbanned on: &f{expires-date}",
+                "&7Ban ID: &f#{id}",
+                "",
+                "&7Appeal: &b{appeal}",
+                "&8&m                                    "));
+        messages.put("ban-screen-permanent", String.join("\n",
+                "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ",
+                "&8&m                                    ",
+                "&4&lYOU ARE PERMANENTLY BANNED",
+                "",
+                "&7Reason: &f{reason} &8({offence} offence)",
+                "&7Banned by: &f{staff}",
+                "&7Banned on: &f{date}",
+                "&7Ban ID: &f#{id}",
+                "",
+                "&7Appeal: &b{appeal}",
+                "&8&m                                    "));
+        messages.put("ban-screen-anticheat", String.join("\n",
+                "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ",
+                "&8&m                                    ",
+                "&c&l⚠ BANNED BY THE ANTI-CHEAT ⚠",
+                "",
+                "&7Detected: &f{reason}",
+                "&7Length: &f{duration} &8({offence} offence)",
+                "&7Banned on: &f{date}",
+                "&7Unbanned on: &f{expires-date}",
+                "&7Ban ID: &f#{id}",
+                "",
+                "&7Think this is a mistake? Appeal: &b{appeal}",
+                "&8&m                                    "));
+        messages.put("kick-screen", String.join("\n",
+                "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ",
+                "&8&m                                    ",
+                "&e&lYOU WERE KICKED",
+                "",
+                "&7Reason: &f{reason}",
+                "&7Kicked by: &f{staff}",
+                "",
+                "&7You can join again right away.",
+                "&8&m                                    "));
+        messages.put("mute-notify", "&cYou have been muted for &f{reason}&c. &7Length: &f{duration} &8(until {expires-date})");
+        messages.put("muted-chat", "&cYou are muted for &f{reason}&c. &7Unmuted in &f{expires}&7.");
         messages.put("unmute-notify", "&aYou have been unmuted.");
         messages.put("warn-notify", "&cYou have been warned for &f{reason}&c. &7(warning #{count})");
         messages.put("not-banned", "&c{player} is not banned.");
         messages.put("not-muted", "&c{player} is not muted.");
         messages.put("cannot-punish", "&cYou cannot punish {player}.");
         messages.put("moderation-disabled", "&cModeration commands are disabled in the configuration.");
+        messages.put("never", "Never");
+        messages.put("presets-header", "&7Preset reasons &8(time for the 1st → 2nd → 3rd offence...)&7:");
+        messages.put("warn-escalation-reason", "Too many warnings ({count})");
         DEFAULT_MESSAGES = java.util.Collections.unmodifiableMap(messages);
     }
 
@@ -85,6 +151,13 @@ public final class ConfigLoader {
     static final List<String> DEFAULT_HIDDEN_STORAGE = List.of("CHEST", "TRAPPED_CHEST", "BARREL", "ENDER_CHEST",
             "*SHULKER_BOX", "HOPPER", "DROPPER", "DISPENSER", "CRAFTER", "FURNACE", "BLAST_FURNACE", "SMOKER",
             "BREWING_STAND", "*_BED", "ENCHANTING_TABLE");
+
+    static final String DEFAULT_APPEAL = "Ask a staff member on our Discord";
+    static final String DEFAULT_DATE_FORMAT = "dd MMM yyyy, HH:mm";
+    static final List<Settings.WarnStep> DEFAULT_WARN_ESCALATION = List.of(
+            new Settings.WarnStep(3, PunishmentType.MUTE, 60L * 60 * 1000),
+            new Settings.WarnStep(5, PunishmentType.BAN, 24L * 3600 * 1000),
+            new Settings.WarnStep(7, PunishmentType.BAN, 7L * 24 * 3600 * 1000));
 
     /** Hacked clients that put their name into the client brand. */
     static final List<String> DEFAULT_BLOCKED_BRANDS = List.of("*meteor*", "*wurst*", "*liquidbounce*",
@@ -105,20 +178,53 @@ public final class ConfigLoader {
     static final Map<PunishmentType, List<ReasonPreset>> DEFAULT_REASONS;
 
     static {
+        // Lengths per offence: "7d, 30d, perm" = 7 days the 1st time, 30 days the 2nd, permanent after that.
         Map<PunishmentType, List<ReasonPreset>> reasons = new EnumMap<>(PunishmentType.class);
         reasons.put(PunishmentType.BAN, presets(
-                "Cheating", "30d", "Hacked_Client", "30d", "Kill_Aura", "30d", "Fly_Hacks", "14d",
-                "Speed_Hacks", "14d", "X-Ray", "14d", "Reach", "14d", "Auto_Clicker", "7d", "Duping", "30d",
-                "Exploiting", "14d", "Griefing", "7d", "Stealing", "3d", "Scamming", "7d", "Harassment", "7d",
-                "Hate_Speech", "30d", "Threats", "30d", "Doxxing", "perm", "Advertising", "7d", "Spam", "1d",
-                "Inappropriate_Build", "3d", "Inappropriate_Skin", "1d", "Inappropriate_Name", "perm",
-                "Lag_Machine", "7d", "Staff_Disrespect", "3d", "Ban_Evasion", "perm", "Alt_Account", "perm",
+                "Cheating", "7d, 30d, perm",
+                "Hacked_Client", "14d, 30d, perm",
+                "Kill_Aura", "14d, 30d, perm",
+                "Fly_Hacks", "7d, 14d, 30d, perm",
+                "Speed_Hacks", "7d, 14d, 30d, perm",
+                "X-Ray", "7d, 14d, 30d, perm",
+                "Reach", "7d, 14d, 30d, perm",
+                "Auto_Clicker", "3d, 7d, 14d, 30d",
+                "Mace_Exploit", "14d, 30d, perm",
+                "Duping", "30d, perm",
+                "Exploiting", "7d, 14d, 30d, perm",
+                "Griefing", "3d, 7d, 30d, perm",
+                "Stealing", "1d, 3d, 7d, 30d",
+                "Scamming", "3d, 7d, 30d, perm",
+                "Harassment", "3d, 7d, 30d, perm",
+                "Hate_Speech", "7d, 30d, perm",
+                "Threats", "14d, 30d, perm",
+                "Doxxing", "perm",
+                "Advertising", "1d, 7d, 30d, perm",
+                "Spam", "1d, 3d, 7d",
+                "Inappropriate_Build", "1d, 3d, 7d, 30d",
+                "Inappropriate_Skin", "1d, 3d, 7d",
+                "Inappropriate_Name", "perm",
+                "Lag_Machine", "3d, 7d, 30d, perm",
+                "Staff_Disrespect", "1d, 3d, 7d",
+                "Ban_Evasion", "perm",
+                "Alt_Account", "perm",
                 "Chargeback", "perm"));
         reasons.put(PunishmentType.MUTE, presets(
-                "Spam", "30m", "Chat_Flood", "30m", "Excessive_Caps", "15m", "Swearing", "30m", "Toxicity", "1h",
-                "Harassment", "6h", "Hate_Speech", "7d", "Threats", "7d", "Advertising", "1d",
-                "Inappropriate_Language", "1h", "Arguing_With_Staff", "30m", "Spoilers", "15m", "Begging", "30m",
-                "Impersonation", "1d", "Politics_Or_Religion", "1h"));
+                "Spam", "15m, 1h, 6h, 1d",
+                "Chat_Flood", "15m, 1h, 6h, 1d",
+                "Excessive_Caps", "10m, 30m, 1h, 6h",
+                "Swearing", "30m, 2h, 1d, 7d",
+                "Toxicity", "1h, 6h, 1d, 7d",
+                "Harassment", "6h, 1d, 7d, 30d",
+                "Hate_Speech", "1d, 7d, 30d, perm",
+                "Threats", "1d, 7d, 30d, perm",
+                "Advertising", "1h, 1d, 7d, 30d",
+                "Inappropriate_Language", "30m, 2h, 1d, 7d",
+                "Arguing_With_Staff", "30m, 2h, 1d",
+                "Spoilers", "15m, 1h, 6h",
+                "Begging", "30m, 2h, 1d",
+                "Impersonation", "1d, 7d, 30d",
+                "Politics_Or_Religion", "1h, 6h, 1d"));
         reasons.put(PunishmentType.WARN, presets(
                 "Spam", "", "Excessive_Caps", "", "Swearing", "", "Toxicity", "", "Harassment", "",
                 "Advertising", "", "Inappropriate_Language", "", "Arguing_With_Staff", "", "Begging", "",
@@ -137,9 +243,44 @@ public final class ConfigLoader {
     private static List<ReasonPreset> presets(String... pairs) {
         List<ReasonPreset> result = new ArrayList<>();
         for (int i = 0; i + 1 < pairs.length; i += 2) {
-            result.add(new ReasonPreset(pairs[i], pairs[i + 1].isEmpty() ? null : Durations.parse(pairs[i + 1])));
+            result.add(new ReasonPreset(pairs[i], parseLadder(pairs[i + 1], null, null)));
         }
         return List.copyOf(result);
+    }
+
+    /**
+     * Lengths per offence from {@code 30d}, {@code "7d, 30d, perm"}, {@code 7d > 30d} or a
+     * YAML list. Invalid entries are reported (when a reader is given) and skipped.
+     */
+    static List<Long> parseLadder(Object value, Reader r, String path) {
+        List<String> parts = new ArrayList<>();
+        if (value instanceof List<?> list) {
+            for (Object element : list) {
+                if (element != null) {
+                    parts.add(element.toString());
+                }
+            }
+        } else if (value != null) {
+            for (String part : value.toString().split("[,>→]+")) {
+                parts.add(part);
+            }
+        }
+        List<Long> ladder = new ArrayList<>();
+        for (String part : parts) {
+            String text = part.trim();
+            if (text.isEmpty() || text.equalsIgnoreCase("none")) {
+                continue;
+            }
+            Long duration = Durations.parse(text);
+            if (duration == null) {
+                if (r != null) {
+                    r.warn(path + " has an invalid duration '" + text + "' (use e.g. 30m, 12h, 7d, perm); it is skipped.");
+                }
+                continue;
+            }
+            ladder.add(duration);
+        }
+        return ladder;
     }
 
     private static final Set<String> COMMON_CHECK_KEYS = Set.of("enabled", "ban-at", "alert-at",
@@ -232,10 +373,12 @@ public final class ConfigLoader {
                 r.bool("advanced.log-to-file", true),
                 (int) r.number("advanced.log-retention-days", 30, 0, 36500));
 
-        long autoBanDuration = r.duration("anticheat.auto-ban.duration", Durations.parse("30d"));
+        Object rawAutoBanDuration = r.root.get("anticheat.auto-ban.duration");
+        List<Long> autoBanDurations = parseLadder(rawAutoBanDuration == null ? "30d, perm" : rawAutoBanDuration, r,
+                "anticheat.auto-ban.duration");
         Settings.AutoBan autoBan = new Settings.AutoBan(
                 r.bool("anticheat.auto-ban.enabled", true),
-                autoBanDuration,
+                autoBanDurations,
                 r.string("anticheat.auto-ban.reason", "Cheating ({reason})"),
                 r.bool("anticheat.auto-ban.broadcast", true),
                 stripSlash(r.string("anticheat.auto-ban.command", "").trim()),
@@ -256,6 +399,15 @@ public final class ConfigLoader {
                 r.stringList("anticheat.client-check.blocked-channels", DEFAULT_BLOCKED_CHANNELS),
                 r.bool("anticheat.client-check.block-all-mods", false));
 
+        Settings.Discord discord = new Settings.Discord(
+                r.string("discord.webhook", "").trim(),
+                r.bool("discord.send-punishments", true),
+                r.bool("discord.send-auto-bans", true),
+                r.bool("discord.send-alerts", false));
+        if (!discord.webhookUrl().isEmpty() && !discord.enabled()) {
+            r.warn("discord.webhook must be a https:// Discord webhook URL; Discord messages are off.");
+        }
+
         Settings.Moderation moderation = loadModeration(r);
 
         Map<CheckType, String> sections = resolveCheckSections(r);
@@ -264,8 +416,8 @@ public final class ConfigLoader {
             checks.put(type, loadCheck(r, type, sections.get(type)));
         }
 
-        return new Settings(general, lag, alerts, violations, autoBan, antiXray, antiEsp, clientCheck, moderation,
-                checks, messages, r.warnings);
+        return new Settings(general, lag, alerts, violations, autoBan, antiXray, antiEsp, clientCheck, discord,
+                moderation, checks, messages, r.warnings);
     }
 
     /** Maps every check to its configuration path, accepting (with a warning) the 1.x check names. */
@@ -316,10 +468,78 @@ public final class ConfigLoader {
                 r.duration("moderation.default-duration.ban", Durations.PERMANENT),
                 r.duration("moderation.default-duration.mute", Durations.PERMANENT),
                 blocked,
-                reasons);
+                reasons,
+                r.string("moderation.appeal", DEFAULT_APPEAL),
+                dateFormat(r),
+                r.duration("moderation.warnings-expire-after", 30L * 24 * 3600 * 1000),
+                warnEscalation(r));
     }
 
-    /** Reads {@code moderation.reasons.<type>}: a map of name to duration, or a plain list of names. */
+    private static String dateFormat(Reader r) {
+        String pattern = r.string("moderation.date-format", DEFAULT_DATE_FORMAT);
+        try {
+            java.time.format.DateTimeFormatter.ofPattern(pattern);
+            return pattern;
+        } catch (IllegalArgumentException e) {
+            r.warn("moderation.date-format '" + pattern + "' is not a valid date pattern; using the default.");
+            return DEFAULT_DATE_FORMAT;
+        }
+    }
+
+    /** {@code moderation.warn-escalation}: "number of warnings: mute 1h | ban 7d | kick". */
+    private static List<Settings.WarnStep> warnEscalation(Reader r) {
+        String path = "moderation.warn-escalation";
+        Object raw = r.root.get(path);
+        if (raw == null) {
+            return DEFAULT_WARN_ESCALATION;
+        }
+        List<Settings.WarnStep> steps = new ArrayList<>();
+        if (!(raw instanceof ConfigurationSection section)) {
+            r.warn(path + " must be a map like '3: mute 1h'; warnings do not escalate.");
+            return steps;
+        }
+        for (String key : section.getKeys(false)) {
+            Settings.WarnStep step = parseWarnStep(key, String.valueOf(section.get(key)));
+            if (step == null) {
+                r.warn(path + "." + key + " must look like '3: mute 1h', '5: ban 7d' or '4: kick'; it is ignored.");
+            } else {
+                steps.add(step);
+            }
+        }
+        return steps;
+    }
+
+    static Settings.WarnStep parseWarnStep(String warnings, String action) {
+        try {
+            int count = Integer.parseInt(warnings.trim());
+            String[] parts = action.trim().toLowerCase(Locale.ROOT).split("\\s+");
+            PunishmentType type = switch (parts[0]) {
+                case "ban" -> PunishmentType.BAN;
+                case "mute" -> PunishmentType.MUTE;
+                case "kick" -> PunishmentType.KICK;
+                default -> null;
+            };
+            if (count < 1 || type == null) {
+                return null;
+            }
+            long duration = Durations.PERMANENT;
+            if (type != PunishmentType.KICK && parts.length > 1) {
+                Long parsed = Durations.parse(parts[1]);
+                if (parsed == null) {
+                    return null;
+                }
+                duration = parsed;
+            }
+            return new Settings.WarnStep(count, type, duration);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Reads {@code moderation.reasons.<type>}: a map of name to length(s) per offence, or a
+     * plain list of names without lengths.
+     */
     private static List<ReasonPreset> loadReasons(Reader r, PunishmentType type) {
         String path = "moderation.reasons." + type.key();
         Object raw = r.root.get(path);
@@ -329,22 +549,12 @@ public final class ConfigLoader {
         List<ReasonPreset> presets = new ArrayList<>();
         if (raw instanceof ConfigurationSection section) {
             for (String name : section.getKeys(false)) {
-                Object value = section.get(name);
-                String text = value == null ? "" : value.toString().trim();
-                Long duration = null;
-                if (!text.isEmpty() && !text.equalsIgnoreCase("none")) {
-                    duration = Durations.parse(text);
-                    if (duration == null) {
-                        r.warn(path + "." + name + " has an invalid duration '" + text
-                                + "' (use e.g. 30m, 12h, 7d, perm); the reason is kept without a default duration.");
-                    }
-                }
-                presets.add(new ReasonPreset(name, duration));
+                presets.add(new ReasonPreset(name, parseLadder(section.get(name), r, path + "." + name)));
             }
         } else if (raw instanceof List<?> list) {
             for (Object element : list) {
                 if (element != null && !element.toString().isBlank()) {
-                    presets.add(new ReasonPreset(element.toString().trim(), null));
+                    presets.add(new ReasonPreset(element.toString().trim(), List.of()));
                 }
             }
         } else {

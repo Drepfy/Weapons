@@ -1,11 +1,17 @@
 package io.github.drepfy.vigil.moderation;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import io.github.drepfy.vigil.config.ConfigLoader;
+import io.github.drepfy.vigil.config.Settings;
 import io.github.drepfy.vigil.storage.IoExecutor;
+import org.bukkit.ChatColor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.logging.Logger;
@@ -49,7 +55,7 @@ class ModerationTest {
 
     @Test
     void findsPresetsLeniently() {
-        List<ReasonPreset> presets = List.of(new ReasonPreset("Hacked_Client", 30 * DAY), new ReasonPreset("X-Ray", null));
+        List<ReasonPreset> presets = List.of(new ReasonPreset("Hacked_Client", 30 * DAY), new ReasonPreset("X-Ray", (Long) null));
         assertEquals("Hacked_Client", ReasonPreset.find(presets, "hacked client").name());
         assertEquals("Hacked_Client", ReasonPreset.find(presets, "HACKED_CLIENT").name());
         assertEquals("X-Ray", ReasonPreset.find(presets, "xray").name());
@@ -71,6 +77,132 @@ class ModerationTest {
         Punishment warning = new Punishment(3, PunishmentType.WARN, UUID.randomUUID(), "Sam", "Spam", "Mod",
                 now, 0L, false, null, null, 0L);
         assertFalse(warning.isInEffect(now));
+    }
+
+    @Test
+    void presetTimesEscalatePerOffence() {
+        ReasonPreset cheating = new ReasonPreset("Cheating", List.of(7 * DAY, 30 * DAY, Durations.PERMANENT));
+        assertEquals(7 * DAY, cheating.durationFor(0));
+        assertEquals(30 * DAY, cheating.durationFor(1));
+        assertEquals(Durations.PERMANENT, cheating.durationFor(2));
+        assertEquals(Durations.PERMANENT, cheating.durationFor(10), "the last step repeats");
+        assertEquals(7 * DAY, cheating.defaultDuration());
+        assertTrue(cheating.escalates());
+        assertEquals("7 days → 30 days → Permanent", cheating.ladderText("Permanent"));
+
+        ReasonPreset doxxing = new ReasonPreset("Doxxing", Durations.PERMANENT);
+        assertFalse(doxxing.escalates());
+        assertEquals(Durations.PERMANENT, doxxing.durationFor(3));
+        ReasonPreset free = new ReasonPreset("Other", (Long) null);
+        assertNull(free.durationFor(0));
+        assertEquals("", free.ladderText("Permanent"));
+
+        assertEquals("1st", ReasonPreset.ordinal(1));
+        assertEquals("2nd", ReasonPreset.ordinal(2));
+        assertEquals("3rd", ReasonPreset.ordinal(3));
+        assertEquals("4th", ReasonPreset.ordinal(4));
+        assertEquals("11th", ReasonPreset.ordinal(11));
+        assertEquals("12th", ReasonPreset.ordinal(12));
+        assertEquals("13th", ReasonPreset.ordinal(13));
+        assertEquals("21st", ReasonPreset.ordinal(21));
+        assertEquals("102nd", ReasonPreset.ordinal(102));
+    }
+
+    @Test
+    void offencesAreCountedFromHistory(@TempDir Path dir) {
+        IoExecutor io = new IoExecutor(LOGGER);
+        ModerationService service = new ModerationService(LOGGER, io, dir.resolve("punishments.yml"));
+        UUID steve = UUID.randomUUID();
+        UUID alex = UUID.randomUUID();
+        assertEquals(0, service.previousOffences(steve, PunishmentType.BAN, "Cheating", Integer.MAX_VALUE));
+
+        Punishment first = service.ban(steve, "Steve", "Cheating", "Mod", 7 * DAY);
+        service.unban(steve, "Mod", "Served");
+        service.ban(steve, "Steve", "cheating (fly)", "Mod", 30 * DAY); // same reason with details
+        service.unban(steve, "Admin", "False ban"); // lifted as a mistake: does not count
+        service.ban(steve, "Steve", "Griefing", "Mod", 3 * DAY); // another reason
+        service.mute(steve, "Steve", "Cheating", "Mod", DAY); // another type
+        service.ban(alex, "Alex", "Cheating", "Mod", 7 * DAY); // another player
+        assertEquals(1, service.previousOffences(steve, PunishmentType.BAN, "Cheating", Integer.MAX_VALUE));
+        assertEquals(0, service.previousOffences(steve, PunishmentType.BAN, "Cheating", first.id()),
+                "only older punishments count");
+        assertEquals(1, service.previousOffences(steve, PunishmentType.MUTE, "cheating", Integer.MAX_VALUE));
+        assertEquals(0, service.previousOffences(steve, PunishmentType.BAN, "Cheat", Integer.MAX_VALUE),
+                "a reason must match whole words");
+
+        String auto = ModerationListener.ANTI_CHEAT_STAFF;
+        service.ban(alex, "Alex", "Speed", auto, 30 * DAY);
+        Punishment second = service.ban(alex, "Alex", "Flight", auto, Durations.PERMANENT);
+        assertEquals(2, service.previousAutoBans(alex, auto));
+        assertEquals(1, service.previousAutoBans(alex, auto, second.id()));
+        service.unban(alex, "Admin", "Appeal accepted");
+        assertEquals(1, service.previousAutoBans(alex, auto));
+
+        service.warn(steve, "Steve", "Spam", "Mod");
+        service.warn(steve, "Steve", "Caps", "Mod");
+        assertEquals(2, service.warningCount(steve));
+        assertEquals(2, service.warningCount(steve, DAY));
+        io.shutdown(1000);
+    }
+
+    @Test
+    void banScreensFitTheBan(@TempDir Path dir) {
+        IoExecutor io = new IoExecutor(LOGGER);
+        ModerationService service = new ModerationService(LOGGER, io, dir.resolve("punishments.yml"));
+        Settings settings = ConfigLoader.defaults(new ArrayList<>());
+        ModerationListener listener = new ModerationListener(() -> settings, service);
+        UUID steve = UUID.randomUUID();
+
+        Punishment first = service.ban(steve, "Steve", "Cheating", "Mod", 7 * DAY);
+        String temporary = ChatColor.stripColor(listener.banScreen(first));
+        assertTrue(temporary.contains("YOU ARE BANNED"), temporary);
+        assertTrue(temporary.contains("for another 7 days"), temporary);
+        assertTrue(temporary.contains("Reason: Cheating (1st offence)"), temporary);
+        assertTrue(temporary.contains("Banned by: Mod"), temporary);
+        assertTrue(temporary.contains("Ban ID: #" + first.id()), temporary);
+        assertTrue(temporary.contains("Appeal: Ask a staff member on our Discord"), temporary);
+        assertFalse(temporary.contains("{"), "every placeholder is filled: " + temporary);
+
+        Punishment second = service.ban(steve, "Steve", "Cheating", "Mod", Durations.PERMANENT);
+        String permanent = ChatColor.stripColor(listener.banScreen(second));
+        assertTrue(permanent.contains("YOU ARE PERMANENTLY BANNED"), permanent);
+        assertTrue(permanent.contains("Reason: Cheating (2nd offence)"), permanent);
+        assertFalse(permanent.contains("{"), permanent);
+
+        UUID alex = UUID.randomUUID();
+        service.ban(alex, "Alex", "Speed", ModerationListener.ANTI_CHEAT_STAFF, 30 * DAY);
+        Punishment auto = service.ban(alex, "Alex", "Flight", ModerationListener.ANTI_CHEAT_STAFF, Durations.PERMANENT);
+        String antiCheat = ChatColor.stripColor(listener.banScreen(auto));
+        assertTrue(antiCheat.contains("BANNED BY THE ANTI-CHEAT"), antiCheat);
+        assertTrue(antiCheat.contains("Detected: Flight"), antiCheat);
+        assertTrue(antiCheat.contains("Length: Permanent (2nd offence)"), "any earlier auto-ban counts: " + antiCheat);
+        assertTrue(antiCheat.contains("Unbanned on: Never"), antiCheat);
+        assertFalse(antiCheat.contains("{"), antiCheat);
+        io.shutdown(1000);
+    }
+
+    @Test
+    void discordMessagesAreValidJsonWithoutPings() {
+        assertEquals("\"Say \\\"hi\\\"\\nnow\"", DiscordNotifier.quote("&cSay \"hi\"\nnow"));
+        assertEquals("\"\\u0001\"", DiscordNotifier.quote("\u0001"));
+        assertTrue(DiscordNotifier.quote("x".repeat(5000)).length() < 1100, "long text is cut");
+
+        Punishment ban = new Punishment(12, PunishmentType.BAN, UUID.randomUUID(), "Steve", "Cheating \"fly\" @everyone",
+                "Mod", System.currentTimeMillis(), 30 * DAY, false, null, null, 0L);
+        JsonObject json = JsonParser.parseString(DiscordNotifier.punishmentJson(ban, "Permanent")).getAsJsonObject();
+        assertEquals(0, json.getAsJsonObject("allowed_mentions").getAsJsonArray("parse").size(), "no pings");
+        JsonObject embed = json.getAsJsonArray("embeds").get(0).getAsJsonObject();
+        assertEquals("Banned: Steve", embed.get("title").getAsString());
+        String fields = embed.getAsJsonArray("fields").toString();
+        assertTrue(fields.contains("Cheating \\\"fly\\\" @everyone"), fields);
+        assertTrue(fields.contains("30 days"), fields);
+        assertTrue(fields.contains("#12"), fields);
+
+        Punishment lifted = ban.revoke("Admin", "Appeal", System.currentTimeMillis());
+        embed = JsonParser.parseString(DiscordNotifier.punishmentJson(lifted, "Permanent")).getAsJsonObject()
+                .getAsJsonArray("embeds").get(0).getAsJsonObject();
+        assertEquals("Unbanned: Steve", embed.get("title").getAsString());
+        assertTrue(embed.getAsJsonArray("fields").toString().contains("Admin: Appeal"));
     }
 
     @Test

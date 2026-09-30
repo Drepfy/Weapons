@@ -814,16 +814,136 @@ class AntiCheatScenarioTest {
         assertNotNull(ban);
         assertEquals("Griefing", ban.reason());
         List<String> banned = messages(staff);
-        assertTrue(banned.stream().anyMatch(m -> m.contains("You have banned player Griefer for Griefing for 7 days")),
-                banned.toString());
+        assertTrue(banned.stream().anyMatch(m -> m.contains("You have banned player Griefer for Griefing for 3 days")
+                && m.contains("1st offence")), banned.toString());
 
         staff.performCommand("unban Griefer");
         assertNull(plugin.moderation().activeBan(target.getUniqueId()));
         assertTrue(messages(staff).stream().anyMatch(m -> m.contains("unbanned player Griefer for No Reason")));
 
+        // The same reason again gets the next time of the preset.
+        staff.performCommand("ban Griefer Griefing");
+        assertEquals(7L * 24 * 3600 * 1000, plugin.moderation().activeBan(target.getUniqueId()).durationMs());
+        List<String> again = messages(staff);
+        assertTrue(again.stream().anyMatch(m -> m.contains("for Griefing for 7 days") && m.contains("2nd offence")),
+                again.toString());
+        // Lifted as a mistake: it no longer counts.
+        staff.performCommand("unban Griefer False_Ban");
+        staff.performCommand("ban Griefer Griefing");
+        assertEquals(7L * 24 * 3600 * 1000, plugin.moderation().activeBan(target.getUniqueId()).durationMs());
+        staff.performCommand("unban Griefer");
+
         staff.performCommand("ac");
         List<String> help = messages(staff);
         assertTrue(help.stream().anyMatch(m -> m.contains("/ac check")), help.toString());
+    }
+
+    @Test
+    void banWithoutArgumentsListsThePresetTimes() {
+        PlayerMock staff = join("Admin", 0.5, groundY, 0.5);
+        staff.setOp(true);
+        messages(staff);
+        staff.performCommand("ban");
+        List<String> lines = messages(staff);
+        assertTrue(lines.stream().anyMatch(m -> m.contains("Preset reasons")), lines.toString());
+        assertTrue(lines.stream().anyMatch(m -> m.contains("Cheating » 7d → 30d → perm")), lines.toString());
+        assertTrue(lines.stream().anyMatch(m -> m.contains("Doxxing » perm")), lines.toString());
+        staff.performCommand("mute");
+        assertTrue(messages(staff).stream().anyMatch(m -> m.contains("Spam » 15m → 1h → 6h → 1d")));
+    }
+
+    @Test
+    void tooManyWarningsMuteAutomatically() {
+        PlayerMock staff = join("Admin", 0.5, groundY, 0.5);
+        staff.setOp(true);
+        PlayerMock chatty = join("Chatty", 3.5, groundY, 0.5);
+        messages(staff);
+        staff.performCommand("warn Chatty Spam");
+        staff.performCommand("warn Chatty Swearing");
+        assertNull(plugin.moderation().activeMute(chatty.getUniqueId()));
+        staff.performCommand("warn Chatty Begging");
+        Punishment mute = plugin.moderation().activeMute(chatty.getUniqueId());
+        assertNotNull(mute, "the 3rd warning mutes (moderation.warn-escalation)");
+        assertEquals(3_600_000L, mute.durationMs());
+        assertEquals("Too many warnings (3)", mute.reason());
+        List<String> lines = messages(staff);
+        assertTrue(lines.stream().anyMatch(m -> m.contains("warning #3")), lines.toString());
+        assertTrue(lines.stream().anyMatch(m -> m.contains("muted player Chatty for Too many warnings (3) for 1 hour")),
+                lines.toString());
+        assertTrue(messages(chatty).stream().anyMatch(m -> m.contains("You have been muted")));
+
+        // A longer mute is never shortened by the escalation.
+        PlayerMock toxic = join("Toxic", 6.5, groundY, 0.5);
+        staff.performCommand("mute Toxic perm Toxicity");
+        for (int i = 0; i < 3; i++) {
+            staff.performCommand("warn Toxic Swearing");
+        }
+        assertEquals("Toxicity", plugin.moderation().activeMute(toxic.getUniqueId()).reason());
+        assertTrue(plugin.moderation().activeMute(toxic.getUniqueId()).isPermanent());
+    }
+
+    @Test
+    void punishMenuBansWithThePresetTime() {
+        PlayerMock staff = join("Admin", 0.5, groundY, 0.5);
+        staff.setOp(true);
+        PlayerMock target = join("Cheater", 3.5, groundY, 0.5);
+        staff.performCommand("punish Cheater");
+        var top = staff.getOpenInventory().getTopInventory();
+        assertEquals(54, top.getSize(), "the punish menu is open");
+        var cheating = top.getItem(9);
+        assertNotNull(cheating);
+        assertTrue(org.bukkit.ChatColor.stripColor(cheating.getItemMeta().getDisplayName()).contains("Cheating"));
+        String lore = org.bukkit.ChatColor.stripColor(String.join("\n", cheating.getItemMeta().getLore()));
+        assertTrue(lore.contains("7 days → 30 days → Permanent"), lore);
+        assertTrue(lore.contains("Next for Cheater: 7 days (1st offence)"), lore);
+
+        var first = menuClick(staff, 9);
+        assertTrue(first.isCancelled(), "items cannot be taken out");
+        assertEquals(Material.TNT, top.getItem(9).getType(), "the first click asks to confirm");
+        assertTrue(target.isOnline());
+        menuClick(staff, 9);
+        tick(1);
+        assertFalse(target.isOnline());
+        Punishment ban = plugin.moderation().activeBan(target.getUniqueId());
+        assertNotNull(ban);
+        assertEquals("Cheating", ban.reason());
+        assertEquals(7L * 24 * 3600 * 1000, ban.durationMs());
+
+        // Opened again, the menu shows the next step and can lift the ban.
+        staff.performCommand("punish Cheater");
+        top = staff.getOpenInventory().getTopInventory();
+        lore = org.bukkit.ChatColor.stripColor(String.join("\n", top.getItem(9).getItemMeta().getLore()));
+        assertTrue(lore.contains("Next for Cheater: 30 days (2nd offence)"), lore);
+        assertEquals(Material.LIME_DYE, top.getItem(50).getType());
+        menuClick(staff, 50);
+        tick(1);
+        assertNull(plugin.moderation().activeBan(target.getUniqueId()));
+    }
+
+    private org.bukkit.event.inventory.InventoryClickEvent menuClick(PlayerMock player, int slot) {
+        var event = new org.bukkit.event.inventory.InventoryClickEvent(player.getOpenInventory(),
+                org.bukkit.event.inventory.InventoryType.SlotType.CONTAINER, slot,
+                org.bukkit.event.inventory.ClickType.LEFT, org.bukkit.event.inventory.InventoryAction.PICKUP_ALL);
+        server.getPluginManager().callEvent(event);
+        return event;
+    }
+
+    @Test
+    void bannedPlayersSeeTheBanScreenWhenJoining() throws Exception {
+        java.util.UUID uuid = java.util.UUID.randomUUID();
+        plugin.moderation().ban(uuid, "Returning", "Cheating", "Admin", 7L * 24 * 3600 * 1000);
+        var event = new org.bukkit.event.player.AsyncPlayerPreLoginEvent("Returning",
+                java.net.InetAddress.getLoopbackAddress(), uuid);
+        Thread login = new Thread(() -> server.getPluginManager().callEvent(event));
+        login.start();
+        login.join();
+        assertEquals(org.bukkit.event.player.AsyncPlayerPreLoginEvent.Result.KICK_BANNED, event.getLoginResult());
+        String screen = org.bukkit.ChatColor.stripColor(event.getKickMessage());
+        assertTrue(screen.contains("YOU ARE BANNED"), screen);
+        assertTrue(screen.contains("Reason: Cheating (1st offence)"), screen);
+        assertTrue(screen.contains("Banned by: Admin"), screen);
+        assertTrue(screen.contains("Unbanned on: "), screen);
+        assertFalse(screen.contains("{"), screen);
     }
 
     @Test

@@ -4,6 +4,7 @@ import io.github.drepfy.vigil.config.CheckSettings;
 import io.github.drepfy.vigil.config.Settings;
 import io.github.drepfy.vigil.data.FlagRecord;
 import io.github.drepfy.vigil.data.PlayerData;
+import io.github.drepfy.vigil.moderation.DiscordNotifier;
 import io.github.drepfy.vigil.moderation.Durations;
 import io.github.drepfy.vigil.moderation.ModerationListener;
 import io.github.drepfy.vigil.moderation.ModerationService;
@@ -30,7 +31,7 @@ import java.util.logging.Logger;
  */
 public final class AutoBanService {
 
-    public static final String STAFF_NAME = "Anti-Cheat";
+    public static final String STAFF_NAME = ModerationListener.ANTI_CHEAT_STAFF;
     public static final String PROTECT_PERMISSION = "vigil.protect";
     /** How long the ban animation plays before the kick. */
     private static final long ANIMATION_TICKS = 60;
@@ -42,9 +43,11 @@ public final class AutoBanService {
     private final AlertService alerts;
     private final Logger logger;
     private final Consumer<String> auditLog;
+    private final DiscordNotifier discord;
 
     public AutoBanService(Plugin plugin, Supplier<Settings> settings, ModerationService moderation,
-                          ModerationListener formatter, AlertService alerts, Logger logger, Consumer<String> auditLog) {
+                          ModerationListener formatter, AlertService alerts, Logger logger, Consumer<String> auditLog,
+                          DiscordNotifier discord) {
         this.plugin = plugin;
         this.settings = settings;
         this.moderation = moderation;
@@ -52,6 +55,7 @@ public final class AutoBanService {
         this.alerts = alerts;
         this.logger = logger;
         this.auditLog = auditLog;
+        this.discord = discord;
     }
 
     public void onFlag(Player player, PlayerData data, FlagRecord flag, CheckSettings check) {
@@ -75,8 +79,9 @@ public final class AutoBanService {
         }
 
         String permanent = config.messages().get("permanent");
+        long duration = autoBan.durationFor(moderation.previousAutoBans(player.getUniqueId(), STAFF_NAME));
         auditLog.accept("[auto-ban] " + player.getName() + " (" + player.getUniqueId() + ") for " + reason
-                + ", " + Durations.format(autoBan.durationMs(), permanent) + ", " + flag.check().id()
+                + ", " + Durations.format(duration, permanent) + ", " + flag.check().id()
                 + " VL " + Text.num(flag.vl()));
         long delay = 1L;
         if (autoBan.animation()) {
@@ -88,15 +93,15 @@ public final class AutoBanService {
         if (!autoBan.command().isEmpty()) {
             String command = Text.replace(autoBan.command(), "player", player.getName(),
                     "uuid", player.getUniqueId(), "reason", reason,
-                    "duration", autoBan.durationMs() == Durations.PERMANENT ? "" : Durations.compact(autoBan.durationMs()));
+                    "duration", duration == Durations.PERMANENT ? "" : Durations.compact(duration));
             // Never kick or ban from inside a movement/combat event.
             Bukkit.getScheduler().runTaskLater(plugin, () -> Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command),
                     delay);
         } else {
             // Recorded now, so leaving during the animation does not help.
-            Punishment ban = moderation.ban(player.getUniqueId(), player.getName(), reason, STAFF_NAME,
-                    autoBan.durationMs());
-            String screen = formatter.screen("ban-screen", ban);
+            Punishment ban = moderation.ban(player.getUniqueId(), player.getName(), reason, STAFF_NAME, duration);
+            discord.punishment(ban);
+            String screen = formatter.banScreen(ban);
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 if (player.isOnline()) {
                     player.kickPlayer(screen);
@@ -105,7 +110,7 @@ public final class AutoBanService {
         }
 
         String announcement = banner(config, player.getName(), flag.check().reason(), flag.check().displayName(),
-                Durations.format(autoBan.durationMs(), permanent));
+                Durations.format(duration, permanent));
         logger.info(ChatColor.stripColor(announcement.replace("\n", " ")));
         for (Player online : Bukkit.getOnlinePlayers()) {
             if (autoBan.broadcast() || online.hasPermission(AlertService.ALERT_PERMISSION)) {

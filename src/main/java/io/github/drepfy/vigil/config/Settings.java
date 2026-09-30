@@ -21,6 +21,7 @@ public record Settings(General general,
                        AntiXray antiXray,
                        AntiEsp antiEsp,
                        ClientCheck clientCheck,
+                       Discord discord,
                        Moderation moderation,
                        Map<CheckType, CheckSettings> checks,
                        Messages messages,
@@ -84,13 +85,26 @@ public record Settings(General general,
     /**
      * Automatic bans once a check's VL reaches its {@code ban-at}.
      *
-     * @param durationMs ban length ({@code -1} = permanent)
+     * @param durations  ban length per automatic ban: first, second, ... ({@code -1} = permanent)
      * @param reason     ban reason; {@code {reason}} is replaced by the check reason, e.g. "Flying"
      * @param broadcast  announce the ban to every player (staff are always told)
      * @param command    console command to run instead of Vigil's own ban (empty = use Vigil's ban)
      */
-    public record AutoBan(boolean enabled, long durationMs, String reason, boolean broadcast, String command,
+    public record AutoBan(boolean enabled, List<Long> durations, String reason, boolean broadcast, String command,
                           boolean animation) {
+        public AutoBan {
+            durations = durations.isEmpty() ? List.of(30L * 24 * 3600 * 1000) : List.copyOf(durations);
+        }
+
+        /** Length of a first automatic ban. */
+        public long durationMs() {
+            return durations.get(0);
+        }
+
+        /** Length after {@code previousBans} earlier automatic bans (the last step repeats). */
+        public long durationFor(int previousBans) {
+            return durations.get(Math.min(Math.max(0, previousBans), durations.size() - 1));
+        }
     }
 
     /**
@@ -147,8 +161,13 @@ public record Settings(General general,
                              long defaultBanMs,
                              long defaultMuteMs,
                              Set<String> mutedBlockedCommands,
-                             Map<PunishmentType, List<ReasonPreset>> reasons) {
+                             Map<PunishmentType, List<ReasonPreset>> reasons,
+                             String appeal,
+                             String dateFormat,
+                             long warningsExpireMs,
+                             List<WarnStep> warnEscalation) {
         public Moderation {
+            warnEscalation = List.copyOf(warnEscalation);
             mutedBlockedCommands = Set.copyOf(mutedBlockedCommands);
             EnumMap<PunishmentType, List<ReasonPreset>> copy = new EnumMap<>(PunishmentType.class);
             for (PunishmentType type : PunishmentType.values()) {
@@ -159,6 +178,36 @@ public record Settings(General general,
 
         public List<ReasonPreset> reasons(PunishmentType type) {
             return reasons.get(type);
+        }
+
+        /** The automatic punishment for reaching exactly this many warnings, or {@code null}. */
+        public WarnStep warnStep(int warnings) {
+            for (WarnStep step : warnEscalation) {
+                if (step.warnings() == warnings) {
+                    return step;
+                }
+            }
+            return null;
+        }
+    }
+
+    /**
+     * An automatic punishment for collecting warnings.
+     *
+     * @param type       {@link PunishmentType#BAN}, {@link PunishmentType#MUTE} or {@link PunishmentType#KICK}
+     * @param durationMs length for bans and mutes ({@code -1} = permanent)
+     */
+    public record WarnStep(int warnings, PunishmentType type, long durationMs) {
+    }
+
+    /**
+     * Posts punishments (and optionally anti-cheat alerts) to a Discord channel.
+     *
+     * @param webhookUrl Discord webhook URL, empty = off
+     */
+    public record Discord(String webhookUrl, boolean punishments, boolean autoBans, boolean alerts) {
+        public boolean enabled() {
+            return webhookUrl != null && webhookUrl.startsWith("https://");
         }
     }
 

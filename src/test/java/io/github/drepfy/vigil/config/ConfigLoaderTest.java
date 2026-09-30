@@ -11,6 +11,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
 
+import io.github.drepfy.vigil.moderation.Durations;
+import io.github.drepfy.vigil.moderation.PunishmentType;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -134,6 +137,71 @@ class ConfigLoaderTest {
         assertEquals(ConfigLoader.DEFAULT_REASONS.get(io.github.drepfy.vigil.moderation.PunishmentType.MUTE),
                 settings.moderation().reasons(io.github.drepfy.vigil.moderation.PunishmentType.MUTE));
         assertEquals(3, settings.warnings().size(), settings.warnings().toString());
+    }
+
+    @Test
+    void escalatingTimesAndWarningStepsAreParsed() throws Exception {
+        long day = 24L * 3600 * 1000;
+        Settings settings = ConfigLoader.load(yaml("""
+                anticheat:
+                  auto-ban:
+                    duration: 1d, 7d > perm
+                moderation:
+                  appeal: discord.gg/example
+                  date-format: yyyy-MM-dd
+                  warnings-expire-after: perm
+                  warn-escalation:
+                    2: kick
+                    4: mute 30m
+                    6: ban
+                    8: jail 1d
+                  reasons:
+                    ban:
+                      Cheating: 7d, 30d, perm
+                      Listed: [1d, 3d]
+                      Arrow: 1h → 2h
+                      Broken: 7d, soon
+                discord:
+                  webhook: https://discord.com/api/webhooks/1/abc
+                  send-alerts: true
+                """));
+        assertEquals(List.of(day, 7 * day, Durations.PERMANENT), settings.autoBan().durations());
+        assertEquals(day, settings.autoBan().durationFor(0));
+        assertEquals(Durations.PERMANENT, settings.autoBan().durationFor(5));
+
+        var ban = settings.moderation().reasons(PunishmentType.BAN);
+        assertEquals(List.of(7 * day, 30 * day, Durations.PERMANENT), ban.get(0).durations());
+        assertEquals(List.of(day, 3 * day), ban.get(1).durations());
+        assertEquals(List.of(3_600_000L, 7_200_000L), ban.get(2).durations());
+        assertEquals(List.of(7 * day), ban.get(3).durations(), "invalid steps are skipped");
+        assertTrue(settings.warnings().stream().anyMatch(w -> w.contains("Broken")), settings.warnings().toString());
+
+        Settings.Moderation moderation = settings.moderation();
+        assertEquals("discord.gg/example", moderation.appeal());
+        assertEquals("yyyy-MM-dd", moderation.dateFormat());
+        assertEquals(Durations.PERMANENT, moderation.warningsExpireMs());
+        assertEquals(new Settings.WarnStep(2, PunishmentType.KICK, Durations.PERMANENT), moderation.warnStep(2));
+        assertEquals(new Settings.WarnStep(4, PunishmentType.MUTE, 30 * 60_000L), moderation.warnStep(4));
+        assertEquals(new Settings.WarnStep(6, PunishmentType.BAN, Durations.PERMANENT), moderation.warnStep(6));
+        assertEquals(null, moderation.warnStep(3));
+        assertEquals(null, moderation.warnStep(8), "unknown actions are ignored");
+        assertTrue(settings.warnings().stream().anyMatch(w -> w.contains("warn-escalation.8")),
+                settings.warnings().toString());
+
+        assertTrue(settings.discord().enabled());
+        assertTrue(settings.discord().alerts());
+        assertTrue(settings.discord().punishments());
+        assertFalse(ConfigLoader.defaults(new java.util.ArrayList<>()).discord().enabled(), "off without a webhook");
+    }
+
+    @Test
+    void badDateFormatFallsBack() throws Exception {
+        Settings settings = ConfigLoader.load(yaml("""
+                moderation:
+                  date-format: "dd MMM yyyy {"
+                """));
+        assertEquals("dd MMM yyyy, HH:mm", settings.moderation().dateFormat());
+        assertEquals(1, settings.warnings().size(), settings.warnings().toString());
     }
 
     @Test

@@ -42,7 +42,11 @@ public final class AlertService {
     private final Path preferencesFile;
     private final Set<UUID> disabled = ConcurrentHashMap.newKeySet();
 
-    public AlertService(Supplier<Settings> settings, Logger logger, IoExecutor io, Path preferencesFile) {
+    private final io.github.drepfy.vigil.moderation.DiscordNotifier discord;
+
+    public AlertService(Supplier<Settings> settings, Logger logger, IoExecutor io, Path preferencesFile,
+                        io.github.drepfy.vigil.moderation.DiscordNotifier discord) {
+        this.discord = discord;
         this.settings = settings;
         this.logger = logger;
         this.io = io;
@@ -89,6 +93,10 @@ public final class AlertService {
                 "&eClick to run /ac check " + player.getName());
 
         broadcast(message, String.join("\n", hover), "/ac check " + player.getName(), config.clickable());
+        if (discord != null) {
+            discord.alert(player.getName(), flag.check().reason(), Text.num(Math.round(flag.vl() * 10) / 10.0),
+                    flag.detail());
+        }
         if (config.console()) {
             logger.info(org.bukkit.ChatColor.stripColor(message) + " - " + flag.detail());
         }

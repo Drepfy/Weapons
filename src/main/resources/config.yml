@@ -14,8 +14,8 @@ anticheat:
   alerts: true
   auto-ban:
     enabled: true
-    # How long automatic bans last (e.g. 7d, 30d, perm).
-    duration: 30d
+    # How long automatic bans last: 1st ban, 2nd ban... (e.g. "7d", "30d, perm").
+    duration: 30d, perm
     # {reason} = what was detected, e.g. "Flying".
     reason: "Cheating ({reason})"
     # Tell every player about the ban (staff are always told).
@@ -75,64 +75,87 @@ moderation:
   enabled: true
   # Who else sees punishments: staff (vigil.alerts), all, or none.
   broadcast: staff
-  # Used when no duration is typed and the reason has no preset duration.
+  # Shown on ban screens. Put your Discord invite or website here.
+  appeal: "Ask a staff member on our Discord"
+  # How dates are shown on ban screens (Java date pattern).
+  date-format: "dd MMM yyyy, HH:mm"
+  # Used when no time is typed and the reason has no preset time.
   default-duration:
     ban: perm
     mute: perm
+  # Automatic punishment when a player reaches a number of warnings.
+  warn-escalation:
+    3: mute 1h
+    5: ban 1d
+    7: ban 7d
+  # Warnings older than this no longer count (perm = they never expire).
+  warnings-expire-after: 30d
   # Commands muted players cannot use.
   muted-blocked-commands: [msg, tell, w, whisper, r, reply, me, say, mail, m, t, pm, dm, message, emsg, etell, ewhisper, er, ereply]
-  # Preset reasons: "/ban Steve Cheating" bans for 30 days. Underscores show as spaces.
+  # Preset reasons with their time for the 1st, 2nd, 3rd... offence (the last one repeats).
+  # "/ban Steve Cheating" = 7 days the first time, 30 days the second time, permanent after that.
+  # A single time (e.g. "Doxxing: perm") is used every time. Underscores show as spaces.
   reasons:
     ban:
-      Cheating: 30d
-      Hacked_Client: 30d
-      Kill_Aura: 30d
-      Fly_Hacks: 14d
-      Speed_Hacks: 14d
-      X-Ray: 14d
-      Reach: 14d
-      Auto_Clicker: 7d
-      Duping: 30d
-      Exploiting: 14d
-      Griefing: 7d
-      Stealing: 3d
-      Scamming: 7d
-      Harassment: 7d
-      Hate_Speech: 30d
-      Threats: 30d
+      Cheating: 7d, 30d, perm
+      Hacked_Client: 14d, 30d, perm
+      Kill_Aura: 14d, 30d, perm
+      Fly_Hacks: 7d, 14d, 30d, perm
+      Speed_Hacks: 7d, 14d, 30d, perm
+      X-Ray: 7d, 14d, 30d, perm
+      Reach: 7d, 14d, 30d, perm
+      Auto_Clicker: 3d, 7d, 14d, 30d
+      Mace_Exploit: 14d, 30d, perm
+      Duping: 30d, perm
+      Exploiting: 7d, 14d, 30d, perm
+      Griefing: 3d, 7d, 30d, perm
+      Stealing: 1d, 3d, 7d, 30d
+      Scamming: 3d, 7d, 30d, perm
+      Harassment: 3d, 7d, 30d, perm
+      Hate_Speech: 7d, 30d, perm
+      Threats: 14d, 30d, perm
       Doxxing: perm
-      Advertising: 7d
-      Spam: 1d
-      Inappropriate_Build: 3d
-      Inappropriate_Skin: 1d
+      Advertising: 1d, 7d, 30d, perm
+      Spam: 1d, 3d, 7d
+      Inappropriate_Build: 1d, 3d, 7d, 30d
+      Inappropriate_Skin: 1d, 3d, 7d
       Inappropriate_Name: perm
-      Lag_Machine: 7d
-      Staff_Disrespect: 3d
+      Lag_Machine: 3d, 7d, 30d, perm
+      Staff_Disrespect: 1d, 3d, 7d
       Ban_Evasion: perm
       Alt_Account: perm
       Chargeback: perm
     mute:
-      Spam: 30m
-      Chat_Flood: 30m
-      Excessive_Caps: 15m
-      Swearing: 30m
-      Toxicity: 1h
-      Harassment: 6h
-      Hate_Speech: 7d
-      Threats: 7d
-      Advertising: 1d
-      Inappropriate_Language: 1h
-      Arguing_With_Staff: 30m
-      Spoilers: 15m
-      Begging: 30m
-      Impersonation: 1d
-      Politics_Or_Religion: 1h
+      Spam: 15m, 1h, 6h, 1d
+      Chat_Flood: 15m, 1h, 6h, 1d
+      Excessive_Caps: 10m, 30m, 1h, 6h
+      Swearing: 30m, 2h, 1d, 7d
+      Toxicity: 1h, 6h, 1d, 7d
+      Harassment: 6h, 1d, 7d, 30d
+      Hate_Speech: 1d, 7d, 30d, perm
+      Threats: 1d, 7d, 30d, perm
+      Advertising: 1h, 1d, 7d, 30d
+      Inappropriate_Language: 30m, 2h, 1d, 7d
+      Arguing_With_Staff: 30m, 2h, 1d
+      Spoilers: 15m, 1h, 6h
+      Begging: 30m, 2h, 1d
+      Impersonation: 1d, 7d, 30d
+      Politics_Or_Religion: 1h, 6h, 1d
     warn: [Spam, Excessive_Caps, Swearing, Toxicity, Harassment, Advertising, Inappropriate_Language, Arguing_With_Staff, Begging, Griefing, Stealing, Minor_Exploit, Inappropriate_Build, Unfair_PvP, Trapping, Ignoring_Staff, Build_Too_Close]
     kick: [AFK, Spam, Toxicity, Glitching, Inappropriate_Skin, Inappropriate_Name, Suspicious_Activity, Staff_Request, Server_Maintenance]
     unban: [Appeal_Accepted, False_Ban, Served_Time, Staff_Decision]
     unmute: [Appeal_Accepted, False_Mute, Served_Time, Staff_Decision]
 
-# Placeholders: {player} {staff} {reason} {duration} {expires} {count} {vl}
+# Post bans, mutes, warnings and kicks to a Discord channel.
+# Discord: channel settings > Integrations > Webhooks > New Webhook > Copy Webhook URL.
+discord:
+  webhook: ""
+  send-punishments: true
+  send-auto-bans: true
+  # Every anti-cheat alert too (can be a lot).
+  send-alerts: false
+
+# Placeholders: {player} {staff} {reason} {duration} {expires} {expires-date} {date} {id} {offence} {appeal} {count} {vl}
 messages:
   flagged: "&f{player} &7has been flagged for &c{reason} &8(VL {vl})"
   # Shown to everyone when the anti-cheat bans someone.
@@ -151,9 +174,9 @@ messages:
     - "&7Detected: &f{client}"
     - "&7Please join with a normal Minecraft client."
   client-blocked-alert: "&f{player} &7was kicked for joining with &c{client}&7."
-  ban-success: "&7You have banned player &b{player} &7for &b{reason} &7for &b{duration}&7."
+  ban-success: "&7You have banned player &b{player} &7for &b{reason} &7for &b{duration}&7. &8({offence} offence, #{id})"
   unban-success: "&7You have unbanned player &b{player} &7for &b{reason}&7."
-  mute-success: "&7You have muted player &b{player} &7for &b{reason} &7for &b{duration}&7."
+  mute-success: "&7You have muted player &b{player} &7for &b{reason} &7for &b{duration}&7. &8({offence} offence, #{id})"
   unmute-success: "&7You have unmuted player &b{player} &7for &b{reason}&7."
   warn-success: "&7You have warned player &b{player} &7for &b{reason}&7. &8(warning #{count})"
   kick-success: "&7You have kicked player &b{player} &7for &b{reason}&7."
@@ -163,28 +186,66 @@ messages:
   unmute-broadcast: "&b{staff} &7unmuted &b{player} &7for &b{reason}&7."
   warn-broadcast: "&b{staff} &7warned &b{player} &7for &b{reason}&7."
   kick-broadcast: "&b{staff} &7kicked &b{player} &7for &b{reason}&7."
+  # Shown to a banned player who tries to join (temporary ban).
   ban-screen:
     - "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ"
+    - "&8&m                                    "
+    - "&c&lYOU ARE BANNED"
+    - "&7for another &f{expires}"
     - ""
-    - "&cYou are banned from this server."
-    - ""
-    - "&7Reason: &f{reason}"
-    - "&7Duration: &f{duration}"
-    - "&7Expires in: &f{expires}"
+    - "&7Reason: &f{reason} &8({offence} offence)"
     - "&7Banned by: &f{staff}"
+    - "&7Banned on: &f{date}"
+    - "&7Unbanned on: &f{expires-date}"
+    - "&7Ban ID: &f#{id}"
+    - ""
+    - "&7Appeal: &b{appeal}"
+    - "&8&m                                    "
+  ban-screen-permanent:
+    - "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ"
+    - "&8&m                                    "
+    - "&4&lYOU ARE PERMANENTLY BANNED"
+    - ""
+    - "&7Reason: &f{reason} &8({offence} offence)"
+    - "&7Banned by: &f{staff}"
+    - "&7Banned on: &f{date}"
+    - "&7Ban ID: &f#{id}"
+    - ""
+    - "&7Appeal: &b{appeal}"
+    - "&8&m                                    "
+  # Bans given automatically by the anti-cheat.
+  ban-screen-anticheat:
+    - "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ"
+    - "&8&m                                    "
+    - "&c&l⚠ BANNED BY THE ANTI-CHEAT ⚠"
+    - ""
+    - "&7Detected: &f{reason}"
+    - "&7Length: &f{duration} &8({offence} offence)"
+    - "&7Banned on: &f{date}"
+    - "&7Unbanned on: &f{expires-date}"
+    - "&7Ban ID: &f#{id}"
+    - ""
+    - "&7Think this is a mistake? Appeal: &b{appeal}"
+    - "&8&m                                    "
   kick-screen:
     - "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ"
-    - ""
-    - "&cYou were kicked from this server."
+    - "&8&m                                    "
+    - "&e&lYOU WERE KICKED"
     - ""
     - "&7Reason: &f{reason}"
     - "&7Kicked by: &f{staff}"
-  mute-notify: "&cYou have been muted for &f{reason}&c. &7Duration: &f{duration}"
-  muted-chat: "&cYou are muted for &f{reason}&c. &7Expires in: &f{expires}"
+    - ""
+    - "&7You can join again right away."
+    - "&8&m                                    "
+  mute-notify: "&cYou have been muted for &f{reason}&c. &7Length: &f{duration} &8(until {expires-date})"
+  muted-chat: "&cYou are muted for &f{reason}&c. &7Unmuted in &f{expires}&7."
   unmute-notify: "&aYou have been unmuted."
   warn-notify: "&cYou have been warned for &f{reason}&c. &7(warning #{count})"
+  warn-escalation-reason: "Too many warnings ({count})"
+  presets-header: "&7Preset reasons &8(time for the 1st → 2nd → 3rd offence...)&7:"
   no-reason: "No Reason"
   permanent: "Permanent"
+  never: "Never"
   no-permission: "&cYou do not have permission to do that."
   player-not-found: "&cPlayer not found: &f{player}"
   not-banned: "&c{player} is not banned."

@@ -129,10 +129,39 @@ permission silently bypassed everything.
   once). `/ac preview` shows it without banning.
 - Tests: 95.
 
+## 2.3.0: preset times per offence, new ban screens, punish menu, warnings, Discord
+
+- Preset reasons have a time per offence ("7d, 30d, perm"; the last one repeats).
+  The offence number comes from the punishment history (same type, same reason or
+  reason + details), so the storage format is unchanged. Punishments lifted as a
+  mistake or after an appeal (unban reason with "false", "mistake" or "appeal") don't
+  count. `/ban` or `/mute` alone lists the presets with their times.
+- Automatic bans use a ladder too (`auto-ban.duration: 30d, perm`), counting earlier
+  automatic bans for any reason. The anti-cheat ban screen uses the same count.
+- Ban screens: temporary, permanent and anti-cheat versions with reason, offence
+  number, staff, date, unban date, ban ID and appeal text (`moderation.appeal`,
+  `moderation.date-format`). The countdown rounds up, so a new 7 day ban says 7 days.
+- `/punish <player>`: chest menu with ban/mute/warn/kick tabs (only the ones the
+  staff member may use), presets with their times and the player's next step, a
+  confirm click, unban/unmute and history. It runs the normal commands, so all
+  rules, messages and escalation apply.
+- Warning escalation (`3: mute 1h`, `5: ban 1d`, `7: ban 7d`; kick also possible) and
+  warning expiry (30 days). Escalation never shortens a longer ban or mute.
+- Discord webhook (off by default): punishments, auto-bans and optionally alerts, as
+  embeds, on a background thread with a small queue; mentions are disabled.
+- Config upgrader: 2.x configs get new options with comments; values still at an old
+  default (ban screen, single preset times, `auto-ban.duration: 30d`) are replaced;
+  edited values are kept. The old file is kept as `config-before-<version>.yml`.
+- Tests: 108 (ladders, offence counting, ban screens, Discord JSON, config
+  parsing and upgrading, and scenarios for escalation, the preset list, warnings,
+  the punish menu and the join-time ban screen).
+
 ## Remaining / next steps
 
 - Validate on a live server with a hacked client on an alt (see the README
   checklist) and tune `ban-at` values from real alerts.
 - Prediction-based movement (Grim style) would catch subtle speed and strafe
   cheats, but it is a large project.
-- Moderation ideas: IP bans, warning escalation, a Discord webhook for bans.
+- Moderation ideas: IP bans and alt detection, a `/history` page in the punish menu.
+- When `auto-ban.command` hands bans to another plugin, Vigil doesn't store them,
+  so the auto-ban ladder always uses its first step.

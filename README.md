@@ -19,11 +19,25 @@ Anti-cheat and moderation for a Spigot/Paper SMP (built for **ᴠᴀɴɪʟʟᴀ 
 - **Ban animation**: lightning, an explosion, thunder and a big red **BANNED**
   title on the cheater's screen, then a banner in chat for everyone.
 - **Automatic bans**: when a check's violation level reaches its `ban-at`, the
-  player is banned for 30 days ("Cheating (Flying)"), kicked with a ban screen,
-  and everyone is told. Staff see every detection live:
+  player is banned ("Cheating (Flying)"): 30 days the first time, permanent the
+  second time. They are kicked with the anti-cheat ban screen and everyone is
+  told. Staff see every detection live:
   `Steve has been flagged for Kill Aura (VL 3)`.
-- **Few commands**: `/ac` for the anti-cheat, plus `/ban /unban /mute /unmute
-  /warn /kick` with preset reasons.
+- **Preset bans with times that go up**: `/ban Steve Cheating` is 7 days the
+  first time, 30 days the second time and permanent after that. Every preset
+  reason (Cheating, X-Ray, Griefing, Spam...) has its own times per offence.
+  `/ban` on its own lists them all.
+- **Clear ban screens**: separate screens for temporary, permanent and
+  anti-cheat bans, showing the reason, which offence it is, who banned you, the
+  date, when it ends, a ban ID and how to appeal.
+- **Punish menu**: `/punish Steve` opens a menu with every preset, its times and
+  what Steve's next offence would get. Click twice to punish.
+- **Warnings add up**: 3 warnings = muted for 1 hour, 5 = banned for 1 day,
+  7 = banned for 7 days (configurable). Warnings expire after 30 days.
+- **Discord log** (optional): bans, mutes, warnings and kicks posted to a
+  Discord channel through a webhook.
+- **Few commands**: `/ac` for the anti-cheat, `/punish` for the menu, plus
+  `/ban /unban /mute /unmute /warn /kick` with preset reasons.
 - **Low false positives**: every check allows for lag, ping, knockback, pistons,
   ice, slime, water, ladders, potions and more. A single odd event never flags
   and violation levels decay, so only repeated cheating reaches a ban.
@@ -36,6 +50,12 @@ Anti-cheat and moderation for a Spigot/Paper SMP (built for **ᴠᴀɴɪʟʟᴀ 
 2. Ops have every staff permission. For other staff, give `vigil.*` or the
    single permissions below.
 3. Optional: edit `plugins/Vigil/config.yml`, then run `/ac reload`.
+
+**Updating from 2.x:** just replace the jar. On start, Vigil adds the new
+options to your `config.yml` and saves the old file as
+`config-before-<version>.yml`. Anything still set to an old default (ban screen,
+preset times, auto-ban length) gets the new default; anything you changed is
+kept as it is. Bans, mutes and warnings are kept.
 
 **Updating from 1.x:** your old config is saved as `config-1.x-backup.yml` and
 replaced by the new, shorter one. Your reasons, messages, prefix and disabled
@@ -54,16 +74,122 @@ Requirements: Paper (recommended) or Spigot 1.20–1.21.x, Java 17+ (Java 21 on
 | `/ac debug <player> [check]` | `vigil.admin` | Show live check values (for tuning) |
 | `/ac reload` | `vigil.admin` | Reload `config.yml` |
 | `/ac preview` | `vigil.admin` | Watch the ban animation on yourself (you are not banned) |
-| `/ban <player> [duration] [reason]` | `vigil.ban` | `/ban Steve Cheating` = 30 days (preset), `/ban Steve 3d Griefing`, `/ban Steve` = permanent, "No Reason" |
+| `/punish <player>` | any of `vigil.ban/mute/warn/kick` | Menu with every preset reason, its times and the player's next punishment; also unban/unmute and history |
+| `/ban <player> [duration] [reason]` | `vigil.ban` | `/ban Steve Cheating` = preset time (7 days, then 30 days, then permanent), `/ban Steve 3d Griefing` = your own time, `/ban Steve` = permanent, "No Reason". `/ban` alone lists the presets |
 | `/unban <player> [reason]` | `vigil.ban` | Lift a ban (also automatic bans) |
-| `/mute <player> [duration] [reason]` | `vigil.mute` | Blocks chat and `/msg`, `/r`, `/me`... |
+| `/mute <player> [duration] [reason]` | `vigil.mute` | Blocks chat and `/msg`, `/r`, `/me`... `/mute` alone lists the presets |
 | `/unmute <player> [reason]` | `vigil.mute` | |
-| `/warn <player> [reason]` | `vigil.warn` | The player sees the warning and their count |
-| `/kick <player> [reason]` | `vigil.kick` | |
+| `/warn <player> [reason]` | `vigil.warn` | The player sees the warning and their count; enough warnings mute or ban |
+| `/kick <player> [reason]` | `vigil.kick` | Kicked with the kick screen |
 
 `/ac` also works as `/anticheat` and `/vigil`. Durations: `30m`, `12h`, `7d`,
 `2w`, `1mo`, `1y`, `perm`. Tab completion shows the preset reasons. If another
 plugin also has `/ban`, use `/vigil:ban`.
+
+## Moderation
+
+### Preset reasons and their times
+
+Each preset has a time per offence. The last time repeats:
+
+| Ban reason | 1st | 2nd | 3rd | 4th+ |
+|---|---|---|---|---|
+| Cheating | 7 days | 30 days | Permanent | |
+| Hacked Client, Kill Aura, Mace Exploit, Threats | 14 days | 30 days | Permanent | |
+| Fly/Speed Hacks, X-Ray, Reach, Exploiting | 7 days | 14 days | 30 days | Permanent |
+| Auto Clicker | 3 days | 7 days | 14 days | 30 days |
+| Duping | 30 days | Permanent | | |
+| Griefing, Scamming, Harassment, Lag Machine | 3 days | 7 days | 30 days | Permanent |
+| Stealing, Inappropriate Build | 1 day | 3 days | 7 days | 30 days |
+| Hate Speech | 7 days | 30 days | Permanent | |
+| Advertising | 1 day | 7 days | 30 days | Permanent |
+| Spam, Inappropriate Skin, Staff Disrespect | 1 day | 3 days | 7 days | |
+| Doxxing, Inappropriate Name, Ban Evasion, Alt Account, Chargeback | Permanent | | | |
+
+| Mute reason | 1st | 2nd | 3rd | 4th+ |
+|---|---|---|---|---|
+| Spam, Chat Flood | 15 min | 1 hour | 6 hours | 1 day |
+| Excessive Caps | 10 min | 30 min | 1 hour | 6 hours |
+| Swearing, Inappropriate Language | 30 min | 2 hours | 1 day | 7 days |
+| Toxicity | 1 hour | 6 hours | 1 day | 7 days |
+| Harassment | 6 hours | 1 day | 7 days | 30 days |
+| Hate Speech, Threats | 1 day | 7 days | 30 days | Permanent |
+| Advertising | 1 hour | 1 day | 7 days | 30 days |
+| Arguing With Staff, Begging | 30 min | 2 hours | 1 day | |
+| Spoilers | 15 min | 1 hour | 6 hours | |
+| Politics Or Religion | 1 hour | 6 hours | 1 day | |
+| Impersonation | 1 day | 7 days | 30 days | |
+
+The offence number counts earlier bans (or mutes) of that player for the same
+reason, including expired and lifted ones. A punishment lifted as a mistake
+(the unban reason contains "false", "mistake" or "appeal", e.g.
+`/unban Steve False_Ban`) doesn't count. Typing a time yourself
+(`/ban Steve 3d Cheating`) always wins. Change the presets in
+`moderation.reasons`:
+
+```yaml
+moderation:
+  reasons:
+    ban:
+      Cheating: 7d, 30d, perm   # 1st, 2nd, 3rd+ offence
+      Doxxing: perm             # always permanent
+```
+
+### Ban screens
+
+A banned player sees one of three screens (all in `messages`, all editable):
+
+```
+            ᴠᴀɴɪʟʟᴀ sᴍᴘ
+  ────────────────────────────
+         YOU ARE BANNED
+      for another 6 days 23 hours
+
+  Reason: Cheating (1st offence)
+  Banned by: Admin
+  Banned on: 30 Sep 2026, 14:05
+  Unbanned on: 07 Oct 2026, 14:05
+  Ban ID: #42
+
+  Appeal: Ask a staff member on our Discord
+  ────────────────────────────
+```
+
+- `ban-screen`: temporary bans (with the countdown and the unban date).
+- `ban-screen-permanent`: permanent bans.
+- `ban-screen-anticheat`: automatic bans ("BANNED BY THE ANTI-CHEAT", what was
+  detected).
+- `kick-screen`: kicks.
+
+Set your Discord invite or website in `moderation.appeal`, and the date style in
+`moderation.date-format`. Placeholders: `{player} {staff} {reason} {duration}
+{expires} {expires-date} {date} {id} {offence} {appeal}`.
+
+### Warnings
+
+```yaml
+moderation:
+  warn-escalation:
+    3: mute 1h     # the 3rd warning mutes for 1 hour
+    5: ban 1d
+    7: ban 7d      # also: "kick", "mute perm", "ban perm"
+  warnings-expire-after: 30d   # perm = warnings never expire
+```
+
+### Discord
+
+Create a webhook (channel settings → Integrations → Webhooks), then:
+
+```yaml
+discord:
+  webhook: "https://discord.com/api/webhooks/..."
+  send-punishments: true   # bans, mutes, warnings, kicks, unbans
+  send-auto-bans: true     # automatic anti-cheat bans
+  send-alerts: false       # every anti-cheat alert (a lot)
+```
+
+Messages are sent in the background; if Discord is down nothing on the server
+is affected. Mentions like `@everyone` in reasons never ping.
 
 ## Permissions
 
@@ -180,8 +306,8 @@ prefix: "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ » &r"
 anticheat:
   enabled: true
   alerts: true
-  auto-ban: {enabled: true, duration: 30d, reason: "Cheating ({reason})", broadcast: true, command: "",
-             animation: true}
+  auto-ban: {enabled: true, duration: "30d, perm", reason: "Cheating ({reason})", broadcast: true,
+             command: "", animation: true}   # 30 days the 1st time, permanent after that
   exempt-creative-and-spectator: true
   disabled-worlds: []
   bypass-permission: false
@@ -192,8 +318,9 @@ anticheat:
   checks:
     speed: {enabled: true, ban-at: 15}
     # ... one line per check; ban-at: 0 = alerts only
-moderation: ...   # broadcast, default durations, muted commands, preset reasons
-messages: ...     # every text players and staff see
+moderation: ...   # appeal, date format, warnings, preset reasons and their times
+discord: ...      # optional webhook
+messages: ...     # every text players and staff see, including the ban screens
 ```
 
 - To ban with another plugin (LiteBans, EssentialsX...), set
@@ -201,7 +328,8 @@ messages: ...     # every text players and staff see
   (`{duration}` is empty for permanent bans).
 - A check can be switched off with `speed: false`.
 - Invalid values fall back to their defaults and are listed in the console and
-  after `/ac reload`. The file is never rewritten (except the one-time 1.x migration).
+  after `/ac reload`. The file is only rewritten when a new version adds options
+  (with a backup, see "Updating from 2.x").
 
 ### Advanced options (optional)
 
@@ -296,7 +424,7 @@ Maven tab → **Lifecycle → package**. GitHub Actions builds every push.
 
 ## Testing
 
-`mvn test` runs 95 tests. 30 of them are end-to-end scenarios on a simulated
+`mvn test` runs 108 tests. 34 of them are end-to-end scenarios on a simulated
 server (MockBukkit). They check that legit sprint-jumping, wall jumps, stairs,
 bridging, knockback, falls with damage, normal fights, fights against a strafing
 target, real mace smashes and normal branch mining are **never** flagged, and that
@@ -307,9 +435,15 @@ chests and cave diamonds behind walls are hidden, reappear up close and are hidd
 again when you leave; that inventory macros are refused and flagged while normal
 clicking is not; that world-downloader clients are kicked; and that a flyer is
 held in place during the ban animation, then auto-banned, kicked and refused at
-login. The Paper anti-xray setup is tested on
-sample Paper config files (backups, other settings untouched, runs only once). Physics simulations with random network jitter,
-lag spikes and frozen clients guard the speed, timer and flight limits.
+login. For moderation they check that a repeated preset ban gets the next time
+(and that a ban lifted as a mistake doesn't count), that the punish menu bans
+with the right time after a confirm click, that 3 warnings mute (without ever
+shortening a longer mute) and that a banned player sees the ban screen when
+joining. The Paper anti-xray setup is tested on sample Paper config files
+(backups, other settings untouched, runs only once), and the config upgrade on
+the real 2.2.0 config (new options added, edited values kept). Physics
+simulations with random network jitter, lag spikes and frozen clients guard the
+speed, timer and flight limits.
 
 On a test server, before going live:
 
@@ -317,8 +451,11 @@ On a test server, before going live:
       elytra, boats, horses, pearls, knockback, fighting mobs and players. `/ac check <you>` shows no violations.
 - [ ] With a hacked client on an alt, try fly, speed, kill aura, reach, NoFall and
       scaffold. You should get alerts, then an automatic ban.
-- [ ] `/unban <alt>`, `/ban <alt> Cheating` (30 days), `/mute`, `/warn`, `/kick`
-      show the right messages. The banned alt sees the ban screen when rejoining.
+- [ ] `/ban <alt> Cheating` bans for 7 days (1st offence); after `/unban <alt>`,
+      the same command bans for 30 days (2nd offence). The banned alt sees the ban
+      screen with the reason, dates, ban ID and appeal when rejoining.
+- [ ] `/punish <alt>` opens the menu; clicking a reason twice punishes.
+- [ ] `/mute`, `/warn` (3 warnings mute for 1 hour) and `/kick` show the right messages.
 - [ ] Give a staff member `vigil.protect`: they are flagged but not banned.
 - [ ] After the first start, restart once. The console should say
       "Paper anti-xray is on (engine-mode 2)". With an x-ray pack, stone is full of fake ores.
