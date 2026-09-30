@@ -48,13 +48,13 @@ public record ReasonPreset(String name, List<Long> durations) {
         return durations.size() > 1;
     }
 
-    /** "7 days → 30 days → Permanent", or "" without a default. */
+    /** "7 days, 30 days, Permanent", or "" without a default. */
     public String ladderText(String permanentText) {
         List<String> parts = new ArrayList<>();
         for (Long duration : durations) {
             parts.add(Durations.format(duration, permanentText));
         }
-        return String.join(" → ", parts);
+        return String.join(", ", parts);
     }
 
     /** Finds a preset by name, ignoring case, spaces, underscores and dashes. */

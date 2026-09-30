@@ -114,7 +114,7 @@ public final class PaperAntiXraySetup {
             }
             writeMarker(marker);
             logger.warning("Anti-xray: Paper anti-xray has been switched ON (engine-mode 2) in " + changed.size()
-                    + " file(s). RESTART the server (not /reload) to activate it. Backups end in .vigil-backup.");
+                    + " file(s). Restart the server (not /reload) to activate it. Backups end in .vigil-backup.");
         } catch (IOException | RuntimeException e) {
             logger.warning("Anti-xray: could not set up Paper anti-xray (" + e.getMessage() + "); nothing was changed "
                     + "that could not be restored from the .vigil-backup files.");
@@ -157,7 +157,7 @@ public final class PaperAntiXraySetup {
             logger.info("Anti-xray: Paper anti-xray is on; its block lists were customised, so they were kept.");
         } else {
             logger.warning("Anti-xray: added fake caves to Paper anti-xray in " + changed.size()
-                    + " file(s), so x-ray can't see caves either. RESTART the server to activate it.");
+                    + " file(s), so x-ray can't see caves either. Restart the server to activate it.");
         }
     }
 

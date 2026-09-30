@@ -93,8 +93,8 @@ public final class DiscordNotifier {
                 color = lifted ? GREEN : ORANGE;
             }
             case WARN -> {
-                title = "Warned: " + p.name();
-                color = YELLOW;
+                title = (lifted ? "Warning removed: " : "Warned: ") + p.name();
+                color = lifted ? GREEN : YELLOW;
             }
             default -> {
                 title = "Kicked: " + p.name();
@@ -102,7 +102,8 @@ public final class DiscordNotifier {
             }
         }
         fields.add(new String[] {"Reason", p.reason()});
-        if (p.type() == PunishmentType.BAN || p.type() == PunishmentType.MUTE) {
+        if (p.type() == PunishmentType.BAN || p.type() == PunishmentType.MUTE
+                || (p.type() == PunishmentType.WARN && p.durationMs() != 0L)) {
             fields.add(new String[] {"Length", Durations.format(p.durationMs(), permanent)});
         }
         fields.add(new String[] {"By", p.staff()});

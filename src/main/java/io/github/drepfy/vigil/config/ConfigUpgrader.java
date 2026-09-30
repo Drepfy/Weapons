@@ -31,7 +31,8 @@ public final class ConfigUpgrader {
             "moderation.appeal",
             "moderation.date-format",
             "moderation.warn-escalation",
-            "moderation.warnings-expire-after",
+            "moderation.warn-time",
+            "moderation.reasons.unwarn",
             "discord");
 
     /** Ban presets of 2.0-2.2 (one time each). */
@@ -60,6 +61,18 @@ public final class ConfigUpgrader {
      * @return a short description of every change (empty when nothing changed)
      */
     public static List<String> upgrade(YamlConfiguration current, YamlConfiguration defaults) {
+        return upgrade(current, defaults, List.of());
+    }
+
+    /**
+     * Upgrades {@code current} in place.
+     *
+     * @param olderDefaults the bundled config.yml of older versions: a message still equal to
+     *                      its value in one of them was never edited and gets the new text
+     * @return a short description of every change (empty when nothing changed)
+     */
+    public static List<String> upgrade(YamlConfiguration current, YamlConfiguration defaults,
+                                       List<YamlConfiguration> olderDefaults) {
         List<String> changes = new ArrayList<>();
         if (!current.isConfigurationSection("anticheat")) {
             return changes; // Not a 2.x file (1.x files are migrated separately).
@@ -71,6 +84,23 @@ public final class ConfigUpgrader {
             if (entry.getValue().equals(text(current.get(path))) && defaults.contains(path)) {
                 current.set(path, defaults.get(path));
                 changes.add(path);
+            }
+        }
+        ConfigurationSection messages = current.getConfigurationSection("messages");
+        if (messages != null) {
+            for (String key : messages.getKeys(false)) {
+                String path = "messages." + key;
+                String value = text(current.get(path));
+                if (value == null || !defaults.contains(path) || value.equals(text(defaults.get(path)))) {
+                    continue;
+                }
+                for (YamlConfiguration older : olderDefaults) {
+                    if (older.contains(path) && value.equals(text(older.get(path)))) {
+                        current.set(path, defaults.get(path));
+                        changes.add(path);
+                        break;
+                    }
+                }
             }
         }
         // Preset reasons still at the old single times become escalating.

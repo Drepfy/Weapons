@@ -54,15 +54,22 @@ public final class ConfigLoader {
         messages.put("prefix", DEFAULT_PREFIX);
         // Anti-cheat. Placeholders: {player} {reason} {check} {vl} {detail}
         messages.put("flagged", "&f{player} &7has been flagged for &c{reason} &8(VL {vl})");
-        messages.put("auto-banned", "&8&m                                                  \n"
-                + "&c&l  ⚠ ANTI-CHEAT ⚠\n"
-                + "&f  {player} &7was caught cheating and banned for &c{reason}&7.\n"
-                + "&8&m                                                  ");
-        messages.put("ban-title", "&c&lBANNED");
-        messages.put("ban-subtitle", "&7Caught cheating: &c{reason}");
-        messages.put("client-blocked", "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ\n\n&cYour client or mods are not allowed here.\n\n"
-                + "&7Detected: &f{client}\n&7Please join with a normal Minecraft client.");
-        messages.put("client-blocked-alert", "&f{player} &7was kicked for joining with &c{client}&7.");
+        messages.put("auto-banned", String.join("\n",
+                "&8&m                                                  ",
+                "&c&lVigil &7Anti-Cheat",
+                "&f{player} &7has been banned for cheating &8(&c{reason}&8)&7.",
+                "&8&m                                                  "));
+        messages.put("ban-title", "&c&lBanned");
+        messages.put("ban-subtitle", "&7Detected: &c{reason}");
+        messages.put("client-blocked", String.join("\n",
+                "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ",
+                "&8&m                                    ",
+                "&cYour client is not allowed on this server.",
+                "",
+                "&7Detected: &f{client}",
+                "&7Please reconnect using an unmodified Minecraft client.",
+                "&8&m                                    "));
+        messages.put("client-blocked-alert", "&f{player} &7was disconnected for using &c{client}&7.");
         messages.put("alerts-enabled", "&aAnti-cheat alerts enabled.");
         messages.put("alerts-disabled", "&eAnti-cheat alerts disabled.");
         messages.put("reloaded", "&aConfiguration reloaded. &7({warnings} warning(s), see console)");
@@ -76,24 +83,26 @@ public final class ConfigLoader {
         messages.put("unban-success", "&7You have unbanned player &b{player} &7for &b{reason}&7.");
         messages.put("mute-success", "&7You have muted player &b{player} &7for &b{reason} &7for &b{duration}&7. &8({offence} offence, #{id})");
         messages.put("unmute-success", "&7You have unmuted player &b{player} &7for &b{reason}&7.");
-        messages.put("warn-success", "&7You have warned player &b{player} &7for &b{reason}&7. &8(warning #{count})");
+        messages.put("warn-success", "&7You have warned player &b{player} &7for &b{reason} &7for &b{duration}&7. &8(active warnings: {count}, #{id})");
+        messages.put("unwarn-success", "&7You have removed a warning from &b{player} &7for &b{reason}&7. &8(active warnings: {count})");
         messages.put("kick-success", "&7You have kicked player &b{player} &7for &b{reason}&7.");
         messages.put("ban-broadcast", "&b{staff} &7banned &b{player} &7for &b{reason} &7for &b{duration}&7.");
         messages.put("unban-broadcast", "&b{staff} &7unbanned &b{player} &7for &b{reason}&7.");
         messages.put("mute-broadcast", "&b{staff} &7muted &b{player} &7for &b{reason} &7for &b{duration}&7.");
         messages.put("unmute-broadcast", "&b{staff} &7unmuted &b{player} &7for &b{reason}&7.");
-        messages.put("warn-broadcast", "&b{staff} &7warned &b{player} &7for &b{reason}&7.");
+        messages.put("warn-broadcast", "&b{staff} &7warned &b{player} &7for &b{reason} &7for &b{duration}&7.");
+        messages.put("unwarn-broadcast", "&b{staff} &7removed a warning from &b{player} &7for &b{reason}&7.");
         messages.put("kick-broadcast", "&b{staff} &7kicked &b{player} &7for &b{reason}&7.");
         messages.put("ban-screen", String.join("\n",
                 "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ",
                 "&8&m                                    ",
-                "&c&lYOU ARE BANNED",
-                "&7for another &f{expires}",
+                "&cYou are banned from this server.",
+                "&7Time remaining: &f{expires}",
                 "",
                 "&7Reason: &f{reason} &8({offence} offence)",
                 "&7Banned by: &f{staff}",
-                "&7Banned on: &f{date}",
-                "&7Unbanned on: &f{expires-date}",
+                "&7Date: &f{date}",
+                "&7Expires: &f{expires-date}",
                 "&7Ban ID: &f#{id}",
                 "",
                 "&7Appeal: &b{appeal}",
@@ -101,11 +110,11 @@ public final class ConfigLoader {
         messages.put("ban-screen-permanent", String.join("\n",
                 "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ",
                 "&8&m                                    ",
-                "&4&lYOU ARE PERMANENTLY BANNED",
+                "&cYou are permanently banned from this server.",
                 "",
                 "&7Reason: &f{reason} &8({offence} offence)",
                 "&7Banned by: &f{staff}",
-                "&7Banned on: &f{date}",
+                "&7Date: &f{date}",
                 "&7Ban ID: &f#{id}",
                 "",
                 "&7Appeal: &b{appeal}",
@@ -113,36 +122,44 @@ public final class ConfigLoader {
         messages.put("ban-screen-anticheat", String.join("\n",
                 "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ",
                 "&8&m                                    ",
-                "&c&l⚠ BANNED BY THE ANTI-CHEAT ⚠",
+                "&cYou have been banned by Vigil Anti-Cheat.",
                 "",
                 "&7Detected: &f{reason}",
                 "&7Length: &f{duration} &8({offence} offence)",
-                "&7Banned on: &f{date}",
-                "&7Unbanned on: &f{expires-date}",
+                "&7Date: &f{date}",
+                "&7Expires: &f{expires-date}",
                 "&7Ban ID: &f#{id}",
                 "",
-                "&7Think this is a mistake? Appeal: &b{appeal}",
+                "&7If you believe this is a mistake, you may appeal: &b{appeal}",
                 "&8&m                                    "));
         messages.put("kick-screen", String.join("\n",
                 "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ",
                 "&8&m                                    ",
-                "&e&lYOU WERE KICKED",
+                "&eYou have been kicked from this server.",
                 "",
                 "&7Reason: &f{reason}",
                 "&7Kicked by: &f{staff}",
                 "",
-                "&7You can join again right away.",
+                "&7You may reconnect at any time.",
                 "&8&m                                    "));
         messages.put("mute-notify", "&cYou have been muted for &f{reason}&c. &7Length: &f{duration} &8(until {expires-date})");
         messages.put("muted-chat", "&cYou are muted for &f{reason}&c. &7Unmuted in &f{expires}&7.");
         messages.put("unmute-notify", "&aYou have been unmuted.");
-        messages.put("warn-notify", "&cYou have been warned for &f{reason}&c. &7(warning #{count})");
+        messages.put("warn-notify", "&cYou have been warned for &f{reason}&c. &7This warning expires in &f{duration}&7. &8(active warnings: {count})");
+        messages.put("unwarn-notify", "&aOne of your warnings has been removed. &7(active warnings: {count})");
+        // Shown in bold above the hotbar.
+        messages.put("mute-actionbar", "&c&lYou have been muted for {reason}");
+        messages.put("unmute-actionbar", "&a&lYou have been unmuted");
+        messages.put("warn-actionbar", "&c&lYou have been warned for {reason}");
+        messages.put("unwarn-actionbar", "&a&lA warning has been removed");
+        messages.put("warn-time-required", "&cA warning needs a time between &f{min} &cand &f{max}&c, for example: &f/warn {player} 1d Spam");
         messages.put("not-banned", "&c{player} is not banned.");
         messages.put("not-muted", "&c{player} is not muted.");
+        messages.put("not-warned", "&c{player} has no active warnings.");
         messages.put("cannot-punish", "&cYou cannot punish {player}.");
         messages.put("moderation-disabled", "&cModeration commands are disabled in the configuration.");
         messages.put("never", "Never");
-        messages.put("presets-header", "&7Preset reasons &8(time for the 1st → 2nd → 3rd offence...)&7:");
+        messages.put("presets-header", "&7Preset reasons &8(time for the 1st, 2nd, 3rd offence...)&7:");
         messages.put("warn-escalation-reason", "Too many warnings ({count})");
         DEFAULT_MESSAGES = java.util.Collections.unmodifiableMap(messages);
     }
@@ -152,6 +169,8 @@ public final class ConfigLoader {
             "*SHULKER_BOX", "HOPPER", "DROPPER", "DISPENSER", "CRAFTER", "FURNACE", "BLAST_FURNACE", "SMOKER",
             "BREWING_STAND", "*_BED", "ENCHANTING_TABLE");
 
+    static final long DEFAULT_WARN_MIN_MS = 60L * 60 * 1000;
+    static final long DEFAULT_WARN_MAX_MS = 10L * 24 * 60 * 60 * 1000;
     static final String DEFAULT_APPEAL = "Ask a staff member on our Discord";
     static final String DEFAULT_DATE_FORMAT = "dd MMM yyyy, HH:mm";
     static final List<Settings.WarnStep> DEFAULT_WARN_ESCALATION = List.of(
@@ -237,6 +256,8 @@ public final class ConfigLoader {
                 "Appeal_Accepted", "", "False_Ban", "", "Served_Time", "", "Staff_Decision", ""));
         reasons.put(PunishmentType.UNMUTE, presets(
                 "Appeal_Accepted", "", "False_Mute", "", "Served_Time", "", "Staff_Decision", ""));
+        reasons.put(PunishmentType.UNWARN, presets(
+                "Appeal_Accepted", "", "False_Warning", "", "Staff_Decision", ""));
         DEFAULT_REASONS = java.util.Collections.unmodifiableMap(reasons);
     }
 
@@ -261,7 +282,7 @@ public final class ConfigLoader {
                 }
             }
         } else if (value != null) {
-            for (String part : value.toString().split("[,>→]+")) {
+            for (String part : value.toString().split("[,>\u2192]+")) {
                 parts.add(part);
             }
         }
@@ -448,6 +469,13 @@ public final class ConfigLoader {
     }
 
     private static Settings.Moderation loadModeration(Reader r) {
+        long warnMin = r.duration("moderation.warn-time.min", DEFAULT_WARN_MIN_MS);
+        long warnMax = r.duration("moderation.warn-time.max", DEFAULT_WARN_MAX_MS);
+        if (warnMin == Durations.PERMANENT || warnMax == Durations.PERMANENT || warnMin > warnMax) {
+            r.warn("moderation.warn-time needs a min and max time with min <= max (e.g. 1h and 10d); using 1h to 10d.");
+            warnMin = DEFAULT_WARN_MIN_MS;
+            warnMax = DEFAULT_WARN_MAX_MS;
+        }
         String broadcast = r.string("moderation.broadcast", "staff").trim().toLowerCase(Locale.ROOT);
         if (!broadcast.equals("staff") && !broadcast.equals("all") && !broadcast.equals("none")) {
             r.warn("moderation.broadcast must be staff, all or none (got '" + broadcast + "'); using staff.");
@@ -472,7 +500,9 @@ public final class ConfigLoader {
                 r.string("moderation.appeal", DEFAULT_APPEAL),
                 dateFormat(r),
                 r.duration("moderation.warnings-expire-after", 30L * 24 * 3600 * 1000),
-                warnEscalation(r));
+                warnEscalation(r),
+                warnMin,
+                warnMax);
     }
 
     private static String dateFormat(Reader r) {

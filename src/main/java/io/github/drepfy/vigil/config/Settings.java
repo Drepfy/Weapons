@@ -155,6 +155,9 @@ public record Settings(General general,
      * @param defaultMuteMs  duration of a mute without a duration or preset ({@code -1} = permanent)
      * @param mutedBlockedCommands commands (without slash, lower case) muted players cannot use
      * @param reasons        preset reasons per punishment type
+     * @param warningsExpireMs how long old warnings without their own time count
+     * @param warnMinMs      shortest time a warning may be given for
+     * @param warnMaxMs      longest time a warning may be given for
      */
     public record Moderation(boolean enabled,
                              String broadcast,
@@ -165,7 +168,9 @@ public record Settings(General general,
                              String appeal,
                              String dateFormat,
                              long warningsExpireMs,
-                             List<WarnStep> warnEscalation) {
+                             List<WarnStep> warnEscalation,
+                             long warnMinMs,
+                             long warnMaxMs) {
         public Moderation {
             warnEscalation = List.copyOf(warnEscalation);
             mutedBlockedCommands = Set.copyOf(mutedBlockedCommands);

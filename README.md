@@ -16,8 +16,9 @@ Anti-cheat and moderation for a Spigot/Paper SMP (built for **ᴠᴀɴɪʟʟᴀ 
 - **Blocks hacked clients**: kicks clients that announce themselves (Meteor,
   Wurst, LiquidBounce...) and world downloaders. Optionally kicks every modded
   (Fabric/Forge) client.
-- **Ban animation**: lightning, an explosion, thunder and a big red **BANNED**
-  title on the cheater's screen, then a banner in chat for everyone.
+- **Ban animation**: lightning, an explosion, thunder and a large red "Banned"
+  title on the cheater's screen, then a "Vigil Anti-Cheat" notice in chat for
+  everyone.
 - **Automatic bans**: when a check's violation level reaches its `ban-at`, the
   player is banned ("Cheating (Flying)"): 30 days the first time, permanent the
   second time. They are kicked with the anti-cheat ban screen and everyone is
@@ -30,14 +31,18 @@ Anti-cheat and moderation for a Spigot/Paper SMP (built for **ᴠᴀɴɪʟʟᴀ 
 - **Clear ban screens**: separate screens for temporary, permanent and
   anti-cheat bans, showing the reason, which offence it is, who banned you, the
   date, when it ends, a ban ID and how to appeal.
-- **Punish menu**: `/punish Steve` opens a menu with every preset, its times and
-  what Steve's next offence would get. Click twice to punish.
-- **Warnings add up**: 3 warnings = muted for 1 hour, 5 = banned for 1 day,
-  7 = banned for 7 days (configurable). Warnings expire after 30 days.
+- **Timed warnings**: every warning needs a time from 1 hour to 10 days
+  (`/warn Steve 1d Spam`) and stops counting after it. 3 active warnings = muted
+  for 1 hour, 5 = banned for 1 day, 7 = banned for 7 days (configurable).
+  `/unwarn` removes one.
+- **Hotbar notices**: being muted, unmuted, warned or having a warning removed is
+  shown in bold above the hotbar as well as in chat.
 - **Discord log** (optional): bans, mutes, warnings and kicks posted to a
   Discord channel through a webhook.
-- **Few commands**: `/ac` for the anti-cheat, `/punish` for the menu, plus
-  `/ban /unban /mute /unmute /warn /kick` with preset reasons.
+- **Few commands, no menus**: `/ac` for the anti-cheat, plus `/ban /unban /mute
+  /unmute /warn /unwarn /kick` with preset reasons.
+- **LuckPerms ready**: every command has its own permission node, plus
+  `vigil.staff` and `vigil.admin` sets (see "Permissions").
 - **Low false positives**: every check allows for lag, ping, knockback, pistons,
   ice, slime, water, ladders, potions and more. A single odd event never flags
   and violation levels decay, so only repeated cheating reaches a ban.
@@ -51,7 +56,9 @@ Anti-cheat and moderation for a Spigot/Paper SMP (built for **ᴠᴀɴɪʟʟᴀ 
    single permissions below.
 3. Optional: edit `plugins/Vigil/config.yml`, then run `/ac reload`.
 
-**Updating from 2.x:** just replace the jar. On start, Vigil adds the new
+**Updating from 2.x:** just replace the jar. (2.4.0 removed `/punish`,
+`/ac reset` and `/ac debug`; `/unban`, `/unmute` and `/ac reload` now have their
+own permissions, which ops and `vigil.*` already include.) On start, Vigil adds the new
 options to your `config.yml` and saves the old file as
 `config-before-<version>.yml`. Anything still set to an old default (ban screen,
 preset times, auto-ban length) gets the new default; anything you changed is
@@ -70,16 +77,14 @@ Requirements: Paper (recommended) or Spigot 1.20–1.21.x, Java 17+ (Java 21 on
 |---|---|---|
 | `/ac alerts` | `vigil.alerts` | Turn anti-cheat alerts on/off for yourself |
 | `/ac check <player>` | `vigil.check` | Why a player is or isn't checked, violation levels, recent flags, punishment history (offline too) |
-| `/ac reset <player> [check]` | `vigil.admin` | Clear violation levels |
-| `/ac debug <player> [check]` | `vigil.admin` | Show live check values (for tuning) |
-| `/ac reload` | `vigil.admin` | Reload `config.yml` |
-| `/ac preview` | `vigil.admin` | Watch the ban animation on yourself (you are not banned) |
-| `/punish <player>` | any of `vigil.ban/mute/warn/kick` | Menu with every preset reason, its times and the player's next punishment; also unban/unmute and history |
+| `/ac reload` | `vigil.reload` | Reload `config.yml` |
+| `/ac preview` | `vigil.preview` | Watch the ban animation on yourself (you are not banned) |
 | `/ban <player> [duration] [reason]` | `vigil.ban` | `/ban Steve Cheating` = preset time (7 days, then 30 days, then permanent), `/ban Steve 3d Griefing` = your own time, `/ban Steve` = permanent, "No Reason". `/ban` alone lists the presets |
-| `/unban <player> [reason]` | `vigil.ban` | Lift a ban (also automatic bans) |
+| `/unban <player> [reason]` | `vigil.unban` | Lift a ban (also automatic bans) |
 | `/mute <player> [duration] [reason]` | `vigil.mute` | Blocks chat and `/msg`, `/r`, `/me`... `/mute` alone lists the presets |
-| `/unmute <player> [reason]` | `vigil.mute` | |
-| `/warn <player> [reason]` | `vigil.warn` | The player sees the warning and their count; enough warnings mute or ban |
+| `/unmute <player> [reason]` | `vigil.unmute` | |
+| `/warn <player> <time> [reason]` | `vigil.warn` | The time is required, 1h to 10d: `/warn Steve 1d Spam`. Enough active warnings mute or ban |
+| `/unwarn <player> [reason]` | `vigil.unwarn` | Remove the player's newest active warning |
 | `/kick <player> [reason]` | `vigil.kick` | Kicked with the kick screen |
 
 `/ac` also works as `/anticheat` and `/vigil`. Durations: `30m`, `12h`, `7d`,
@@ -142,13 +147,13 @@ A banned player sees one of three screens (all in `messages`, all editable):
 ```
             ᴠᴀɴɪʟʟᴀ sᴍᴘ
   ────────────────────────────
-         YOU ARE BANNED
-      for another 6 days 23 hours
+   You are banned from this server.
+     Time remaining: 6 days 23 hours
 
   Reason: Cheating (1st offence)
   Banned by: Admin
-  Banned on: 30 Sep 2026, 14:05
-  Unbanned on: 07 Oct 2026, 14:05
+  Date: 30 Sep 2026, 14:05
+  Expires: 07 Oct 2026, 14:05
   Ban ID: #42
 
   Appeal: Ask a staff member on our Discord
@@ -157,8 +162,8 @@ A banned player sees one of three screens (all in `messages`, all editable):
 
 - `ban-screen`: temporary bans (with the countdown and the unban date).
 - `ban-screen-permanent`: permanent bans.
-- `ban-screen-anticheat`: automatic bans ("BANNED BY THE ANTI-CHEAT", what was
-  detected).
+- `ban-screen-anticheat`: automatic bans ("You have been banned by Vigil
+  Anti-Cheat", what was detected).
 - `kick-screen`: kicks.
 
 Set your Discord invite or website in `moderation.appeal`, and the date style in
@@ -173,8 +178,21 @@ moderation:
     3: mute 1h     # the 3rd warning mutes for 1 hour
     5: ban 1d
     7: ban 7d      # also: "kick", "mute perm", "ban perm"
-  warnings-expire-after: 30d   # perm = warnings never expire
+  warn-time:       # every warning needs a time in this range
+    min: 1h
+    max: 10d
 ```
+
+`/warn Steve 1d Spam` gives a warning that counts for 1 day. `/warn Steve Spam`
+(no time), `30m` or `11d` are refused. Warnings from before 2.4.0 (which had no
+time) count for 30 days. `/unwarn Steve False_Warning` removes the newest one.
+
+### Hotbar notices
+
+Muting, unmuting, warning and removing a warning also show a bold line above
+the player's hotbar for about 5 seconds (`mute-actionbar`, `unmute-actionbar`,
+`warn-actionbar`, `unwarn-actionbar` in `messages`; set one to `""` to turn it
+off).
 
 ### Discord
 
@@ -193,15 +211,55 @@ is affected. Mentions like `@everyone` in reasons never ping.
 
 ## Permissions
 
+Every node is registered with the server, so LuckPerms suggests them all (tab
+completion and the web editor).
+
 | Permission | Default | |
 |---|---|---|
-| `vigil.*` | op | All of the permissions below except `vigil.protect` and `vigil.bypass` |
+| `vigil.*` | op | `vigil.staff` + `vigil.admin` (not `vigil.protect` or `vigil.bypass`) |
+| `vigil.staff` | op | Moderator set: all of the nodes from `vigil.alerts` to `vigil.kick` below |
+| `vigil.admin` | op | Admin set: `vigil.reload` and `vigil.preview` |
 | `vigil.alerts` | op | See detections, auto-bans and staff punishments; `/ac alerts` |
 | `vigil.check` | op | `/ac check` |
-| `vigil.admin` | op | `/ac reload`, `/ac reset`, `/ac debug` |
-| `vigil.ban`, `vigil.mute`, `vigil.warn`, `vigil.kick` | op | The moderation commands |
+| `vigil.ban` | op | `/ban` |
+| `vigil.unban` | op | `/unban` |
+| `vigil.mute` | op | `/mute` |
+| `vigil.unmute` | op | `/unmute` |
+| `vigil.warn` | op | `/warn` |
+| `vigil.unwarn` | op | `/unwarn` |
+| `vigil.kick` | op | `/kick` |
+| `vigil.reload` | op | `/ac reload` |
+| `vigil.preview` | op | `/ac preview` |
 | `vigil.protect` | false | Cannot be punished by staff commands and is never auto-banned (still flagged) |
 | `vigil.bypass` | false | Not checked at all (and sees hidden storage), **only** if `anticheat.bypass-permission: true` (off so `*` permissions can't switch the anti-cheat off) |
+| `vigil.bypass.<check>` | false | Skip one check, e.g. `vigil.bypass.flight` (same condition) |
+
+### LuckPerms setup
+
+Example groups (type these in the console, or use `/lp editor`):
+
+```
+lp creategroup helper
+lp group helper permission set vigil.alerts true
+lp group helper permission set vigil.check true
+lp group helper permission set vigil.warn true
+lp group helper permission set vigil.mute true
+lp group helper permission set vigil.kick true
+
+lp creategroup mod
+lp group mod parent add helper
+lp group mod permission set vigil.staff true
+
+lp creategroup admin
+lp group admin parent add mod
+lp group admin permission set vigil.* true
+lp group admin permission set vigil.protect true
+
+lp user Steve parent add mod
+```
+
+A helper can warn, mute and kick but not ban or undo punishments; a mod can do
+every punishment; an admin can also reload and cannot be punished.
 
 ## Checks
 
@@ -338,7 +396,7 @@ Add them only if you need to. Defaults shown.
 ```yaml
 advanced:
   passive-mode: false          # detect and alert only: no setbacks, cancels or bans
-  debug: false                 # print /ac debug output to the console
+  debug: false                 # print live check values to the console
   alert-console: true
   alert-cooldown-ms: 3000      # per player and check; the next alert says "(+N more)"
   alert-clickable: true        # click an alert to run /ac check
@@ -424,7 +482,7 @@ Maven tab → **Lifecycle → package**. GitHub Actions builds every push.
 
 ## Testing
 
-`mvn test` runs 108 tests. 34 of them are end-to-end scenarios on a simulated
+`mvn test` runs 113 tests. 37 of them are end-to-end scenarios on a simulated
 server (MockBukkit). They check that legit sprint-jumping, wall jumps, stairs,
 bridging, knockback, falls with damage, normal fights, fights against a strafing
 target, real mace smashes and normal branch mining are **never** flagged, and that
@@ -436,8 +494,9 @@ again when you leave; that inventory macros are refused and flagged while normal
 clicking is not; that world-downloader clients are kicked; and that a flyer is
 held in place during the ban animation, then auto-banned, kicked and refused at
 login. For moderation they check that a repeated preset ban gets the next time
-(and that a ban lifted as a mistake doesn't count), that the punish menu bans
-with the right time after a confirm click, that 3 warnings mute (without ever
+(and that a ban lifted as a mistake doesn't count), that warnings need a time
+from 1 hour to 10 days, that mute/warn notices appear above the hotbar, that
+`/unwarn` works, that every command has its own permission, that 3 warnings mute (without ever
 shortening a longer mute) and that a banned player sees the ban screen when
 joining. The Paper anti-xray setup is tested on sample Paper config files
 (backups, other settings untouched, runs only once), and the config upgrade on
@@ -454,8 +513,9 @@ On a test server, before going live:
 - [ ] `/ban <alt> Cheating` bans for 7 days (1st offence); after `/unban <alt>`,
       the same command bans for 30 days (2nd offence). The banned alt sees the ban
       screen with the reason, dates, ban ID and appeal when rejoining.
-- [ ] `/punish <alt>` opens the menu; clicking a reason twice punishes.
-- [ ] `/mute`, `/warn` (3 warnings mute for 1 hour) and `/kick` show the right messages.
+- [ ] `/warn <alt> 1d Spam` works and shows a bold line above the alt's hotbar;
+      `/warn <alt> Spam` (no time) is refused. 3 warnings mute for 1 hour.
+- [ ] `/mute`, `/unmute`, `/unwarn` and `/kick` show the right messages.
 - [ ] Give a staff member `vigil.protect`: they are flagged but not banned.
 - [ ] After the first start, restart once. The console should say
       "Paper anti-xray is on (engine-mode 2)". With an x-ray pack, stone is full of fake ores.

@@ -47,7 +47,6 @@ import io.github.drepfy.vigil.moderation.DiscordNotifier;
 import io.github.drepfy.vigil.moderation.ModerationCommand;
 import io.github.drepfy.vigil.moderation.ModerationListener;
 import io.github.drepfy.vigil.moderation.ModerationService;
-import io.github.drepfy.vigil.moderation.PunishMenu;
 import io.github.drepfy.vigil.storage.FlagLogWriter;
 import io.github.drepfy.vigil.storage.IoExecutor;
 import io.github.drepfy.vigil.storage.PlayerRecord;
@@ -180,16 +179,9 @@ public class VigilPlugin extends JavaPlugin {
         new OptionalHooks(this, checks, lifecycle, combat, interaction, timer).registerAll();
         registerBypassPermissions(pm);
 
-        ModerationCommand moderationCommand = new ModerationCommand(this::settings, moderation, moderationListener,
+        ModerationCommand moderationCommand = new ModerationCommand(this, this::settings, moderation, moderationListener,
                 getLogger(), discord::punishment);
-        PunishMenu punishMenu = new PunishMenu(this, this::settings, moderation);
-        pm.registerEvents(punishMenu, this);
-        PluginCommand punishCommand = getCommand("punish");
-        if (punishCommand != null) {
-            punishCommand.setExecutor(punishMenu);
-            punishCommand.setTabCompleter(punishMenu);
-        }
-        for (String name : List.of("ban", "unban", "mute", "unmute", "warn", "kick")) {
+        for (String name : List.of("ban", "unban", "mute", "unmute", "warn", "unwarn", "kick")) {
             PluginCommand moderationPluginCommand = getCommand(name);
             if (moderationPluginCommand != null) {
                 moderationPluginCommand.setExecutor(moderationCommand);
@@ -229,7 +221,7 @@ public class VigilPlugin extends JavaPlugin {
         getLogger().info("Enabled: " + enabledChecks() + " of " + CheckType.values().length + " checks active"
                 + (settings.general().passiveMode() ? " (passive mode: no setbacks, no bans)" : "")
                 + ", auto-ban " + (autoBanSettings.enabled() && !settings.general().passiveMode() ? "ON" : "off")
-                + ". Staff commands: /ac, /punish, /ban, /mute, /warn, /kick.");
+                + ". Staff commands: /ac, /ban, /mute, /warn, /kick (and /unban, /unmute, /unwarn).");
     }
 
     @Override
@@ -391,7 +383,19 @@ public class VigilPlugin extends JavaPlugin {
         } catch (IOException | InvalidConfigurationException | RuntimeException e) {
             return; // An unreadable file is reported by readSettings and never rewritten.
         }
-        List<String> changes = ConfigUpgrader.upgrade(current, defaults);
+        List<YamlConfiguration> older = new ArrayList<>();
+        for (String name : List.of("upgrade/config-2.2.yml", "upgrade/config-2.3.yml")) {
+            java.io.InputStream stream = getResource(name);
+            if (stream == null) {
+                continue;
+            }
+            try (Reader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
+                older.add(YamlConfiguration.loadConfiguration(reader));
+            } catch (IOException ignored) {
+                // Only used to recognise unedited messages.
+            }
+        }
+        List<String> changes = ConfigUpgrader.upgrade(current, defaults, older);
         if (changes.isEmpty()) {
             return;
         }
@@ -402,8 +406,8 @@ public class VigilPlugin extends JavaPlugin {
                 Files.copy(file.toPath(), backup.toPath());
             }
             current.save(file);
-            getLogger().warning("config.yml was upgraded to " + version + " (" + changes.size() + " changes: new ban "
-                    + "screens, escalating preset times, new options). Your settings were kept; the old file is "
+            getLogger().warning("config.yml was upgraded to " + version + " (" + changes.size() + " changes: new messages "
+                    + "and options). Your own changes were kept; the old file is "
                     + backup.getName() + ".");
         } catch (IOException | RuntimeException e) {
             getLogger().warning("Could not upgrade config.yml (" + e.getMessage() + "); it was left as it was.");
@@ -507,7 +511,6 @@ public class VigilPlugin extends JavaPlugin {
 
     private void handleQuit(Player player) {
         PlayerData data = players.quit(player.getUniqueId(), Clock.now());
-        debug.removeViewer(player.getUniqueId());
         if (data != null && data.record != null) {
             data.record.seen(player.getName());
             records.saveAsync(data.record);
@@ -549,10 +552,6 @@ public class VigilPlugin extends JavaPlugin {
 
     public AlertService alerts() {
         return alerts;
-    }
-
-    public DebugService debugService() {
-        return debug;
     }
 
     public TpsMonitor tpsMonitor() {

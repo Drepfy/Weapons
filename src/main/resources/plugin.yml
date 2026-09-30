@@ -11,10 +11,6 @@ commands:
     description: Anti-cheat staff command (alerts, check, reset, debug, reload).
     usage: /<command> [alerts|check|reset|debug|reload]
     aliases: [anticheat, vigil]
-  punish:
-    description: Open the punish menu for a player (preset reasons with their times).
-    usage: /<command> <player>
-    aliases: [punishmenu]
   ban:
     description: Ban a player (optionally for a duration, e.g. 7d).
     usage: /<command> <player> [duration] [reason]
@@ -23,7 +19,7 @@ commands:
     description: Unban a player.
     usage: /<command> <player> [reason]
     aliases: [pardon]
-    permission: vigil.ban
+    permission: vigil.unban
   mute:
     description: Mute a player (optionally for a duration, e.g. 1h).
     usage: /<command> <player> [duration] [reason]
@@ -31,45 +27,77 @@ commands:
   unmute:
     description: Unmute a player.
     usage: /<command> <player> [reason]
-    permission: vigil.mute
+    permission: vigil.unmute
   warn:
-    description: Warn a player.
-    usage: /<command> <player> [reason]
+    description: Warn a player for a set time (1h to 10d).
+    usage: /<command> <player> <time> [reason]
     permission: vigil.warn
+  unwarn:
+    description: Remove a player's newest active warning.
+    usage: /<command> <player> [reason]
+    aliases: [delwarn]
+    permission: vigil.unwarn
   kick:
     description: Kick a player.
     usage: /<command> <player> [reason]
     permission: vigil.kick
 
+# Every node below shows up in LuckPerms (tab completion and the web editor).
 permissions:
   vigil.*:
-    description: Everything staff can do.
+    description: Everything staff can do (not vigil.protect or vigil.bypass).
+    default: op
+    children:
+      vigil.staff: true
+      vigil.admin: true
+  vigil.staff:
+    description: "Moderator set: alerts, /ac check and every punishment command."
     default: op
     children:
       vigil.alerts: true
       vigil.check: true
-      vigil.admin: true
       vigil.ban: true
+      vigil.unban: true
       vigil.mute: true
+      vigil.unmute: true
       vigil.warn: true
+      vigil.unwarn: true
       vigil.kick: true
+  vigil.admin:
+    description: "Admin set: /ac reload and /ac preview."
+    default: op
+    children:
+      vigil.reload: true
+      vigil.preview: true
   vigil.alerts:
-    description: See anti-cheat alerts and punishments, and use /ac alerts.
+    description: See anti-cheat alerts and staff punishments, and use /ac alerts.
     default: op
   vigil.check:
     description: Use /ac check to see a player's violations, flags and punishments.
     default: op
-  vigil.admin:
-    description: Use /ac reload, /ac reset and /ac debug.
+  vigil.reload:
+    description: Use /ac reload.
+    default: op
+  vigil.preview:
+    description: Use /ac preview (watch the ban animation on yourself).
     default: op
   vigil.ban:
-    description: Use /ban and /unban.
+    description: Use /ban.
+    default: op
+  vigil.unban:
+    description: Use /unban.
     default: op
   vigil.mute:
-    description: Use /mute and /unmute.
+    description: Use /mute.
+    default: op
+  vigil.unmute:
+    description: Use /unmute.
     default: op
   vigil.warn:
     description: Use /warn.
+    default: op
+  vigil.unwarn:
+    description: Use /unwarn.
     default: op
   vigil.kick:
     description: Use /kick.
@@ -79,4 +107,64 @@ permissions:
     default: false
   vigil.bypass:
     description: Not checked at all. Only works when anticheat.bypass-permission is true in config.yml.
+    default: false
+  vigil.bypass.speed:
+    description: Exempt from the Speed check (only when anticheat.bypass-permission is true).
+    default: false
+  vigil.bypass.flight:
+    description: Exempt from the Flight check (only when anticheat.bypass-permission is true).
+    default: false
+  vigil.bypass.step:
+    description: Exempt from the Step check (only when anticheat.bypass-permission is true).
+    default: false
+  vigil.bypass.nofall:
+    description: Exempt from the NoFall check (only when anticheat.bypass-permission is true).
+    default: false
+  vigil.bypass.timer:
+    description: Exempt from the Timer check (only when anticheat.bypass-permission is true).
+    default: false
+  vigil.bypass.noslow:
+    description: Exempt from the NoSlow check (only when anticheat.bypass-permission is true).
+    default: false
+  vigil.bypass.velocity:
+    description: Exempt from the Velocity check (only when anticheat.bypass-permission is true).
+    default: false
+  vigil.bypass.reach:
+    description: Exempt from the Reach check (only when anticheat.bypass-permission is true).
+    default: false
+  vigil.bypass.killaura:
+    description: Exempt from the KillAura check (only when anticheat.bypass-permission is true).
+    default: false
+  vigil.bypass.noswing:
+    description: Exempt from the NoSwing check (only when anticheat.bypass-permission is true).
+    default: false
+  vigil.bypass.wallhit:
+    description: Exempt from the WallHit check (only when anticheat.bypass-permission is true).
+    default: false
+  vigil.bypass.autoclicker:
+    description: Exempt from the AutoClicker check (only when anticheat.bypass-permission is true).
+    default: false
+  vigil.bypass.mace:
+    description: Exempt from the Mace check (only when anticheat.bypass-permission is true).
+    default: false
+  vigil.bypass.blockreach:
+    description: Exempt from the BlockReach check (only when anticheat.bypass-permission is true).
+    default: false
+  vigil.bypass.interact:
+    description: Exempt from the Interact check (only when anticheat.bypass-permission is true).
+    default: false
+  vigil.bypass.fastplace:
+    description: Exempt from the FastPlace check (only when anticheat.bypass-permission is true).
+    default: false
+  vigil.bypass.nuker:
+    description: Exempt from the Nuker check (only when anticheat.bypass-permission is true).
+    default: false
+  vigil.bypass.chestaura:
+    description: Exempt from the ChestAura check (only when anticheat.bypass-permission is true).
+    default: false
+  vigil.bypass.xray:
+    description: Exempt from the XRay check (only when anticheat.bypass-permission is true).
+    default: false
+  vigil.bypass.inventory:
+    description: Exempt from the Inventory check (only when anticheat.bypass-permission is true).
     default: false

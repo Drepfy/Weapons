@@ -29,10 +29,11 @@ public record Punishment(int id,
         return isPermanent() ? Long.MAX_VALUE : createdEpochMs + durationMs;
     }
 
-    /** Whether a ban or mute is currently enforced. */
+    /** Whether a ban, mute or timed warning is currently in effect. */
     public boolean isInEffect(long nowEpochMs) {
-        return (type == PunishmentType.BAN || type == PunishmentType.MUTE) && !revoked
-                && nowEpochMs < expiresEpochMs();
+        boolean timed = type == PunishmentType.BAN || type == PunishmentType.MUTE
+                || (type == PunishmentType.WARN && durationMs != 0L);
+        return timed && !revoked && nowEpochMs < expiresEpochMs();
     }
 
     public Punishment revoke(String by, String reason, long nowEpochMs) {

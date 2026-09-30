@@ -25,6 +25,10 @@ class ConfigUpgraderTest {
         }
     }
 
+    private static List<YamlConfiguration> older() throws Exception {
+        return List.of(resource("/upgrade/config-2.2.yml"), resource("/upgrade/config-2.3.yml"));
+    }
+
     /** Saves and reloads, like the plugin does, so the result must also survive YAML. */
     private static YamlConfiguration roundTrip(YamlConfiguration yaml) throws Exception {
         YamlConfiguration copy = new YamlConfiguration();
@@ -34,8 +38,8 @@ class ConfigUpgraderTest {
 
     @Test
     void untouchedOldConfigGetsEverythingNew() throws Exception {
-        YamlConfiguration old = resource("/config-2.2.yml");
-        List<String> changes = ConfigUpgrader.upgrade(old, resource("/config.yml"));
+        YamlConfiguration old = resource("/upgrade/config-2.2.yml");
+        List<String> changes = ConfigUpgrader.upgrade(old, resource("/config.yml"), older());
         for (String expected : List.of("messages.ban-screen", "messages.ban-screen-permanent",
                 "messages.ban-screen-anticheat", "moderation.reasons.ban", "moderation.reasons.mute",
                 "anticheat.auto-ban.duration", "moderation.appeal", "moderation.warn-escalation", "discord")) {
@@ -43,7 +47,8 @@ class ConfigUpgraderTest {
         }
 
         YamlConfiguration saved = roundTrip(old);
-        assertEquals(List.of(), ConfigUpgrader.upgrade(saved, resource("/config.yml")), "the next start changes nothing");
+        assertEquals(List.of(), ConfigUpgrader.upgrade(saved, resource("/config.yml"), older()),
+                "the next start changes nothing");
         Settings upgraded = ConfigLoader.load(saved);
         assertEquals(List.of(), upgraded.warnings());
         Settings fresh = ConfigLoader.load(resource("/config.yml"));
@@ -56,11 +61,11 @@ class ConfigUpgraderTest {
 
     @Test
     void ownerChangesAreKept() throws Exception {
-        YamlConfiguration old = resource("/config-2.2.yml");
+        YamlConfiguration old = resource("/upgrade/config-2.2.yml");
         old.set("messages.ban-screen", List.of("&cGo away, {player}", "{reason}"));
         old.set("moderation.reasons.ban.Cheating", "90d");
         old.set("anticheat.auto-ban.duration", "14d");
-        ConfigUpgrader.upgrade(old, resource("/config.yml"));
+        ConfigUpgrader.upgrade(old, resource("/config.yml"), older());
 
         Settings upgraded = ConfigLoader.load(roundTrip(old));
         assertEquals("&cGo away, {player}\n{reason}", upgraded.messages().get("ban-screen"));
@@ -74,8 +79,25 @@ class ConfigUpgraderTest {
     }
 
     @Test
+    void config23GetsTheNewMessagesAndWarningTimes() throws Exception {
+        YamlConfiguration old = resource("/upgrade/config-2.3.yml");
+        old.set("messages.kick-screen", "&cBye {player}");
+        List<String> changes = ConfigUpgrader.upgrade(old, resource("/config.yml"), older());
+        for (String expected : List.of("messages.auto-banned", "messages.ban-title", "messages.ban-screen",
+                "messages.warn-success", "messages.mute-actionbar", "moderation.warn-time", "moderation.reasons.unwarn")) {
+            assertTrue(changes.contains(expected), expected + " in " + changes);
+        }
+        Settings upgraded = ConfigLoader.load(roundTrip(old));
+        assertEquals(List.of(), upgraded.warnings());
+        assertEquals("&c&lBanned", upgraded.messages().get("ban-title"));
+        assertFalse(upgraded.messages().get("auto-banned").contains("\u26a0"), "the emoji banner is replaced");
+        assertEquals("&cBye {player}", upgraded.messages().get("kick-screen"), "edited messages are kept");
+        assertEquals(ConfigLoader.DEFAULT_WARN_MAX_MS, upgraded.moderation().warnMaxMs());
+    }
+
+    @Test
     void currentConfigNeedsNoChanges() throws Exception {
-        assertEquals(List.of(), ConfigUpgrader.upgrade(resource("/config.yml"), resource("/config.yml")));
+        assertEquals(List.of(), ConfigUpgrader.upgrade(resource("/config.yml"), resource("/config.yml"), older()));
         YamlConfiguration notVigil = new YamlConfiguration();
         notVigil.set("config-version", 1);
         assertEquals(List.of(), ConfigUpgrader.upgrade(notVigil, resource("/config.yml")));

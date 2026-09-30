@@ -88,7 +88,7 @@ class ModerationTest {
         assertEquals(Durations.PERMANENT, cheating.durationFor(10), "the last step repeats");
         assertEquals(7 * DAY, cheating.defaultDuration());
         assertTrue(cheating.escalates());
-        assertEquals("7 days → 30 days → Permanent", cheating.ladderText("Permanent"));
+        assertEquals("7 days, 30 days, Permanent", cheating.ladderText("Permanent"));
 
         ReasonPreset doxxing = new ReasonPreset("Doxxing", Durations.PERMANENT);
         assertFalse(doxxing.escalates());
@@ -138,10 +138,19 @@ class ModerationTest {
         service.unban(alex, "Admin", "Appeal accepted");
         assertEquals(1, service.previousAutoBans(alex, auto));
 
-        service.warn(steve, "Steve", "Spam", "Mod");
-        service.warn(steve, "Steve", "Caps", "Mod");
+        service.warn(steve, "Steve", "Spam", "Mod", DAY);
+        Punishment newest = service.warn(steve, "Steve", "Caps", "Mod", 7 * DAY);
         assertEquals(2, service.warningCount(steve));
-        assertEquals(2, service.warningCount(steve, DAY));
+        assertEquals(2, service.activeWarnings(steve, 30 * DAY).size());
+        assertTrue(newest.isInEffect(System.currentTimeMillis() + 2 * DAY), "a 7 day warning still counts after 2 days");
+        assertFalse(newest.isInEffect(System.currentTimeMillis() + 8 * DAY), "and stops counting after 7 days");
+
+        Punishment removed = service.unwarn(steve, "Admin", "False Warning", 30 * DAY);
+        assertEquals(newest.id(), removed.id(), "/unwarn removes the newest warning");
+        assertEquals(1, service.activeWarnings(steve, 30 * DAY).size());
+        assertNotNull(service.unwarn(steve, "Admin", "Staff Decision", 30 * DAY));
+        assertNull(service.unwarn(steve, "Admin", "again", 30 * DAY), "nothing left to remove");
+        assertEquals(2, service.warningCount(steve), "removed warnings stay in the history");
         io.shutdown(1000);
     }
 
@@ -155,8 +164,8 @@ class ModerationTest {
 
         Punishment first = service.ban(steve, "Steve", "Cheating", "Mod", 7 * DAY);
         String temporary = ChatColor.stripColor(listener.banScreen(first));
-        assertTrue(temporary.contains("YOU ARE BANNED"), temporary);
-        assertTrue(temporary.contains("for another 7 days"), temporary);
+        assertTrue(temporary.contains("You are banned from this server."), temporary);
+        assertTrue(temporary.contains("Time remaining: 7 days"), temporary);
         assertTrue(temporary.contains("Reason: Cheating (1st offence)"), temporary);
         assertTrue(temporary.contains("Banned by: Mod"), temporary);
         assertTrue(temporary.contains("Ban ID: #" + first.id()), temporary);
@@ -165,7 +174,7 @@ class ModerationTest {
 
         Punishment second = service.ban(steve, "Steve", "Cheating", "Mod", Durations.PERMANENT);
         String permanent = ChatColor.stripColor(listener.banScreen(second));
-        assertTrue(permanent.contains("YOU ARE PERMANENTLY BANNED"), permanent);
+        assertTrue(permanent.contains("You are permanently banned from this server."), permanent);
         assertTrue(permanent.contains("Reason: Cheating (2nd offence)"), permanent);
         assertFalse(permanent.contains("{"), permanent);
 
@@ -173,11 +182,15 @@ class ModerationTest {
         service.ban(alex, "Alex", "Speed", ModerationListener.ANTI_CHEAT_STAFF, 30 * DAY);
         Punishment auto = service.ban(alex, "Alex", "Flight", ModerationListener.ANTI_CHEAT_STAFF, Durations.PERMANENT);
         String antiCheat = ChatColor.stripColor(listener.banScreen(auto));
-        assertTrue(antiCheat.contains("BANNED BY THE ANTI-CHEAT"), antiCheat);
+        assertTrue(antiCheat.contains("You have been banned by Vigil Anti-Cheat."), antiCheat);
         assertTrue(antiCheat.contains("Detected: Flight"), antiCheat);
         assertTrue(antiCheat.contains("Length: Permanent (2nd offence)"), "any earlier auto-ban counts: " + antiCheat);
-        assertTrue(antiCheat.contains("Unbanned on: Never"), antiCheat);
+        assertTrue(antiCheat.contains("Expires: Never"), antiCheat);
         assertFalse(antiCheat.contains("{"), antiCheat);
+        for (String screen : List.of(temporary, permanent, antiCheat)) {
+            assertFalse(screen.matches("(?s).*\\b[A-Z]{4,}\\b.*"), "no words in capitals: " + screen);
+            assertFalse(screen.contains("\u26a0"), "no emojis: " + screen);
+        }
         io.shutdown(1000);
     }
 
@@ -223,8 +236,8 @@ class ModerationTest {
         ModerationService service = new ModerationService(LOGGER, io, file);
         service.ban(steve, "Steve", "Cheating", "Mod", 30 * DAY);
         service.mute(alex, "Alex", "Spam", "Mod", Durations.PERMANENT);
-        service.warn(alex, "Alex", "Spam", "Mod");
-        service.warn(alex, "Alex", "Caps", "Mod");
+        service.warn(alex, "Alex", "Spam", "Mod", DAY);
+        service.warn(alex, "Alex", "Caps", "Mod", DAY);
         // Re-banning replaces the previous ban.
         Punishment replacement = service.ban(steve, "Steve", "Duping", "Admin", Durations.PERMANENT);
         assertEquals(replacement, service.activeBan(steve));

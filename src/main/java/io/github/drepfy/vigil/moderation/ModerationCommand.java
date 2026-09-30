@@ -1,6 +1,7 @@
 package io.github.drepfy.vigil.moderation;
 
 import io.github.drepfy.vigil.config.Settings;
+import io.github.drepfy.vigil.util.ActionBar;
 import io.github.drepfy.vigil.util.Text;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -10,6 +11,7 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -24,8 +26,11 @@ import java.util.logging.Logger;
  * <pre>
  * /ban &lt;player&gt; [duration] [reason]      /unban &lt;player&gt; [reason]
  * /mute &lt;player&gt; [duration] [reason]     /unmute &lt;player&gt; [reason]
- * /warn &lt;player&gt; [reason]                /kick &lt;player&gt; [reason]
+ * /warn &lt;player&gt; &lt;time&gt; [reason]         /unwarn &lt;player&gt; [reason]
+ * /kick &lt;player&gt; [reason]
  * </pre>
+ * A warning always needs a time (between {@code moderation.warn-time.min} and
+ * {@code max}, 1h to 10d by default); it stops counting after that time.
  * A reason that matches a preset (e.g. {@code Cheating}) uses the preset's time for the
  * player's next offence (7 days, then 30 days, then permanent...) unless a time is
  * given. Without a reason, "No Reason" is used. Typing a command without arguments
@@ -41,17 +46,22 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
     private static final List<String> DURATION_SUGGESTIONS = List.of("30m", "1h", "6h", "12h", "1d", "3d", "7d",
             "14d", "30d", "perm");
 
+    private static final List<String> WARN_TIME_SUGGESTIONS = List.of("1h", "6h", "12h", "1d", "3d", "7d", "10d");
+
     private record Target(UUID uuid, String name, Player online) {
     }
 
+    private final Plugin plugin;
     private final Supplier<Settings> settings;
     private final ModerationService service;
     private final ModerationListener formatter;
     private final Logger logger;
     private final java.util.function.Consumer<Punishment> discord;
 
-    public ModerationCommand(Supplier<Settings> settings, ModerationService service, ModerationListener formatter,
-                             Logger logger, java.util.function.Consumer<Punishment> discord) {
+    public ModerationCommand(Plugin plugin, Supplier<Settings> settings, ModerationService service,
+                             ModerationListener formatter, Logger logger,
+                             java.util.function.Consumer<Punishment> discord) {
+        this.plugin = plugin;
         this.settings = settings;
         this.service = service;
         this.formatter = formatter;
@@ -75,8 +85,9 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
             case "mute" -> punish(sender, PunishmentType.MUTE, args, label);
             case "unban" -> lift(sender, PunishmentType.UNBAN, args, label);
             case "unmute" -> lift(sender, PunishmentType.UNMUTE, args, label);
-            case "warn" -> warnOrKick(sender, PunishmentType.WARN, args, label);
-            case "kick" -> warnOrKick(sender, PunishmentType.KICK, args, label);
+            case "warn" -> warn(sender, args, label);
+            case "unwarn" -> unwarn(sender, args, label);
+            case "kick" -> kick(sender, args, label);
             default -> {
                 return false;
             }
@@ -143,6 +154,7 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
                 online.kickPlayer(formatter.banScreen(punishment));
             } else {
                 online.sendMessage(Text.color(message("prefix") + formatter.fill(message("mute-notify"), punishment)));
+                ActionBar.show(plugin, online, formatter.fill(message("mute-actionbar"), punishment));
             }
         }
         String key = type.key();
@@ -160,7 +172,7 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
         }
         sender.sendMessage(Text.color(message("presets-header")));
         for (ReasonPreset preset : presets) {
-            String times = preset.durations().isEmpty() ? "" : " &8» &f" + compactLadder(preset);
+            String times = preset.durations().isEmpty() ? "" : " &8- &f" + compactLadder(preset);
             sender.sendMessage(Text.color("  &b" + preset.display() + times));
         }
     }
@@ -170,7 +182,7 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
         for (Long duration : preset.durations()) {
             parts.add(duration == Durations.PERMANENT ? "perm" : Durations.compact(duration));
         }
-        return String.join(" &8→ &f", parts);
+        return String.join("&8, &f", parts);
     }
 
     // ---- unban / unmute --------------------------------------------------------------------------
@@ -209,19 +221,93 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
         Player online = Bukkit.getPlayer(lifted.uuid());
         if (!ban && online != null) {
             online.sendMessage(Text.color(message("prefix") + message("unmute-notify")));
+            ActionBar.show(plugin, online, formatter.fill(message("unmute-actionbar"), lifted));
         }
     }
 
-    // ---- warn / kick ------------------------------------------------------------------------------
+    // ---- warn / unwarn / kick ------------------------------------------------------------------------
 
-    private void warnOrKick(CommandSender sender, PunishmentType type, String[] args, String label) {
+    private void warn(CommandSender sender, String[] args, String label) {
+        Settings.Moderation moderation = settings.get().moderation();
         if (args.length < 1) {
-            usage(sender, label + " <player> [reason]");
-            showPresets(sender, type);
+            usage(sender, label + " <player> <time> [reason]");
+            showPresets(sender, PunishmentType.WARN);
             return;
         }
         Target target = resolve(args[0]);
-        if (target == null || (type == PunishmentType.KICK && target.online() == null)) {
+        if (target == null) {
+            send(sender, Text.replace(message("player-not-found"), "player", args[0]));
+            return;
+        }
+        Long duration = args.length > 1 ? Durations.parse(args[1]) : null;
+        if (duration == null || duration == Durations.PERMANENT
+                || duration < moderation.warnMinMs() || duration > moderation.warnMaxMs()) {
+            String permanent = message("permanent");
+            send(sender, Text.replace(message("warn-time-required"), "player", target.name(),
+                    "min", Durations.format(moderation.warnMinMs(), permanent),
+                    "max", Durations.format(moderation.warnMaxMs(), permanent)));
+            return;
+        }
+        if (!mayPunish(sender, target)) {
+            return;
+        }
+        String input = join(args, 2);
+        String reason = reasonText(ReasonPreset.find(moderation.reasons(PunishmentType.WARN), input), input);
+        Punishment warning = service.warn(target.uuid(), target.name(), reason, staffName(sender), duration);
+        int warnings = activeWarnings(target.uuid());
+        String count = String.valueOf(warnings);
+        Player online = Bukkit.getPlayer(target.uuid());
+        if (online != null) {
+            online.sendMessage(Text.color(message("prefix")
+                    + Text.replace(formatter.fill(message("warn-notify"), warning), "count", count)));
+            ActionBar.show(plugin, online, formatter.fill(message("warn-actionbar"), warning));
+        }
+        send(sender, Text.replace(formatter.fill(message("warn-success"), warning), "count", count));
+        broadcast(sender, Text.replace(formatter.fill(message("warn-broadcast"), warning), "count", count));
+        discord.accept(warning);
+        escalate(sender, target, warnings);
+    }
+
+    private void unwarn(CommandSender sender, String[] args, String label) {
+        if (args.length < 1) {
+            usage(sender, label + " <player> [reason]");
+            return;
+        }
+        Target target = resolve(args[0]);
+        if (target == null) {
+            send(sender, Text.replace(message("player-not-found"), "player", args[0]));
+            return;
+        }
+        String input = join(args, 1);
+        String reason = reasonText(ReasonPreset.find(settings.get().moderation().reasons(PunishmentType.UNWARN), input),
+                input);
+        String staff = staffName(sender);
+        Punishment lifted = service.unwarn(target.uuid(), staff, reason, legacyWarningExpireMs());
+        if (lifted == null) {
+            send(sender, Text.replace(message("not-warned"), "player", target.name()));
+            return;
+        }
+        String count = String.valueOf(activeWarnings(target.uuid()));
+        String text = Text.replace(message("unwarn-success"), "reason", reason, "count", count);
+        String broadcastText = Text.replace(message("unwarn-broadcast"), "reason", reason, "staff", staff);
+        send(sender, formatter.fill(text, lifted));
+        broadcast(sender, formatter.fill(broadcastText, lifted));
+        discord.accept(lifted);
+        Player online = Bukkit.getPlayer(target.uuid());
+        if (online != null) {
+            online.sendMessage(Text.color(message("prefix") + Text.replace(message("unwarn-notify"), "count", count)));
+            ActionBar.show(plugin, online, formatter.fill(message("unwarn-actionbar"), lifted));
+        }
+    }
+
+    private void kick(CommandSender sender, String[] args, String label) {
+        if (args.length < 1) {
+            usage(sender, label + " <player> [reason]");
+            showPresets(sender, PunishmentType.KICK);
+            return;
+        }
+        Target target = resolve(args[0]);
+        if (target == null || target.online() == null) {
             send(sender, Text.replace(message("player-not-found"), "player", args[0]));
             return;
         }
@@ -229,36 +315,23 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
             return;
         }
         String input = join(args, 1);
-        String reason = reasonText(ReasonPreset.find(settings.get().moderation().reasons(type), input), input);
-        String staff = staffName(sender);
-        Punishment punishment;
-        String count = "";
-        int warnings = 0;
-        if (type == PunishmentType.WARN) {
-            punishment = service.warn(target.uuid(), target.name(), reason, staff);
-            warnings = activeWarnings(target.uuid());
-            count = String.valueOf(warnings);
-            if (target.online() != null) {
-                target.online().sendMessage(Text.color(message("prefix")
-                        + Text.replace(formatter.fill(message("warn-notify"), punishment), "count", count)));
-            }
-        } else {
-            punishment = service.kick(target.uuid(), target.name(), reason, staff);
-            target.online().kickPlayer(formatter.screen("kick-screen", punishment));
-        }
-        String key = type.key();
-        send(sender, Text.replace(formatter.fill(message(key + "-success"), punishment), "count", count));
-        broadcast(sender, Text.replace(formatter.fill(message(key + "-broadcast"), punishment), "count", count));
-        discord.accept(punishment);
-        if (type == PunishmentType.WARN) {
-            escalate(sender, target, warnings);
-        }
+        String reason = reasonText(ReasonPreset.find(settings.get().moderation().reasons(PunishmentType.KICK), input),
+                input);
+        Punishment kick = service.kick(target.uuid(), target.name(), reason, staffName(sender));
+        target.online().kickPlayer(formatter.screen("kick-screen", kick));
+        send(sender, formatter.fill(message("kick-success"), kick));
+        broadcast(sender, formatter.fill(message("kick-broadcast"), kick));
+        discord.accept(kick);
     }
 
-    /** Warnings that still count (younger than moderation.warnings-expire-after). */
+    /** Warnings that still count (not removed and not expired). */
     private int activeWarnings(UUID uuid) {
-        long expire = settings.get().moderation().warningsExpireMs();
-        return service.warningCount(uuid, expire == Durations.PERMANENT ? 0L : expire);
+        return service.activeWarnings(uuid, legacyWarningExpireMs()).size();
+    }
+
+    /** How long warnings from before 2.4 (given without a time) count. */
+    private long legacyWarningExpireMs() {
+        return settings.get().moderation().warningsExpireMs();
     }
 
     /** Applies moderation.warn-escalation when a player reaches a number of warnings. */
@@ -373,12 +446,9 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
         return from >= args.length ? "" : String.join(" ", Arrays.copyOfRange(args, from, args.length)).trim();
     }
 
+    /** Every command has its own permission, e.g. {@code vigil.unban}. */
     private static String permission(String command) {
-        return switch (command) {
-            case "unban" -> "vigil.ban";
-            case "unmute" -> "vigil.mute";
-            default -> "vigil." + command;
-        };
+        return "vigil." + command;
     }
 
     private String message(String key) {
@@ -406,6 +476,7 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
             List<String> names = switch (name) {
                 case "unban" -> service.bannedNames();
                 case "unmute" -> service.mutedNames();
+                case "unwarn" -> warnedOnlineNames();
                 default -> onlineNames();
             };
             return filter(names, args[0]);
@@ -421,7 +492,14 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
                     options.addAll(presetNames(moderation.reasons(type)));
                 }
             }
-            case "warn", "kick", "unban", "unmute" -> {
+            case "warn" -> {
+                if (args.length == 2) {
+                    options.addAll(WARN_TIME_SUGGESTIONS);
+                } else if (args.length == 3) {
+                    options.addAll(presetNames(moderation.reasons(PunishmentType.WARN)));
+                }
+            }
+            case "kick", "unban", "unmute", "unwarn" -> {
                 if (args.length == 2) {
                     options.addAll(presetNames(moderation.reasons(PunishmentType.valueOf(name.toUpperCase(Locale.ROOT)))));
                 }
@@ -437,6 +515,16 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
         List<String> names = new ArrayList<>(presets.size());
         for (ReasonPreset preset : presets) {
             names.add(preset.name());
+        }
+        return names;
+    }
+
+    private List<String> warnedOnlineNames() {
+        List<String> names = new ArrayList<>();
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (activeWarnings(player.getUniqueId()) > 0) {
+                names.add(player.getName());
+            }
         }
         return names;
     }

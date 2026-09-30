@@ -132,7 +132,7 @@ public final class AutoBanService {
 
     /**
      * The "caught cheating" effect: a lightning strike (harmless), an explosion cloud,
-     * thunder, and a big red BANNED title on the cheater's screen.
+     * thunder, and a large red "Banned" title on the cheater's screen.
      */
     public void playAnimation(Player player, String reason) {
         Settings.Messages messages = settings.get().messages();

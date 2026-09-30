@@ -33,10 +33,8 @@ import java.util.logging.Level;
  * <pre>
  * /ac alerts                  toggle alerts for yourself          vigil.alerts
  * /ac check &lt;player&gt;          violations, flags and punishments   vigil.check
- * /ac reset &lt;player&gt; [check]  clear violation levels              vigil.admin
- * /ac debug &lt;player&gt; [check]  stream live check values            vigil.admin
- * /ac reload                  reload config.yml                   vigil.admin
- * /ac preview                 watch the ban animation (no ban)    vigil.admin
+ * /ac reload                  reload config.yml                   vigil.reload
+ * /ac preview                 watch the ban animation (no ban)    vigil.preview
  * </pre>
  */
 public final class VigilCommand implements CommandExecutor, TabCompleter {
@@ -50,10 +48,8 @@ public final class VigilCommand implements CommandExecutor, TabCompleter {
     private static final List<SubCommand> SUBCOMMANDS = List.of(
             new SubCommand("alerts", "vigil.alerts", "alerts", "Turn anti-cheat alerts on/off"),
             new SubCommand("check", "vigil.check", "check <player>", "Violations, recent flags and punishments"),
-            new SubCommand("reset", "vigil.admin", "reset <player> [check]", "Clear a player's violation levels"),
-            new SubCommand("debug", "vigil.admin", "debug <player> [check]", "Show live check values (tuning)"),
-            new SubCommand("reload", "vigil.admin", "reload", "Reload config.yml"),
-            new SubCommand("preview", "vigil.admin", "preview", "See the ban animation on yourself (no ban)"));
+            new SubCommand("reload", "vigil.reload", "reload", "Reload config.yml"),
+            new SubCommand("preview", "vigil.preview", "preview", "See the ban animation on yourself (no ban)"));
 
     private final VigilPlugin plugin;
 
@@ -76,8 +72,6 @@ public final class VigilCommand implements CommandExecutor, TabCompleter {
             switch (sub.name()) {
                 case "alerts" -> alerts(sender);
                 case "check" -> check(sender, args, label);
-                case "reset" -> reset(sender, args, label);
-                case "debug" -> debug(sender, args, label);
                 case "reload" -> reload(sender);
                 case "preview" -> preview(sender);
                 default -> help(sender, label);
@@ -96,7 +90,7 @@ public final class VigilCommand implements CommandExecutor, TabCompleter {
         for (SubCommand sub : SUBCOMMANDS) {
             if (sender.hasPermission(sub.permission())) {
                 if (!any) {
-                    send(sender, "&fAnti-cheat &7" + plugin.getDescription().getVersion());
+                    send(sender, "&fVigil &7" + plugin.getDescription().getVersion());
                     any = true;
                 }
                 sender.sendMessage(Text.color(" &b/" + label + " " + sub.usage() + " &8- &7" + sub.description()));
@@ -216,13 +210,16 @@ public final class VigilCommand implements CommandExecutor, TabCompleter {
         Punishment ban = moderation.activeBan(uuid);
         Punishment mute = moderation.activeMute(uuid);
         line(sender, "&7Banned: " + (ban != null ? "&cyes" : "&ano") + " &8| &7Muted: "
-                + (mute != null ? "&cyes" : "&ano") + " &8| &7Warnings: &f" + moderation.warningCount(uuid));
+                + (mute != null ? "&cyes" : "&ano") + " &8| &7Active warnings: &f"
+                + moderation.activeWarnings(uuid, plugin.settings().moderation().warningsExpireMs()).size()
+                + " &8(" + moderation.warningCount(uuid) + " in total)");
         String permanent = message("permanent");
         long now = System.currentTimeMillis();
         for (Punishment p : history.subList(0, Math.min(SHOWN_PUNISHMENTS, history.size()))) {
             StringBuilder text = new StringBuilder(" &8#").append(p.id()).append(" &e")
                     .append(p.type().name().toLowerCase(Locale.ROOT)).append(" &f").append(p.reason());
-            if (p.type() == PunishmentType.BAN || p.type() == PunishmentType.MUTE) {
+            if (p.type() == PunishmentType.BAN || p.type() == PunishmentType.MUTE
+                    || (p.type() == PunishmentType.WARN && p.durationMs() != 0L)) {
                 text.append(" &7(").append(Durations.format(p.durationMs(), permanent)).append(')');
                 text.append(p.revoked() ? " &a[lifted]" : p.isInEffect(now) ? " &c[active]" : " &8[expired]");
             }
@@ -230,58 +227,6 @@ public final class VigilCommand implements CommandExecutor, TabCompleter {
                     .append(" ago");
             line(sender, text.toString());
         }
-    }
-
-    private void reset(CommandSender sender, String[] args, String label) {
-        if (args.length < 2) {
-            usage(sender, label, "reset <player> [check]");
-            return;
-        }
-        Player target = Bukkit.getPlayerExact(args[1]);
-        if (target == null) {
-            send(sender, Text.replace(message("player-not-found"), "player", args[1]));
-            return;
-        }
-        CheckType type = null;
-        if (args.length >= 3) {
-            type = CheckType.fromId(args[2]);
-            if (type == null) {
-                send(sender, "&cUnknown check: &f" + args[2]);
-                return;
-            }
-        }
-        plugin.players().get(target).resetViolations(type);
-        send(sender, "&7Cleared " + (type == null ? "all violation levels" : type.reason() + " violations")
-                + " of &b" + target.getName() + "&7.");
-        plugin.getLogger().info(sender.getName() + " reset " + (type == null ? "all" : type.id()) + " VL of "
-                + target.getName());
-    }
-
-    private void debug(CommandSender sender, String[] args, String label) {
-        if (!(sender instanceof Player viewer)) {
-            send(sender, "&7Only players can view debug output; set advanced.debug for console output.");
-            return;
-        }
-        if (args.length < 2) {
-            usage(sender, label, "debug <player> [check]");
-            return;
-        }
-        Player target = Bukkit.getPlayerExact(args[1]);
-        if (target == null) {
-            send(sender, Text.replace(message("player-not-found"), "player", args[1]));
-            return;
-        }
-        CheckType filter = null;
-        if (args.length >= 3) {
-            filter = CheckType.fromId(args[2]);
-            if (filter == null) {
-                send(sender, "&cUnknown check: &f" + args[2]);
-                return;
-            }
-        }
-        boolean on = plugin.debugService().toggle(viewer.getUniqueId(), target.getUniqueId(), filter);
-        send(sender, (on ? "&aShowing" : "&7Stopped showing") + " debug values of &b" + target.getName()
-                + (filter != null ? " &7(" + filter.displayName() + ")" : "") + "&7.");
     }
 
     private void preview(CommandSender sender) {
@@ -292,7 +237,7 @@ public final class VigilCommand implements CommandExecutor, TabCompleter {
         plugin.autoBan().playAnimation(player, "Flying");
         player.sendMessage(io.github.drepfy.vigil.violation.AutoBanService.banner(plugin.settings(), player.getName(),
                 "Flying", "Flight", "30 days"));
-        send(sender, "&7This is what everyone sees when the anti-cheat bans someone. &8(You were not banned.)");
+        send(sender, "&7This is what players see when the anti-cheat bans someone. &8(You have not been banned.)");
     }
 
     private void reload(CommandSender sender) {
@@ -374,20 +319,12 @@ public final class VigilCommand implements CommandExecutor, TabCompleter {
         if (sub == null || !sender.hasPermission(sub.permission())) {
             return List.of();
         }
-        boolean takesPlayer = sub.name().equals("check") || sub.name().equals("reset") || sub.name().equals("debug");
-        if (args.length == 2 && takesPlayer) {
+        if (args.length == 2 && sub.name().equals("check")) {
             List<String> names = new ArrayList<>();
             for (Player player : Bukkit.getOnlinePlayers()) {
                 names.add(player.getName());
             }
             return filter(names, args[1]);
-        }
-        if (args.length == 3 && (sub.name().equals("reset") || sub.name().equals("debug"))) {
-            List<String> ids = new ArrayList<>();
-            for (CheckType type : CheckType.values()) {
-                ids.add(type.id());
-            }
-            return filter(ids, args[2]);
         }
         return List.of();
     }

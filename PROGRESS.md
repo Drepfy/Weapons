@@ -156,12 +156,32 @@ permission silently bypassed everything.
   parsing and upgrading, and scenarios for escalation, the preset list, warnings,
   the punish menu and the join-time ban screen).
 
+## 2.4.0: no menus, professional messages, timed warnings, LuckPerms nodes
+
+- Removed `/punish` (the only menu), `/ac reset` and `/ac debug`. `advanced.debug`
+  still prints check values to the console.
+- Messages rewritten: no emoji, no words in capitals ("Banned", "You are banned from
+  this server."). The auto-ban notice is headed "Vigil Anti-Cheat". Unedited 2.2/2.3
+  messages are upgraded automatically (the old bundled configs ship in the jar under
+  `upgrade/` so the upgrader can recognise them); edited ones are kept.
+- `/warn <player> <time> [reason]`: the time is required, 1h to 10d
+  (`moderation.warn-time`). A warning counts until its time runs out; pre-2.4
+  warnings count for `warnings-expire-after` (30d). `/unwarn` removes the newest
+  active warning (history kept).
+- Mute, unmute, warn and unwarn show a bold action bar for about 5 seconds (Paper
+  Adventure API, Spigot fallback).
+- Permissions: every command has its own node (`vigil.unban`, `vigil.unmute`,
+  `vigil.unwarn`, `vigil.reload`, `vigil.preview`), grouped in `vigil.staff` and
+  `vigil.admin`; per-check `vigil.bypass.<check>` nodes are declared in plugin.yml.
+  README has LuckPerms group commands.
+- Tests: 113.
+
 ## Remaining / next steps
 
 - Validate on a live server with a hacked client on an alt (see the README
   checklist) and tune `ban-at` values from real alerts.
 - Prediction-based movement (Grim style) would catch subtle speed and strafe
   cheats, but it is a large project.
-- Moderation ideas: IP bans and alt detection, a `/history` page in the punish menu.
+- Moderation ideas: IP bans and alt detection.
 - When `auto-ban.command` hands bans to another plugin, Vigil doesn't store them,
   so the auto-ban ladder always uses its first step.

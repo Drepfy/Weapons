@@ -1,6 +1,6 @@
 # ============================================================
 #  Vigil - anti-cheat and moderation for Vanilla SMP
-#  Commands: /ac  /punish  /ban  /unban  /mute  /unmute  /warn  /kick
+#  Commands: /ac  /ban  /unban  /mute  /unmute  /warn  /unwarn  /kick
 #  After editing, run /ac reload.
 # ============================================================
 config-version: 2
@@ -23,7 +23,7 @@ anticheat:
     # Leave empty to use Vigil's own bans. To use another ban plugin instead, e.g.:
     # command: "tempban {player} {duration} {reason}"
     command: ""
-    # Lightning, explosion and a big "BANNED" title before the cheater is kicked.
+    # Lightning, an explosion and a large "Banned" title before the cheater is kicked.
     animation: true
   # Creative and spectator players are never checked.
   exempt-creative-and-spectator: true
@@ -83,13 +83,15 @@ moderation:
   default-duration:
     ban: perm
     mute: perm
-  # Automatic punishment when a player reaches a number of warnings.
+  # Automatic punishment when a player reaches a number of active warnings.
   warn-escalation:
     3: mute 1h
     5: ban 1d
     7: ban 7d
-  # Warnings older than this no longer count (perm = they never expire).
-  warnings-expire-after: 30d
+  # Every warning needs a time: /warn Steve 1d Spam. It stops counting after that time.
+  warn-time:
+    min: 1h
+    max: 10d
   # Commands muted players cannot use.
   muted-blocked-commands: [msg, tell, w, whisper, r, reply, me, say, mail, m, t, pm, dm, message, emsg, etell, ewhisper, er, ereply]
   # Preset reasons with their time for the 1st, 2nd, 3rd... offence (the last one repeats).
@@ -145,6 +147,7 @@ moderation:
     kick: [AFK, Spam, Toxicity, Glitching, Inappropriate_Skin, Inappropriate_Name, Suspicious_Activity, Staff_Request, Server_Maintenance]
     unban: [Appeal_Accepted, False_Ban, Served_Time, Staff_Decision]
     unmute: [Appeal_Accepted, False_Mute, Served_Time, Staff_Decision]
+    unwarn: [Appeal_Accepted, False_Warning, Staff_Decision]
 
 # Post bans, mutes, warnings and kicks to a Discord channel.
 # Discord: channel settings > Integrations > Webhooks > New Webhook > Copy Webhook URL.
@@ -161,54 +164,68 @@ messages:
   # Shown to everyone when the anti-cheat bans someone.
   auto-banned:
     - "&8&m                                                  "
-    - "&c&l  ⚠ ANTI-CHEAT ⚠"
-    - "&f  {player} &7was caught cheating and banned for &c{reason}&7."
+    - "&c&lVigil &7Anti-Cheat"
+    - "&f{player} &7has been banned for cheating &8(&c{reason}&8)&7."
     - "&8&m                                                  "
-  ban-title: "&c&lBANNED"
-  ban-subtitle: "&7Caught cheating: &c{reason}"
+  # Big text on the cheater's screen during the ban animation.
+  ban-title: "&c&lBanned"
+  ban-subtitle: "&7Detected: &c{reason}"
+  # Kick screen for hacked clients and world downloaders.
   client-blocked:
     - "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ"
-    - ""
-    - "&cYour client or mods are not allowed here."
+    - "&8&m                                    "
+    - "&cYour client is not allowed on this server."
     - ""
     - "&7Detected: &f{client}"
-    - "&7Please join with a normal Minecraft client."
-  client-blocked-alert: "&f{player} &7was kicked for joining with &c{client}&7."
+    - "&7Please reconnect using an unmodified Minecraft client."
+    - "&8&m                                    "
+  client-blocked-alert: "&f{player} &7was disconnected for using &c{client}&7."
+  alerts-enabled: "&aAnti-cheat alerts enabled."
+  alerts-disabled: "&eAnti-cheat alerts disabled."
+  reloaded: "&aConfiguration reloaded. &7({warnings} warning(s), see console)"
+  reload-failed: "&cReload failed, previous configuration kept: &f{error}"
+  no-permission: "&cYou do not have permission to do that."
+  player-not-found: "&cPlayer not found: &f{player}"
+  no-reason: "No Reason"
+  permanent: "Permanent"
   ban-success: "&7You have banned player &b{player} &7for &b{reason} &7for &b{duration}&7. &8({offence} offence, #{id})"
   unban-success: "&7You have unbanned player &b{player} &7for &b{reason}&7."
   mute-success: "&7You have muted player &b{player} &7for &b{reason} &7for &b{duration}&7. &8({offence} offence, #{id})"
   unmute-success: "&7You have unmuted player &b{player} &7for &b{reason}&7."
-  warn-success: "&7You have warned player &b{player} &7for &b{reason}&7. &8(warning #{count})"
+  warn-success: "&7You have warned player &b{player} &7for &b{reason} &7for &b{duration}&7. &8(active warnings: {count}, #{id})"
+  unwarn-success: "&7You have removed a warning from &b{player} &7for &b{reason}&7. &8(active warnings: {count})"
   kick-success: "&7You have kicked player &b{player} &7for &b{reason}&7."
   ban-broadcast: "&b{staff} &7banned &b{player} &7for &b{reason} &7for &b{duration}&7."
   unban-broadcast: "&b{staff} &7unbanned &b{player} &7for &b{reason}&7."
   mute-broadcast: "&b{staff} &7muted &b{player} &7for &b{reason} &7for &b{duration}&7."
   unmute-broadcast: "&b{staff} &7unmuted &b{player} &7for &b{reason}&7."
-  warn-broadcast: "&b{staff} &7warned &b{player} &7for &b{reason}&7."
+  warn-broadcast: "&b{staff} &7warned &b{player} &7for &b{reason} &7for &b{duration}&7."
+  unwarn-broadcast: "&b{staff} &7removed a warning from &b{player} &7for &b{reason}&7."
   kick-broadcast: "&b{staff} &7kicked &b{player} &7for &b{reason}&7."
   # Shown to a banned player who tries to join (temporary ban).
   ban-screen:
     - "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ"
     - "&8&m                                    "
-    - "&c&lYOU ARE BANNED"
-    - "&7for another &f{expires}"
+    - "&cYou are banned from this server."
+    - "&7Time remaining: &f{expires}"
     - ""
     - "&7Reason: &f{reason} &8({offence} offence)"
     - "&7Banned by: &f{staff}"
-    - "&7Banned on: &f{date}"
-    - "&7Unbanned on: &f{expires-date}"
+    - "&7Date: &f{date}"
+    - "&7Expires: &f{expires-date}"
     - "&7Ban ID: &f#{id}"
     - ""
     - "&7Appeal: &b{appeal}"
     - "&8&m                                    "
+  # Permanent bans.
   ban-screen-permanent:
     - "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ"
     - "&8&m                                    "
-    - "&4&lYOU ARE PERMANENTLY BANNED"
+    - "&cYou are permanently banned from this server."
     - ""
     - "&7Reason: &f{reason} &8({offence} offence)"
     - "&7Banned by: &f{staff}"
-    - "&7Banned on: &f{date}"
+    - "&7Date: &f{date}"
     - "&7Ban ID: &f#{id}"
     - ""
     - "&7Appeal: &b{appeal}"
@@ -217,44 +234,45 @@ messages:
   ban-screen-anticheat:
     - "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ"
     - "&8&m                                    "
-    - "&c&l⚠ BANNED BY THE ANTI-CHEAT ⚠"
+    - "&cYou have been banned by Vigil Anti-Cheat."
     - ""
     - "&7Detected: &f{reason}"
     - "&7Length: &f{duration} &8({offence} offence)"
-    - "&7Banned on: &f{date}"
-    - "&7Unbanned on: &f{expires-date}"
+    - "&7Date: &f{date}"
+    - "&7Expires: &f{expires-date}"
     - "&7Ban ID: &f#{id}"
     - ""
-    - "&7Think this is a mistake? Appeal: &b{appeal}"
+    - "&7If you believe this is a mistake, you may appeal: &b{appeal}"
     - "&8&m                                    "
   kick-screen:
     - "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ"
     - "&8&m                                    "
-    - "&e&lYOU WERE KICKED"
+    - "&eYou have been kicked from this server."
     - ""
     - "&7Reason: &f{reason}"
     - "&7Kicked by: &f{staff}"
     - ""
-    - "&7You can join again right away."
+    - "&7You may reconnect at any time."
     - "&8&m                                    "
   mute-notify: "&cYou have been muted for &f{reason}&c. &7Length: &f{duration} &8(until {expires-date})"
   muted-chat: "&cYou are muted for &f{reason}&c. &7Unmuted in &f{expires}&7."
   unmute-notify: "&aYou have been unmuted."
-  warn-notify: "&cYou have been warned for &f{reason}&c. &7(warning #{count})"
-  warn-escalation-reason: "Too many warnings ({count})"
-  presets-header: "&7Preset reasons &8(time for the 1st → 2nd → 3rd offence...)&7:"
-  no-reason: "No Reason"
-  permanent: "Permanent"
-  never: "Never"
-  no-permission: "&cYou do not have permission to do that."
-  player-not-found: "&cPlayer not found: &f{player}"
+  warn-notify: "&cYou have been warned for &f{reason}&c. &7This warning expires in &f{duration}&7. &8(active warnings: {count})"
+  unwarn-notify: "&aOne of your warnings has been removed. &7(active warnings: {count})"
+  # Shown in bold above the hotbar for a few seconds ("" = off).
+  mute-actionbar: "&c&lYou have been muted for {reason}"
+  unmute-actionbar: "&a&lYou have been unmuted"
+  warn-actionbar: "&c&lYou have been warned for {reason}"
+  unwarn-actionbar: "&a&lA warning has been removed"
+  # /warn without a valid time. {min} and {max} come from moderation.warn-time.
+  warn-time-required: "&cA warning needs a time between &f{min} &cand &f{max}&c, for example: &f/warn {player} 1d Spam"
   not-banned: "&c{player} is not banned."
   not-muted: "&c{player} is not muted."
+  not-warned: "&c{player} has no active warnings."
   cannot-punish: "&cYou cannot punish {player}."
-  alerts-enabled: "&aAnti-cheat alerts enabled."
-  alerts-disabled: "&eAnti-cheat alerts disabled."
-  reloaded: "&aConfiguration reloaded. &7({warnings} warning(s), see console)"
-  reload-failed: "&cReload failed, previous configuration kept: &f{error}"
   moderation-disabled: "&cModeration commands are disabled in the configuration."
+  never: "Never"
+  presets-header: "&7Preset reasons &8(time for the 1st, 2nd, 3rd offence...)&7:"
+  warn-escalation-reason: "Too many warnings ({count})"
 
 # Fine-tuning (lag protection, per-check thresholds...) is optional and described in the README.

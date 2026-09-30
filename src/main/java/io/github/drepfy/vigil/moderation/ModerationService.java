@@ -58,9 +58,33 @@ public final class ModerationService {
         return place(PunishmentType.MUTE, activeMutes, uuid, name, reason, staff, durationMs);
     }
 
-    public Punishment warn(UUID uuid, String name, String reason, String staff) {
+    /** A warning that counts for {@code durationMs}. */
+    public Punishment warn(UUID uuid, String name, String reason, String staff, long durationMs) {
         return record(new Punishment(nextId++, PunishmentType.WARN, uuid, name, reason, staff,
-                System.currentTimeMillis(), 0L, false, null, null, 0L));
+                System.currentTimeMillis(), durationMs, false, null, null, 0L));
+    }
+
+    /**
+     * Removes the newest warning that still counts.
+     *
+     * @param legacyExpireMs how long warnings from before 2.4 (without their own time) count
+     * @return the removed warning, or {@code null} if the player has none
+     */
+    public Punishment unwarn(UUID uuid, String staff, String reason, long legacyExpireMs) {
+        Punishment newest = null;
+        for (Punishment punishment : activeWarnings(uuid, legacyExpireMs)) {
+            if (newest == null || punishment.id() > newest.id()) {
+                newest = punishment;
+            }
+        }
+        if (newest == null) {
+            return null;
+        }
+        Punishment lifted = newest.revoke(staff, reason, System.currentTimeMillis());
+        all.put(lifted.id(), lifted);
+        dirty = true;
+        saveIfDirty();
+        return lifted;
     }
 
     public Punishment kick(UUID uuid, String name, String reason, String staff) {
@@ -117,21 +141,36 @@ public final class ModerationService {
         return result;
     }
 
+    /** Every warning the player ever got (also expired and removed ones). */
     public int warningCount(UUID uuid) {
-        return warningCount(uuid, 0L);
-    }
-
-    /** Warnings given within the last {@code withinMs} (0 = all of them). */
-    public int warningCount(UUID uuid, long withinMs) {
-        long since = withinMs > 0 ? System.currentTimeMillis() - withinMs : Long.MIN_VALUE;
         int count = 0;
         for (Punishment punishment : all.values()) {
-            if (punishment.type() == PunishmentType.WARN && punishment.uuid().equals(uuid)
-                    && punishment.createdEpochMs() >= since) {
+            if (punishment.type() == PunishmentType.WARN && punishment.uuid().equals(uuid)) {
                 count++;
             }
         }
         return count;
+    }
+
+    /**
+     * Warnings that still count: not removed and not expired.
+     *
+     * @param legacyExpireMs how long warnings from before 2.4 (without their own time) count
+     */
+    public List<Punishment> activeWarnings(UUID uuid, long legacyExpireMs) {
+        long now = System.currentTimeMillis();
+        List<Punishment> result = new ArrayList<>();
+        for (Punishment punishment : all.values()) {
+            if (punishment.type() != PunishmentType.WARN || !punishment.uuid().equals(uuid) || punishment.revoked()) {
+                continue;
+            }
+            boolean counts = punishment.durationMs() != 0L ? punishment.isInEffect(now)
+                    : legacyExpireMs == Durations.PERMANENT || now < punishment.createdEpochMs() + legacyExpireMs;
+            if (counts) {
+                result.add(punishment);
+            }
+        }
+        return result;
     }
 
     /**

@@ -180,6 +180,8 @@ class ConfigLoaderTest {
         assertEquals("discord.gg/example", moderation.appeal());
         assertEquals("yyyy-MM-dd", moderation.dateFormat());
         assertEquals(Durations.PERMANENT, moderation.warningsExpireMs());
+        assertEquals(3_600_000L, moderation.warnMinMs(), "default warn-time.min is 1h");
+        assertEquals(10 * day, moderation.warnMaxMs(), "default warn-time.max is 10d");
         assertEquals(new Settings.WarnStep(2, PunishmentType.KICK, Durations.PERMANENT), moderation.warnStep(2));
         assertEquals(new Settings.WarnStep(4, PunishmentType.MUTE, 30 * 60_000L), moderation.warnStep(4));
         assertEquals(new Settings.WarnStep(6, PunishmentType.BAN, Durations.PERMANENT), moderation.warnStep(6));
@@ -192,6 +194,24 @@ class ConfigLoaderTest {
         assertTrue(settings.discord().alerts());
         assertTrue(settings.discord().punishments());
         assertFalse(ConfigLoader.defaults(new java.util.ArrayList<>()).discord().enabled(), "off without a webhook");
+    }
+
+    @Test
+    void warnTimeLimitsAreValidated() throws Exception {
+        Settings custom = ConfigLoader.load(yaml("""
+                moderation:
+                  warn-time: {min: 30m, max: 14d}
+                """));
+        assertEquals(30 * 60_000L, custom.moderation().warnMinMs());
+        assertEquals(14L * 24 * 3600 * 1000, custom.moderation().warnMaxMs());
+        assertEquals(List.of(), custom.warnings());
+        Settings bad = ConfigLoader.load(yaml("""
+                moderation:
+                  warn-time: {min: 10d, max: 1h}
+                """));
+        assertEquals(ConfigLoader.DEFAULT_WARN_MIN_MS, bad.moderation().warnMinMs());
+        assertEquals(ConfigLoader.DEFAULT_WARN_MAX_MS, bad.moderation().warnMaxMs());
+        assertEquals(1, bad.warnings().size(), bad.warnings().toString());
     }
 
     @Test
