@@ -1,0 +1,347 @@
+package io.github.drepfy.combat;
+
+import io.github.drepfy.combat.config.Settings;
+import io.github.drepfy.combat.config.SettingsLoader;
+import io.github.drepfy.combat.util.ActionBar;
+import io.github.drepfy.combat.util.Text;
+import org.bukkit.Bukkit;
+import org.bukkit.Material;
+import org.bukkit.command.PluginCommand;
+import org.bukkit.configuration.InvalidConfigurationException;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Player;
+import org.bukkit.plugin.ServicePriority;
+import org.bukkit.plugin.java.JavaPlugin;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.function.LongSupplier;
+
+/**
+ * Combat timer and Ender Pearl cooldown.
+ *
+ * <ul>
+ *   <li>Hitting a player puts both in combat for 60 seconds, shown above the hotbar
+ *   ({@code ⚔ Combat: 45s}). Nothing but time, death or the kill rule ends it.</li>
+ *   <li>Killing a player who wears armor ends your combat with them; killing a naked player
+ *   does not.</li>
+ *   <li>Ender Pearls have a 15 second cooldown per player.</li>
+ *   <li>Both are kept on the server and survive reconnects and restarts. Commands, shops and
+ *   menus are never blocked.</li>
+ * </ul>
+ *
+ * <p>Other plugins: {@code Bukkit.getServicesManager().load(CombatPlugin.class).isInCombat(player)}.
+ */
+public class CombatPlugin extends JavaPlugin {
+
+    private record Shown(int seconds, long at) {
+    }
+
+    private volatile Settings settings;
+    private volatile LongSupplier clock = System::currentTimeMillis;
+    private final CombatTracker tracker = new CombatTracker();
+    /** When each player's Ender Pearl cooldown ends (wall clock, so it also runs while offline). */
+    private final Map<UUID, Long> pearls = new HashMap<>();
+    private final Map<UUID, Shown> shown = new HashMap<>();
+    private final Map<UUID, Long> lastRefusal = new HashMap<>();
+    private CombatListener combatListener;
+    private DataFile data;
+    private ExecutorService io;
+    private boolean dirty;
+    private long ticks;
+
+    @Override
+    public void onEnable() {
+        saveDefaultConfig();
+        settings = readSettings(false);
+        settings.warnings().forEach(warning -> getLogger().warning("[config] " + warning));
+        io = Executors.newSingleThreadExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "Combat-IO");
+            thread.setDaemon(true);
+            return thread;
+        });
+        data = new DataFile(getDataFolder().toPath().resolve("data.yml"), getLogger());
+        data.load(tracker, pearls, now());
+
+        combatListener = new CombatListener(this);
+        getServer().getPluginManager().registerEvents(combatListener, this);
+        getServer().getPluginManager().registerEvents(new PearlListener(this), this);
+        CombatCommand command = new CombatCommand(this);
+        PluginCommand pluginCommand = getCommand("combat");
+        if (pluginCommand != null) {
+            pluginCommand.setExecutor(command);
+            pluginCommand.setTabCompleter(command);
+        }
+        getServer().getServicesManager().register(CombatPlugin.class, this, this, ServicePriority.Normal);
+
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            loggedIn(player); // After /reload.
+        }
+        Bukkit.getScheduler().runTaskTimer(this, this::tick, 1L, 1L);
+        getLogger().info("Enabled: combat " + settings.combatMs() / 1000 + "s, Ender Pearl cooldown "
+                + settings.pearlMs() / 1000 + "s, logging out in combat: "
+                + settings.logout().name().toLowerCase(java.util.Locale.ROOT) + ".");
+    }
+
+    @Override
+    public void onDisable() {
+        if (data == null) {
+            return;
+        }
+        long now = now();
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            tracker.pause(player.getUniqueId(), now);
+            ActionBar.clear(player);
+        }
+        io.shutdown();
+        try {
+            io.awaitTermination(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        data.write(data.snapshot(tracker, pearls, now));
+        getServer().getServicesManager().unregisterAll(this);
+    }
+
+    // ---- combat ------------------------------------------------------------------------------------
+
+    /** {@code attacker} hurt {@code victim}: both are in combat with each other. */
+    void fight(Player attacker, Player victim) {
+        if (attacker == null || attacker.equals(victim) || attacker.hasMetadata("NPC") || victim.hasMetadata("NPC")) {
+            return;
+        }
+        long now = now();
+        long duration = settings.combatMs();
+        tracker.tag(attacker.getUniqueId(), victim.getUniqueId(), now, duration);
+        tracker.tag(victim.getUniqueId(), attacker.getUniqueId(), now, duration);
+        dirty = true;
+    }
+
+    /** Ends all of a player's combat (death, or staff). */
+    void endCombat(Player player, boolean tell) {
+        boolean wasTold = tracker.announced(player.getUniqueId());
+        tracker.clear(player.getUniqueId());
+        shown.remove(player.getUniqueId());
+        dirty = true;
+        if (player.isOnline()) {
+            ActionBar.clear(player);
+            if (tell && wasTold) {
+                send(player, "combat-end");
+            }
+        }
+    }
+
+    void loggedOut(Player player, boolean kicked) {
+        long now = now();
+        UUID uuid = player.getUniqueId();
+        if (tracker.inCombat(uuid, now) && settings.logout() == Settings.LogoutRule.KILL && !kicked
+                && !serverStopping() && !player.isDead()) {
+            String text = Text.color(message("prefix")) + Text.format(message("combat-logout-kill"),
+                    "player", player.getName());
+            for (Player online : Bukkit.getOnlinePlayers()) {
+                if (!online.equals(player)) {
+                    online.sendMessage(text);
+                }
+            }
+            getLogger().info(player.getName() + " logged out in combat and was killed.");
+            player.setHealth(0.0);
+        }
+        tracker.pause(uuid, now);
+        shown.remove(uuid);
+        lastRefusal.remove(uuid);
+        dirty = true;
+    }
+
+    void loggedIn(Player player) {
+        long now = now();
+        UUID uuid = player.getUniqueId();
+        tracker.resume(uuid, now);
+        long left = tracker.remaining(uuid, now);
+        if (left > 0) {
+            send(player, "combat-rejoin", "seconds", seconds(left));
+        }
+        showPearlCooldown(player, pearlCooldown(player));
+    }
+
+    /** Every tick: end finished fights and keep the action bar up to date. */
+    private void tick() {
+        long now = now();
+        for (UUID uuid : tracker.expire(now)) {
+            shown.remove(uuid);
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null) {
+                ActionBar.clear(player);
+                send(player, "combat-end");
+            }
+            dirty = true;
+        }
+        for (UUID uuid : new ArrayList<>(tracker.players())) {
+            Player player = Bukkit.getPlayer(uuid);
+            long left = tracker.remaining(uuid, now);
+            if (player == null || left <= 0) {
+                continue;
+            }
+            if (tracker.announce(uuid)) {
+                send(player, "combat-start");
+            }
+            int seconds = seconds(left);
+            Shown last = shown.get(uuid);
+            // Every new second, and at least once a second so the bar never fades.
+            if (last == null || last.seconds() != seconds || now - last.at() >= 1000) {
+                ActionBar.send(player, Text.format(message("action-bar"), "seconds", seconds));
+                shown.put(uuid, new Shown(seconds, now));
+            }
+        }
+        if (++ticks % 100 == 0) {
+            combatListener.forgetOld(now);
+            pearls.values().removeIf(until -> until <= now);
+            save();
+        }
+    }
+
+    // ---- Ender Pearls ---------------------------------------------------------------------------------
+
+    /** Milliseconds until the player may throw an Ender Pearl (0 = now). */
+    public long pearlCooldown(Player player) {
+        Long until = pearls.get(player.getUniqueId());
+        return until == null ? 0L : Math.max(0L, until - now());
+    }
+
+    void pearlThrown(Player player) {
+        long cooldown = settings.pearlMs();
+        if (cooldown <= 0) {
+            return;
+        }
+        pearls.put(player.getUniqueId(), now() + cooldown);
+        dirty = true;
+        showPearlCooldown(player, cooldown);
+        // The game sets its own 1 second cooldown after the throw; replace it with ours.
+        Bukkit.getScheduler().runTask(this, () -> showPearlCooldown(player, pearlCooldown(player)));
+    }
+
+    void pearlRefused(Player player, long left) {
+        showPearlCooldown(player, left);
+        long now = now();
+        Long last = lastRefusal.get(player.getUniqueId());
+        if (last == null || now - last >= 1000 || now < last) {
+            lastRefusal.put(player.getUniqueId(), now);
+            send(player, "pearl-cooldown", "seconds", seconds(left));
+        }
+    }
+
+    /** The grey sweep over the pearl in the hotbar. Only for show: the server enforces the cooldown itself. */
+    private void showPearlCooldown(Player player, long left) {
+        if (settings.pearlOverlay() && left > 0 && player.isOnline()) {
+            try {
+                itemCooldown.accept(player, (int) Math.min(Integer.MAX_VALUE, (left + 49) / 50));
+            } catch (RuntimeException | LinkageError ignored) {
+                // A server without item cooldowns: the pearl is still refused.
+            }
+        }
+    }
+
+    /** Sets the client's item cooldown (replaced in tests). */
+    java.util.function.ObjIntConsumer<Player> itemCooldown =
+            (player, ticks) -> player.setCooldown(Material.ENDER_PEARL, ticks);
+
+    // ---- API -------------------------------------------------------------------------------------------
+
+    public boolean isInCombat(Player player) {
+        return tracker.inCombat(player.getUniqueId(), now());
+    }
+
+    /** Milliseconds of combat left (0 = not in combat). */
+    public long combatRemaining(Player player) {
+        return tracker.remaining(player.getUniqueId(), now());
+    }
+
+    // ---- shared -----------------------------------------------------------------------------------------
+
+    /**
+     * Reads config.yml again.
+     *
+     * @return the warnings
+     */
+    public List<String> reload() {
+        settings = readSettings(true);
+        settings.warnings().forEach(warning -> getLogger().warning("[config] " + warning));
+        return settings.warnings();
+    }
+
+    private Settings readSettings(boolean reloading) {
+        File file = new File(getDataFolder(), "config.yml");
+        YamlConfiguration yaml = new YamlConfiguration();
+        try {
+            yaml.load(file);
+            return SettingsLoader.load(yaml);
+        } catch (IOException | InvalidConfigurationException | RuntimeException e) {
+            if (reloading) {
+                throw new IllegalStateException(e.getMessage(), e);
+            }
+            getLogger().severe("config.yml could not be read (" + e.getMessage() + "); using the defaults.");
+            return SettingsLoader.load(new YamlConfiguration());
+        }
+    }
+
+    private void save() {
+        if (!dirty || io.isShutdown()) {
+            return;
+        }
+        dirty = false;
+        String snapshot = data.snapshot(tracker, pearls, now());
+        try {
+            io.execute(() -> data.write(snapshot));
+        } catch (java.util.concurrent.RejectedExecutionException e) {
+            dirty = true;
+        }
+    }
+
+    /** Paper knows when the server is shutting down (everyone is kicked, nobody logged out to escape). */
+    private static boolean serverStopping() {
+        try {
+            return (boolean) Bukkit.getServer().getClass().getMethod("isStopping").invoke(Bukkit.getServer());
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            return false;
+        }
+    }
+
+    static int seconds(long millis) {
+        return (int) ((millis + 999) / 1000);
+    }
+
+    String message(String key) {
+        return settings.messages().get(key);
+    }
+
+    void send(Player player, String key, Object... pairs) {
+        String template = message(key);
+        if (template != null && !template.isEmpty()) {
+            player.sendMessage(Text.color(message("prefix")) + Text.format(template, pairs));
+        }
+    }
+
+    public Settings settings() {
+        return settings;
+    }
+
+    CombatTracker tracker() {
+        return tracker;
+    }
+
+    public long now() {
+        return clock.getAsLong();
+    }
+
+    /** Tests only. */
+    void setClock(LongSupplier clock) {
+        this.clock = clock;
+    }
+}

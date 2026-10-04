@@ -1,0 +1,21 @@
+name: Combat
+version: '${project.version}'
+main: io.github.drepfy.combat.CombatPlugin
+api-version: '1.20'
+description: 60 second combat timer above the hotbar and a 15 second Ender Pearl cooldown, with no ways around them.
+authors: [Drepfy]
+
+commands:
+  combat:
+    description: Your combat time and Ender Pearl cooldown. Staff can check, tag and untag players.
+    usage: /<command> [info|tag|untag <player> | reload]
+    aliases: [ct, combattag]
+    permission: combat.status
+
+permissions:
+  combat.status:
+    description: Use /combat to see your own combat time and pearl cooldown.
+    default: true
+  combat.admin:
+    description: /combat info, tag, untag and reload.
+    default: op

@@ -18,6 +18,8 @@ jobs:
         run: mvn -B package
       - name: Build and test Lifesteal
         run: mvn -B -f lifesteal/pom.xml package
+      - name: Build and test Combat
+        run: mvn -B -f combat/pom.xml package
       - uses: actions/upload-artifact@v4
         with:
           name: Vigil
@@ -26,3 +28,7 @@ jobs:
         with:
           name: Lifesteal
           path: lifesteal/target/Lifesteal-*.jar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Combat
+          path: combat/target/Combat-*.jar

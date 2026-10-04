@@ -1,0 +1,39 @@
+# Combat. After editing, run /combat reload.
+prefix: "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ » &r"
+
+combat:
+  # How long a player stays in combat after the last hit (given or taken).
+  duration: 60s
+  # Killing a player who wears armor ends your combat with them. Killing a naked player does not.
+  #   armor-pieces: a helmet, chestplate, leggings or boots counts as armor (an elytra, pumpkin
+  #                 or head does not)
+  #   any-item:     anything in those four slots counts
+  armor: armor-pieces
+  # Logging out never ends combat: the timer is paused and continues when the player is back.
+  #   keep: nothing else happens (default)
+  #   kill: the player also dies where they logged out and drops their items (not when they
+  #         are kicked or the server stops)
+  logout: keep
+
+ender-pearl:
+  # Time between two Ender Pearls, per player. 0s = no cooldown.
+  cooldown: 15s
+  # Show the cooldown on the pearl in the hotbar (the grey sweep).
+  show-on-item: true
+
+# {seconds} = seconds left. Set a message to "" to turn it off.
+messages:
+  # Above the hotbar while in combat, updated every second.
+  action-bar: "&c⚔ Combat: &f{seconds}s"
+  combat-start: "&cYou are in combat. Logging out will not end it."
+  combat-end: "&aYou are no longer in combat."
+  combat-rejoin: "&cYou are still in combat: &f{seconds}s&c left."
+  combat-logout-kill: "&c{player} logged out during combat and died."
+  pearl-cooldown: "&cYou can use an Ender Pearl again in &f{seconds}s&c."
+  status-combat: "&7Combat: &c{seconds}s left"
+  status-no-combat: "&7Combat: &anot in combat"
+  status-pearl: "&7Ender Pearl: &c{seconds}s"
+  status-pearl-ready: "&7Ender Pearl: &aready"
+  no-permission: "&cYou do not have permission to do that."
+  player-not-found: "&cPlayer not found: &f{player}"
+  reloaded: "&aCombat reloaded. &7({warnings} warning(s), see console)"
