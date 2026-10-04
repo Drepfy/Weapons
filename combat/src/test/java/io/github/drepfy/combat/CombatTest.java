@@ -773,4 +773,22 @@ class CombatTest {
         assertTrue(inCombat(steve), "players cannot untag themselves");
         assertTrue(has(chat(steve), "You do not have permission"));
     }
+
+    @Test
+    void anotherPluginsActionBarIsLeftAlone() {
+        PlayerMock steve = player("Steve");
+        PlayerMock alex = player("Alex");
+        hit(steve, alex);
+        tick(2);
+        assertTrue(has(bars(steve), "Combat: 60s"));
+        // The Legendary plugin draws the bar itself (with the combat time in it) while a weapon is held.
+        steve.setMetadata(CombatPlugin.BAR_CLAIM, new org.bukkit.metadata.FixedMetadataValue(plugin,
+                System.currentTimeMillis() + 60_000));
+        seconds(3);
+        assertTrue(bars(steve).isEmpty(), "Combat stays out of the way");
+        assertTrue(inCombat(steve), "but the fight goes on");
+        steve.removeMetadata(CombatPlugin.BAR_CLAIM, plugin);
+        tick(1);
+        assertTrue(has(bars(steve), "Combat: 57s"), "and it takes the bar back at once");
+    }
 }

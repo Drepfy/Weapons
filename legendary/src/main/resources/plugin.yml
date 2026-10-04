@@ -1,0 +1,46 @@
+name: Legendary
+version: '${project.version}'
+main: io.github.drepfy.legendary.LegendaryPlugin
+api-version: '1.21'
+description: Five legendary netherite weapons with their own abilities, tracked so they cannot be duplicated, stored or passed between alts.
+authors: [Drepfy]
+softdepend: [Combat]
+
+commands:
+  legendary:
+    description: Legendary weapons. Staff can give, remove, list and inspect them.
+    usage: /<command> [give <player> <weapon> | remove <player|*> <weapon|all> | list | inspect <player> | reload]
+    aliases: [legendaries, lw]
+
+permissions:
+  legendary.admin:
+    description: Every Legendary staff command and alert.
+    default: op
+    children:
+      legendary.give: true
+      legendary.remove: true
+      legendary.list: true
+      legendary.inspect: true
+      legendary.reload: true
+      legendary.alerts: true
+  legendary.give:
+    description: /legendary give <player> <weapon>
+    default: op
+  legendary.remove:
+    description: /legendary remove <player|*> <weapon|all> (also works on offline players)
+    default: op
+  legendary.list:
+    description: /legendary list (every legendary and where it is)
+    default: op
+  legendary.inspect:
+    description: /legendary inspect <player> (their legendaries and cooldowns)
+    default: op
+  legendary.reload:
+    description: /legendary reload
+    default: op
+  legendary.alerts:
+    description: See duplicate, storage and alt-transfer alerts.
+    default: op
+  legendary.bypass.alts:
+    description: May pick up legendaries dropped by an account on the same IP (for siblings on one network).
+    default: false

@@ -186,7 +186,9 @@ public class CombatPlugin extends JavaPlugin {
             shown.remove(uuid);
             Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
-                ActionBar.clear(player);
+                if (!barClaimed(player)) {
+                    ActionBar.clear(player);
+                }
                 send(player, "combat-end");
             }
             dirty = true;
@@ -199,6 +201,11 @@ public class CombatPlugin extends JavaPlugin {
             }
             if (tracker.announce(uuid)) {
                 send(player, "combat-start");
+            }
+            if (barClaimed(player)) {
+                // Another plugin shows the combat time in its own bar (Legendary weapons).
+                shown.remove(uuid);
+                continue;
             }
             int seconds = seconds(left);
             Shown last = shown.get(uuid);
@@ -346,6 +353,22 @@ public class CombatPlugin extends JavaPlugin {
     /** Sets the client's item cooldown (replaced in tests). */
     java.util.function.ObjIntConsumer<Player> itemCooldown =
             (player, ticks) -> player.setCooldown(Material.ENDER_PEARL, ticks);
+
+    /**
+     * Player metadata another plugin sets while it draws the action bar itself; its value is
+     * the epoch millisecond it expires. The Legendary plugin uses it and puts the combat time
+     * in front of its own bar, so the two never keep replacing each other.
+     */
+    public static final String BAR_CLAIM = "vanillasmp:actionbar";
+
+    static boolean barClaimed(Player player) {
+        for (org.bukkit.metadata.MetadataValue value : player.getMetadata(BAR_CLAIM)) {
+            if (value.value() instanceof Long until && until > System.currentTimeMillis()) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     // ---- API -------------------------------------------------------------------------------------------
 

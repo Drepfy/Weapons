@@ -1,0 +1,353 @@
+# Legendary Weapons. After editing, run /legendary reload.
+#
+# Controls: right-click uses a weapon's first ability, sneak + right-click its second
+# (Kurogane and Gravebreaker have one ability and a passive). Times: 8s, 2.5s, 1m, 30d.
+prefix: "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ » &r"
+
+# Only one of each weapon can exist. /legendary give refuses a second Kurogane while the first
+# is still around; remove it first (/legendary remove), or give a new one if it was lost.
+one-of-each: true
+
+# Legendaries always drop on the ground when their holder dies, even with keepInventory on,
+# so they can be won. They never go into grave or death-chest plugins either way.
+# false = they follow keepInventory (kept when it is on, dropped on the ground when it is off).
+drop-on-death: true
+
+# Stops a legendary being passed between accounts of the same person (alts used as storage):
+# a weapon dropped by, or taken from, an account cannot be picked up by another account that
+# joined from the same IP address. Give a player legendary.bypass.alts to allow it (siblings).
+alt-protection:
+  enabled: true
+  # How long a player's IP addresses are remembered (only salted hashes are stored).
+  remember-ip: 30d
+  # An address used by more accounts than this is a shared network (school, hotel): ignored.
+  max-accounts-per-ip: 3
+
+# Commands that cannot be used while carrying a legendary (selling it, auction houses...).
+# Matched against the start of the command, without the slash.
+blocked-commands:
+  - "ah sell"
+  - "ah list"
+  - "auction sell"
+  - "auctionhouse sell"
+  - "sell"
+  - "sellhand"
+  - "sellall"
+
+# What the abilities hit besides players: hostile (monsters), all (every mob) or none.
+hit-mobs: hostile
+
+display:
+  # Ability cooldowns above the hotbar while holding a legendary (shares the bar with the
+  # Combat plugin's combat timer).
+  action-bar: true
+  # A soft chime when an ability is ready again (only while holding the weapon).
+  ready-sound: true
+
+# Each weapon: its name and lore ({id} = its tracking number, {<ability>.<setting>} = a value
+# below), resource pack model, enchantments and abilities. Damage is in health points
+# (2 = one heart) and is reduced by armour like a sword hit.
+weapons:
+  kurogane:
+    name: "<gradient:#F5F5F5:#C21E3A>&lKurogane</gradient>"
+    custom-model-data: 1001
+    # 1.21.4+ resource packs: an item model such as "vanillasmp:kurogane". Empty = none.
+    item-model: ""
+    unbreakable: true
+    enchantments:
+      sharpness: 6
+    lore:
+      - "&8Legendary Katana"
+      - ""
+      - "&7&o\"Steel folded a thousand times;"
+      - "&7&oit remembers every cut.\""
+      - ""
+      - "&c&lRIGHT-CLICK &8» &fCrescent Draw"
+      - "&7A crescent slash flies {crescent-draw.range} blocks,"
+      - "&7cutting and knocking back what it passes."
+      - "&8Cooldown: &7{crescent-draw.cooldown}"
+      - ""
+      - "&c&lPASSIVE &8» &fUnbroken Edge"
+      - "&7Fully charged hits on the same target build"
+      - "&7Edge, up to {unbroken-edge.max-stacks}: &f+{unbroken-edge.damage-per-stack}% &7damage each."
+      - "&7It fades after {unbroken-edge.window} without a hit."
+      - "&7Crescent Draw spends it: &f+{crescent-draw.damage-per-edge} &7damage a stack."
+      - ""
+      - "&6&lLEGENDARY &8#{id}"
+    abilities:
+      crescent-draw:
+        cooldown: 8s
+        damage: 6
+        # Extra damage for each Edge stack the slash spends.
+        damage-per-edge: 1.5
+        # How far the slash flies, how wide it is and how fast (blocks per tick).
+        range: 7
+        width: 3.5
+        speed: 1.2
+        knockback: 0.8
+        lift: 0.2
+      unbroken-edge:
+        max-stacks: 4
+        # Extra melee damage per stack, in percent.
+        damage-per-stack: 5
+        # Stacks fade when this long passes without a hit.
+        window: 3s
+        # Hits closer together than this do not build stacks (no spam clicking).
+        min-hit-gap: 0.55s
+
+  sugarcrash:
+    name: "<gradient:#FF3B5C:#FFFFFF:#FF3B5C>&lSugarcrash</gradient>"
+    custom-model-data: 1002
+    item-model: ""
+    unbreakable: true
+    enchantments:
+      sharpness: 6
+    lore:
+      - "&8Legendary Candy Cane"
+      - ""
+      - "&7&o\"Sweet on the outside."
+      - "&7&oShattering on the inside.\""
+      - ""
+      - "&d&lRIGHT-CLICK &8» &fSugar Rush"
+      - "&7Overload on sugar for {sugar-rush.duration}: faster"
+      - "&7movement and attacks, and a candy trail."
+      - "&8Cooldown: &7{sugar-rush.cooldown} after it ends"
+      - ""
+      - "&d&lSNEAK + RIGHT-CLICK &8» &fSweet Shock"
+      - "&7Strike the ground: players within"
+      - "&7{sweet-shock.radius} blocks are knocked back and slowed."
+      - "&8Cooldown: &7{sweet-shock.cooldown}"
+      - ""
+      - "&6&lLEGENDARY &8#{id}"
+    abilities:
+      sugar-rush:
+        duration: 6s
+        # Starts when Sugar Rush ends.
+        cooldown: 18s
+        # Speed level, and Haste level (Haste makes attacks recharge faster; 0 = none).
+        speed-level: 2
+        haste-level: 2
+      sweet-shock:
+        cooldown: 14s
+        radius: 5
+        damage: 2
+        knockback: 1.1
+        lift: 0.35
+        # Slowness level and how long it lasts (0 = no slowness).
+        slow-level: 2
+        slow-duration: 2.5s
+
+  riftblade:
+    name: "<gradient:#C77DFF:#3C096C>&lRiftblade</gradient>"
+    custom-model-data: 1003
+    item-model: ""
+    unbreakable: true
+    enchantments:
+      sharpness: 6
+    lore:
+      - "&8Legendary Void Sword"
+      - ""
+      - "&7&o\"Space is only a suggestion.\""
+      - ""
+      - "&5&lRIGHT-CLICK &8» &fRift Slash"
+      - "&7Tear open a rift that travels {rift-slash.range}"
+      - "&7blocks, hurting and throwing back"
+      - "&7whoever it passes through."
+      - "&8Cooldown: &7{rift-slash.cooldown}"
+      - ""
+      - "&5&lSNEAK + RIGHT-CLICK &8» &fRift Recall"
+      - "&7Mark where you stand, then use it again"
+      - "&7within {rift-recall.window} to return to the mark."
+      - "&7Everyone can see the mark."
+      - "&8Cooldown: &7{rift-recall.cooldown}"
+      - ""
+      - "&6&lLEGENDARY &8#{id}"
+    abilities:
+      rift-slash:
+        cooldown: 10s
+        damage: 6
+        range: 10
+        width: 2.5
+        height: 2.5
+        speed: 0.9
+        knockback: 0.9
+        lift: 0.25
+        # Nausea for players hit (the visual distortion). 0 = none.
+        distortion: 3s
+      rift-recall:
+        # Time to return after marking.
+        window: 10s
+        # Starts after returning, or when the mark fades.
+        cooldown: 22s
+        # Further than this from the mark and the rift will not take you back.
+        max-distance: 64
+
+  gravebreaker:
+    name: "<gradient:#A8A8A8:#6B0F1A>&lGravebreaker</gradient>"
+    custom-model-data: 1004
+    item-model: ""
+    unbreakable: true
+    enchantments:
+      sharpness: 6
+    lore:
+      - "&8Legendary Executioner's Axe"
+      - ""
+      - "&7&o\"Every grave it opens, it fills.\""
+      - ""
+      - "&4&lRIGHT-CLICK &8» &fEarthsplitter"
+      - "&7Smash the ground: a cracking shockwave"
+      - "&7runs {earthsplitter.range} blocks forward, throwing players"
+      - "&7up and weighing them down with Mining Fatigue."
+      - "&8Cooldown: &7{earthsplitter.cooldown}"
+      - ""
+      - "&4&lPASSIVE &8» &fExecutioner's Mark"
+      - "&7{executioners-mark.hits} hits on the same player mark them for"
+      - "&7{executioners-mark.duration}. The next Earthsplitter to hit them"
+      - "&7throws them much harder."
+      - ""
+      - "&6&lLEGENDARY &8#{id}"
+    abilities:
+      earthsplitter:
+        cooldown: 12s
+        damage: 6
+        range: 9
+        width: 2.2
+        speed: 1
+        # Upward and forward throw.
+        launch: 0.75
+        push: 0.35
+        # Mining Fatigue level and how long it lasts (0 = none).
+        fatigue-level: 2
+        fatigue-duration: 3s
+        # A marked player is thrown this many times harder, up to max-launch upwards.
+        marked-multiplier: 1.6
+        max-launch: 1.2
+      executioners-mark:
+        hits: 3
+        # Time allowed between two of those hits.
+        hit-window: 6s
+        # Hits closer together than this do not count (no spam clicking).
+        min-hit-gap: 0.7s
+        duration: 8s
+
+  starforged:
+    name: "<gradient:#FFE29A:#6FD6FF:#8A5CFF>&lStarforged</gradient>"
+    custom-model-data: 1005
+    item-model: ""
+    unbreakable: true
+    enchantments:
+      sharpness: 6
+    lore:
+      - "&8Legendary Celestial Axe"
+      - ""
+      - "&7&o\"Forged where stars are born.\""
+      - ""
+      - "&b&lRIGHT-CLICK &8» &fAstral Impact"
+      - "&7Call down a star where you look. A circle"
+      - "&7warns everyone {astral-impact.warning} before it lands."
+      - "&8Cooldown: &7{astral-impact.cooldown}"
+      - ""
+      - "&b&lSNEAK + RIGHT-CLICK &8» &fGravity Well"
+      - "&7Open a gravity field for {gravity-well.duration} that"
+      - "&7drags players to its centre, then"
+      - "&7bursts outward."
+      - "&8Cooldown: &7{gravity-well.cooldown}"
+      - ""
+      - "&6&lLEGENDARY &8#{id}"
+    abilities:
+      astral-impact:
+        cooldown: 16s
+        range: 24
+        # Time between the warning circle appearing and the strike (at least 0.5s).
+        warning: 1.25s
+        radius: 4
+        damage: 7
+        launch: 0.9
+        push: 0.3
+      gravity-well:
+        cooldown: 20s
+        range: 20
+        radius: 6
+        duration: 4s
+        # How hard players are dragged to the centre (they can still walk out slowly).
+        pull: 0.12
+        # A player caught in the field takes this once (it is what lets protection plugins
+        # keep players in no-PvP areas out of it).
+        grip-damage: 1
+        pulse-damage: 4
+        pulse-knockback: 1.2
+        pulse-lift: 0.45
+        # Astral Impact cannot be used while a Gravity Well is open (plus this long), and
+        # Gravity Well cannot be used while a star is falling (plus this long), so players can
+        # never be pulled into a falling star.
+        lockout: 1.5s
+
+# Sounds: "<sound> [volume] [pitch]". Any vanilla sound, or a resource pack sound
+# (for example a katana slash: "vanillasmp:katana.slash 1 1").
+sounds:
+  crescent-draw: ["entity.player.attack.sweep 1 1.4", "item.trident.riptide_1 0.7 1.9", "entity.player.attack.strong 0.6 1.6"]
+  crescent-hit: ["entity.player.attack.crit 0.9 1.3"]
+  edge-stack: ["block.note_block.chime 0.6 1.0"]
+  sugar-rush: ["entity.firework_rocket.launch 1 1.4", "block.amethyst_block.chime 1 1.7", "entity.player.levelup 0.4 2"]
+  sugar-rush-end: ["block.amethyst_block.break 0.8 1.3"]
+  sweet-shock: ["entity.firework_rocket.blast 1 1.1", "block.amethyst_cluster.break 1 1.4", "entity.firework_rocket.twinkle 0.7 1.6"]
+  rift-slash: ["entity.enderman.teleport 1 0.6", "entity.enderman.scream 0.35 1.4", "entity.illusioner.mirror_move 0.8 0.7"]
+  rift-hit: ["entity.enderman.hurt 0.7 0.8"]
+  rift-mark: ["block.respawn_anchor.charge 0.9 1.4", "entity.enderman.ambient 0.5 0.6"]
+  rift-recall: ["entity.enderman.teleport 1 1.2", "block.end_portal_frame.fill 1 0.7"]
+  earthsplitter: ["entity.generic.explode 0.7 0.6", "block.anvil.land 0.8 0.5", "entity.ravager.attack 1 0.6"]
+  earthsplitter-crack: ["block.deepslate.break 0.7 0.7"]
+  executioners-mark: ["block.bell.use 1 0.6", "entity.wither.shoot 0.4 0.6"]
+  astral-warning: ["block.beacon.activate 1 1.6", "block.amethyst_block.resonate 1 1.2"]
+  astral-impact: ["entity.lightning_bolt.thunder 0.7 1.5", "entity.generic.explode 1 1.1", "item.trident.thunder 0.8 1.2"]
+  gravity-well: ["block.beacon.power_select 1 0.6", "block.portal.trigger 0.25 1.6"]
+  gravity-hum: ["block.beacon.ambient 1 0.7"]
+  gravity-pulse: ["entity.warden.sonic_boom 0.6 1.4", "entity.generic.explode 0.7 1.4"]
+  cooldown: ["block.note_block.bass 0.4 0.6"]
+  ready: ["block.note_block.chime 0.5 2"]
+
+# {ability}, {time}, {player}, {weapon}... are filled in. Set a message to "" to turn it off.
+messages:
+  # Above the hotbar.
+  hud-ready: "&a{ability}"
+  hud-cooldown: "&7{ability} &c{time}"
+  hud-active: "&d{ability} &f{time}"
+  hud-separator: "  &8|  "
+  hud-edge: "&7Edge {stacks}"
+  hud-edge-on: "&b■"
+  hud-edge-off: "&8■"
+  hud-mark-building: "&7Mark &f{hits}&7/&f{needed}"
+  hud-mark: "&4Marked &c{player} &7{time}"
+  on-cooldown: "&c{ability} &7is recharging: &f{time}"
+  no-target: "&7Nothing to target within {range} blocks."
+  rift-marked: "&5Rift marked. &7Sneak + right-click within {time} to return."
+  rift-blocked: "&cSomething is blocking your rift mark. The rift collapsed."
+  rift-too-far: "&cToo far from your rift mark &7({distance} of {max} blocks)&c."
+  rift-failed: "&cThe rift cannot take you back there right now."
+  # In chat.
+  rift-faded: "&7Your rift mark faded."
+  marked: "&4You have been marked by the Executioner! &7The next Earthsplitter will throw you much harder. ({time})"
+  mark-applied: "&4{player} &cis marked for {time}."
+  sugar-rush-end: "&7Sugar Rush wore off."
+  storage-blocked: "&cLegendary weapons cannot be put in containers."
+  placing-blocked: "&cLegendary weapons cannot be placed there."
+  bundle-blocked: "&cLegendary weapons cannot go in bundles."
+  command-blocked: "&cYou cannot use that command while carrying a legendary weapon."
+  alt-blocked: "&cThis weapon was last held by an account that shares your connection. Legendary weapons cannot be passed between your own accounts."
+  copy-removed: "&cA copy of {weapon} &cwas removed: legendary weapons cannot be duplicated."
+  revoked: "&c{weapon} &cwas taken away by staff."
+  container-returned: "{weapon} &ewas found in storage and moved to your inventory."
+  received: "&6You received the legendary weapon {weapon}&6!"
+  dropped-at-feet: "&eYour inventory is full, so {weapon} &ewas dropped at your feet."
+  # Staff.
+  alert: "&8[&6Legendary&8] &7{message}"
+  given: "&aGave {weapon} &ato &f{player}&a. &7(#{id})"
+  give-exists: "&c{weapon} &calready exists: {where}. Remove it first with &f/legendary remove {holder} {key}&c."
+  removed: "&aRemoved {weapon} &a(#{id}) from &f{player}&a."
+  removed-offline: "&aTook {weapon} &a(#{id}) from &f{player}&a. It disappears from their inventory when they next join."
+  removed-everywhere: "&aRemoved {weapon} &aeverywhere. &7({count} found)"
+  removed-none: "&c{player} does not have {weapon}&c."
+  no-permission: "&cYou do not have permission to do that."
+  player-not-found: "&cPlayer not found: &f{player}"
+  unknown-weapon: "&cUnknown weapon: &f{weapon}&c. Weapons: &f{weapons}"
+  reloaded: "&aLegendary reloaded. &7({warnings} warning(s), see console)"
