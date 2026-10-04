@@ -86,7 +86,7 @@ tracking number (`#3F9A2C1E`) and custom model data (1001 to 1005) for resource 
 | Put it in a bundle, item frame, armour stand, allay, decorated pot or shelf | Refused |
 | Let a hopper or a mob (zombie, fox, allay...) pick it up | Refused |
 | Craft with it (two swords repair into a plain one) | Refused |
-| Sell or list it (`/sell`, `/ah sell`...) | Refused while carrying one (`blocked-commands`) |
+| Sell or list it (`/sell`, `/ah sell`...) | Refused while it is in your hand; `/sellall` is refused while you carry one at all (`blocked-commands`). Other items can still be sold |
 | Pass it to an alt (an account that joined from the same IP) | The alt cannot pick it up. Staff are alerted |
 | Duplicate it (a dupe glitch, creative middle-click, an edited item) | Each weapon has a unique id. When two copies can be seen at once, the one the registry does not expect is deleted, and staff are alerted |
 | Stash it somewhere from before the plugin | Opening that container (or joining with it in the ender chest) moves it back to the player |

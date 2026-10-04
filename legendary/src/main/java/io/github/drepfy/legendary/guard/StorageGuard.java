@@ -220,7 +220,15 @@ public final class StorageGuard implements Listener {
         }
     }
 
-    /** Selling or listing a legendary through a command (shops, auction houses). */
+    /** Commands that act on the whole inventory, not just the held item. */
+    private static final java.util.Set<String> WHOLE_INVENTORY = java.util.Set.of("sellall", "sell all",
+            "sell inventory", "sell invent", "sell inv");
+
+    /**
+     * Selling or listing a legendary through a command (shops, auction houses): refused while
+     * a legendary is in either hand, or, for whole-inventory commands like /sellall, anywhere
+     * in the inventory. Other items can still be sold.
+     */
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onCommand(PlayerCommandPreprocessEvent event) {
         String command = event.getMessage().toLowerCase(Locale.ROOT).trim();
@@ -232,14 +240,23 @@ public final class StorageGuard implements Listener {
         if (colon >= 0 && (space < 0 || colon < space)) {
             command = command.substring(colon + 1); // essentials:sell → sell
         }
+        Player player = event.getPlayer();
         for (String blocked : plugin.settings().blockedCommands()) {
-            if ((command.equals(blocked) || command.startsWith(blocked + " "))
-                    && plugin.tracker().carriesAny(event.getPlayer())) {
+            if (!command.equals(blocked) && !command.startsWith(blocked + " ")) {
+                continue;
+            }
+            boolean whole = false;
+            for (String all : WHOLE_INVENTORY) {
+                whole |= command.equals(all) || command.startsWith(all + " ");
+            }
+            boolean risky = whole ? plugin.tracker().carriesAny(player)
+                    : legendary(player.getInventory().getItemInMainHand())
+                    || legendary(player.getInventory().getItemInOffHand());
+            if (risky) {
                 event.setCancelled(true);
-                plugin.notice(event.getPlayer(), "command-blocked");
+                plugin.notice(player, "command-blocked");
                 return;
             }
         }
     }
-
 }

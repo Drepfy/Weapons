@@ -24,6 +24,7 @@ public final class SettingsLoader {
         m.put("combat-end", "&aYou are no longer in combat.");
         m.put("combat-rejoin", "&cYou are still in combat: &f{seconds}s&c left.");
         m.put("combat-logout-kill", "&c{player} logged out during combat and died.");
+        m.put("command-blocked", "&cYou cannot use commands in combat. &7({seconds}s left)");
         m.put("pearl-cooldown", "&cYou can use an Ender Pearl again in &f{seconds}s&c.");
         m.put("elytra-blocked", "&cYou cannot glide with an elytra in combat.");
         m.put("riptide-blocked", "&cYou cannot use riptide in combat.");
@@ -45,7 +46,26 @@ public final class SettingsLoader {
         List<String> warnings = new ArrayList<>();
         long combat = duration(root, "combat.duration", 60_000L, 1_000L, warnings);
         Settings.ArmorRule armor = choice(root, "combat.armor", Settings.ArmorRule.ARMOR_PIECES, warnings);
-        Settings.LogoutRule logout = choice(root, "combat.logout", Settings.LogoutRule.KEEP, warnings);
+        Settings.LogoutRule logout = choice(root, "combat.logout", Settings.LogoutRule.KILL, warnings);
+        List<String> allowed = new ArrayList<>();
+        Object allowedValue = root.get("combat.allowed-commands");
+        if (allowedValue instanceof List<?> list) {
+            for (Object entry : list) {
+                String name = String.valueOf(entry).trim().toLowerCase(Locale.ROOT);
+                if (name.startsWith("/")) {
+                    name = name.substring(1);
+                }
+                if (!name.isEmpty()) {
+                    allowed.add(name);
+                }
+            }
+        } else if (allowedValue == null) {
+            allowed.addAll(List.of("combat", "ct", "combattag"));
+        } else {
+            warnings.add("combat.allowed-commands should be a list such as [combat, ct]");
+            allowed.addAll(List.of("combat", "ct", "combattag"));
+        }
+        Settings.Commands commands = new Settings.Commands(bool(root, "combat.block-commands", true, warnings), allowed);
         boolean pearlResets = bool(root, "combat.pearl-resets-timer", true, warnings);
         Settings.Movement elytra = new Settings.Movement(bool(root, "combat.elytra.blocked", true, warnings),
                 number(root, "combat.elytra.radius", 15.0, 0.0, 1000.0, warnings));
@@ -64,7 +84,7 @@ public final class SettingsLoader {
         if (prefix != null) {
             messages.put("prefix", prefix.toString());
         }
-        return new Settings(combat, armor, logout, pearlResets, elytra, riptide, pearl, overlay, zones,
+        return new Settings(combat, armor, logout, commands, pearlResets, elytra, riptide, pearl, overlay, zones,
                 new Settings.Messages(messages), warnings);
     }
 

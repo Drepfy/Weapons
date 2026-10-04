@@ -1,0 +1,387 @@
+# ============================================================
+#  AUCTION HOUSE - /ah: players sell items to each other
+#  /ah sell <price>   lists the item in your hand (500, 1k, 10k, 2.5m ... up to 10m)
+#  /ah                opens the auction house (click an item to buy it)
+#  /ah collect        items that did not sell, or that you took back
+#  Settings are in settings.sk. Money goes to the seller even when offline.
+# ============================================================
+
+# ---------- helpers ----------
+
+# How many items a player has listed right now
+function ahCount(seller: text) :: number:
+    set {_n} to 0
+    loop {ah::active::*}:
+        if {ah::listing::%loop-value%::seller} is {_seller}:
+            add 1 to {_n}
+    return {_n}
+
+# Takes a listing off the auction house (sold, taken back or expired)
+function ahUnlist(id: text):
+    delete {ah::active::%{_id}%}
+    delete {ah::listing::%{_id}%::*}
+
+# Money for the seller, online or not
+function ahPaySeller(seller: text, amount: number):
+    set {economy::balance::%{_seller}%} to max(0, rounded down (({economy::balance::%{_seller}%} ? 0) + {_amount}))
+
+# A message for the seller now, or the next time they join
+function ahTell(seller: text, msg: text):
+    loop all players:
+        if "%uuid of loop-player%" is {_seller}:
+            send {_msg} to loop-player
+            play sound "entity.experience_orb.pickup" to loop-player
+            stop
+    add {_msg} to {ah::notice::%{_seller}%::*}
+
+# Hands an item back to its seller: into their inventory if they are online and have room,
+# otherwise into their /ah collect bin
+function ahReturn(seller: text, item: item):
+    loop all players:
+        if "%uuid of loop-player%" is {_seller}:
+            if loop-player can hold {_item}:
+                give {_item} to loop-player
+                stop
+    add {_item} to {ah::bin::%{_seller}%::*}
+
+# ---------- selling ----------
+
+function ahSell(p: player, priceText: text):
+    set {_u} to "%uuid of {_p}%"
+    set {_price} to parseAmount({_priceText})
+    if {_price} is not set:
+        send "%pre()%&cInvalid price. Examples: &f500&c, &f1k&c, &f10k&c, &f2.5m" to {_p}
+        stop
+    set {_min} to {cfg::ah-min-price} ? 1
+    set {_max} to {cfg::ah-max-price} ? 10000000
+    if {_price} < {_min}:
+        send "%pre()%&cThe lowest price is %money({_min})%." to {_p}
+        stop
+    if {_price} > {_max}:
+        send "%pre()%&cThe highest price is %money({_max})% (10m)." to {_p}
+        stop
+    if {_p}'s tool is air:
+        send "%pre()%&cHold the item you want to sell, then type &f/ah sell <price>&c." to {_p}
+        stop
+    set {_limit} to {cfg::ah-max-listings} ? 5
+    if ahCount({_u}) >= {_limit}:
+        send "%pre()%&cYou can list %{_limit}% items at a time. Take one back or wait for one to sell." to {_p}
+        stop
+    add 1 to {ah::next-id}
+    set {_id} to "%{ah::next-id}%"
+    # The item leaves the hand in the same moment it is listed: there is never a copy.
+    set {ah::listing::%{_id}%::item} to {_p}'s tool
+    set {_p}'s tool to air
+    set {ah::listing::%{_id}%::seller} to {_u}
+    set {ah::listing::%{_id}%::seller-name} to "%{_p}%"
+    set {ah::listing::%{_id}%::price} to {_price}
+    set {_hours} to {cfg::ah-duration-hours} ? 48
+    set {ah::listing::%{_id}%::expires} to (unix timestamp of now) + {_hours} * 3600
+    set {ah::active::%{_id}%} to {_id}
+    send "%pre()%&aListed &f%{ah::listing::%{_id}%::item}% &afor %money({_price})%. &7It stays up for %{_hours}%h - &f/ah" to {_p}
+    play sound "block.note_block.pling" to {_p}
+    ahRefreshAll()
+
+# ---------- buying, taking back, collecting ----------
+
+function ahBuy(p: player, id: text):
+    set {_u} to "%uuid of {_p}%"
+    if {ah::listing::%{_id}%::item} is not set:
+        send "%pre()%&cSomeone else bought that item first." to {_p}
+        play sound "entity.villager.no" to {_p}
+        stop
+    if {ah::listing::%{_id}%::seller} is {_u}:
+        stop
+    set {_price} to {ah::listing::%{_id}%::price}
+    if getBalance({_p}) < {_price}:
+        send "%pre()%&cYou need &f%money({_price} - getBalance({_p}))% &cmore to buy that." to {_p}
+        play sound "entity.villager.no" to {_p}
+        stop
+    set {_item} to {ah::listing::%{_id}%::item}
+    if {_p} can't hold {_item}:
+        send "%pre()%&cYour inventory is full." to {_p}
+        play sound "entity.villager.no" to {_p}
+        stop
+    set {_seller} to {ah::listing::%{_id}%::seller}
+    set {_sellerName} to {ah::listing::%{_id}%::seller-name}
+    # Off the auction house first, then pay and hand over: it can only ever be bought once.
+    ahUnlist({_id})
+    addBalance({_p}, 0 - {_price})
+    give {_item} to {_p}
+    set {_tax} to rounded down ({_price} * ({cfg::ah-tax-percent} ? 0) / 100)
+    ahPaySeller({_seller}, {_price} - {_tax})
+    send "%pre()%&aYou bought &f%{_item}% &afor %money({_price})% from &f%{_sellerName}%&a." to {_p}
+    play sound "entity.experience_orb.pickup" to {_p}
+    ahTell({_seller}, "%pre()%&a&l$ &f%{_p}% &7bought your &f%{_item}% &7for &a%money({_price} - {_tax})%&7.")
+
+function ahTakeBack(p: player, id: text):
+    set {_item} to {ah::listing::%{_id}%::item}
+    {_item} is set
+    ahUnlist({_id})
+    if {_p} can hold {_item}:
+        give {_item} to {_p}
+        send "%pre()%&7You took back &f%{_item}%&7." to {_p}
+    else:
+        add {_item} to {ah::bin::%uuid of {_p}%::*}
+        send "%pre()%&7Your inventory is full: &f%{_item}% &7is waiting in &f/ah collect&7." to {_p}
+
+# Staff (ah.admin): sneak-click a listing to take it down. It goes back to the seller.
+function ahStaffRemove(p: player, id: text):
+    set {_item} to {ah::listing::%{_id}%::item}
+    {_item} is set
+    set {_seller} to {ah::listing::%{_id}%::seller}
+    ahUnlist({_id})
+    ahReturn({_seller}, {_item})
+    send "%pre()%&7Removed &f%{_item}% &7from the auction house (returned to its seller)." to {_p}
+    ahTell({_seller}, "%pre()%&7Staff took your &f%{_item}% &7off the auction house. It was returned to you (&f/ah collect&7).")
+
+function ahCollect(p: player):
+    set {_u} to "%uuid of {_p}%"
+    set {_n} to 0
+    loop {ah::bin::%{_u}%::*}:
+        if {_p} can hold loop-value:
+            give loop-value to {_p}
+            add loop-index to {_taken::*}
+            add 1 to {_n}
+        else:
+            set {_full} to true
+    loop {_taken::*}:
+        delete {ah::bin::%{_u}%::%loop-value%}
+    if {_n} > 0:
+        send "%pre()%&aCollected %{_n}% item(s)." to {_p}
+        play sound "entity.item.pickup" to {_p}
+    if {_full} is true:
+        send "%pre()%&cYour inventory is full: make room and collect the rest." to {_p}
+    else if {_n} is 0:
+        send "%pre()%&7You have nothing to collect." to {_p}
+
+# ---------- GUI ----------
+
+function fillAh(p: player, gui: inventory, page: number, mine: boolean):
+    set {_u} to "%uuid of {_p}%"
+    delete {-ah::slot::%{_u}%::*}
+    set slots (integers between 0 and 44) of {_gui} to air
+    set slots (integers between 45 and 53) of {_gui} to gray stained glass pane named "&r"
+
+    # Newest first; "your listings" shows only the player's own items
+    set {_n} to 0
+    loop reversed {ah::active::*}:
+        set {_show} to true
+        if {_mine} is true:
+            if {ah::listing::%loop-value%::seller} is not {_u}:
+                set {_show} to false
+        if {_show} is true:
+            add 1 to {_n}
+            set {_ids::%{_n}%} to loop-value
+    set {_pages} to max(1, ceil({_n} / 45))
+    set {_page} to min(max(1, {_page}), {_pages})
+    set {-ah::page::%{_u}%} to {_page}
+    set {-ah::mine::%{_u}%} to {_mine}
+
+    set {_bal} to getBalance({_p})
+    set {_now} to unix timestamp of now
+    set {_start} to ({_page} - 1) * 45
+    loop 45 times:
+        set {_id} to {_ids::%{_start} + loop-number%}
+        if {_id} is set:
+            set {_slot} to loop-number - 1
+            set {_price} to {ah::listing::%{_id}%::price}
+            set {_lore::*} to lore of {ah::listing::%{_id}%::item}
+            add "&r" to {_lore::*}
+            add "&8▪ &fPrice: &a%money({_price})%" to {_lore::*}
+            add "&8▪ &fSeller: &f%{ah::listing::%{_id}%::seller-name}%" to {_lore::*}
+            add "&8▪ &fEnds in: &e%fmtDuration({ah::listing::%{_id}%::expires} - {_now})%" to {_lore::*}
+            add "&r" to {_lore::*}
+            if {ah::listing::%{_id}%::seller} is {_u}:
+                add "&c» Click to take it back" to {_lore::*}
+            else if {_bal} >= {_price}:
+                add "&e» Click to buy" to {_lore::*}
+            else:
+                add "&c» Not enough money" to {_lore::*}
+            set slot {_slot} of {_gui} to {ah::listing::%{_id}%::item} with lore {_lore::*}
+            set {-ah::slot::%{_u}%::%{_slot}%} to {_id}
+            delete {_lore::*}
+
+    if {_page} > 1:
+        set slot 45 of {_gui} to arrow named "&e« Previous page"
+    if {_page} < {_pages}:
+        set slot 53 of {_gui} to arrow named "&eNext page »"
+    set {_listed} to ahCount({_u})
+    if {_mine} is true:
+        set slot 48 of {_gui} to chest named "&e&lAll listings" with lore "&7Show everyone's items"
+    else:
+        set slot 48 of {_gui} to chest named "&e&lYour listings" with lore "&8▪ &fListed: &e%{_listed}%&7/&e%{cfg::ah-max-listings} ? 5%" and "&e» Click to show only yours"
+    set slot 49 of {_gui} to sunflower named "&6&lAuction House" with lore "&8▪ &fBalance: &a%money({_bal})%", "&8▪ &fPage: &e%{_page}%&7/&e%{_pages}%", "&8▪ &fItems for sale: &e%size of {ah::active::*}%", "&r", "&7To sell: hold an item and type", "&f/ah sell <price> &7(e.g. 1k, 10k, 1m)" and "&7Max price: &a%money({cfg::ah-max-price} ? 10000000)%"
+    set {_waiting} to size of {ah::bin::%{_u}%::*}
+    set slot 50 of {_gui} to ender chest named "&d&lCollect" with lore "&7Items that did not sell", "&7or that you took back", "&8▪ &fWaiting: &e%{_waiting}%", "&r" and "&e» Click to collect"
+
+function openAh(p: player, page: number, mine: boolean):
+    set {_u} to "%uuid of {_p}%"
+    set {_gui} to chest inventory with 6 rows named ({cfg::ah-title} ? "&6&lᴀᴜᴄᴛɪᴏɴ ʜᴏᴜѕᴇ")
+    fillAh({_p}, {_gui}, {_page}, {_mine})
+    delete {-ah::confirm::%{_u}%}
+    set {-ah::gui::%{_u}%} to {_gui}
+    # Flag set BEFORE opening so clicks are blocked from the very first tick
+    set {-ah::opening::%{_u}%} to true
+    set {-ah::open::%{_u}%} to true
+    open {_gui} to {_p}
+    wait 2 ticks
+    delete {-ah::opening::%{_u}%}
+
+function openAhConfirm(p: player, id: text):
+    set {_u} to "%uuid of {_p}%"
+    set {_price} to {ah::listing::%{_id}%::price}
+    set {_gui} to chest inventory with 3 rows named "&6&lConfirm purchase"
+    set slots (integers between 0 and 26) of {_gui} to gray stained glass pane named "&r"
+    set slot 11 of {_gui} to lime stained glass pane named "&a&lBuy for %money({_price})%" with lore "&8▪ &fSeller: &f%{ah::listing::%{_id}%::seller-name}%" and "&8▪ &fYour balance: &a%money(getBalance({_p}))%"
+    set slot 13 of {_gui} to {ah::listing::%{_id}%::item}
+    set slot 15 of {_gui} to red stained glass pane named "&c&lCancel"
+    set {-ah::confirm::%{_u}%} to {_id}
+    set {-ah::gui::%{_u}%} to {_gui}
+    set {-ah::opening::%{_u}%} to true
+    set {-ah::open::%{_u}%} to true
+    open {_gui} to {_p}
+    wait 2 ticks
+    delete {-ah::opening::%{_u}%}
+
+# Updates everyone looking at the auction house (not the confirm screens)
+function ahRefreshAll():
+    loop all players:
+        set {_u} to "%uuid of loop-player%"
+        if {-ah::open::%{_u}%} is set:
+            if {-ah::confirm::%{_u}%} is not set:
+                set {_gui} to {-ah::gui::%{_u}%}
+                if {_gui} is set:
+                    fillAh(loop-player, {_gui}, {-ah::page::%{_u}%} ? 1, {-ah::mine::%{_u}%} ? false)
+
+# ---------- commands ----------
+
+command /ah [<text>] [<text>]:
+    aliases: /auction, /auctionhouse
+    trigger:
+        if arg-1 is not set:
+            openAh(player, 1, false)
+            stop
+        set {_sub} to lowercase arg-1
+        if {_sub} is "sell" or "list":
+            if arg-2 is not set:
+                send "%pre()%&cUsage: /ah sell <price>  &7(e.g. 500, 1k, 10k, 2.5m - up to 10m)"
+                stop
+            ahSell(player, arg-2)
+        else if {_sub} is "collect" or "claim" or "expired":
+            ahCollect(player)
+        else if {_sub} is "mine" or "listings" or "my":
+            openAh(player, 1, true)
+        else:
+            send "%pre()%&6Auction House"
+            send " &f/ah &7- browse and buy"
+            send " &f/ah sell <price> &7- sell the item in your hand (1k, 10k ... up to 10m)"
+            send " &f/ah mine &7- your listings (click one to take it back)"
+            send " &f/ah collect &7- items that did not sell"
+
+# ---------- events ----------
+
+on load:
+    delete {-ah::busy::*}
+
+on inventory click:
+    {-ah::open::%uuid of player%} is set
+    # Block every click (shift-click, hotbar swap, double-click...) while the auction house is open
+    cancel event
+    event-inventory is not player's inventory
+    set {_u} to "%uuid of player%"
+    # One action per click: ignore the duplicate click events a double-click sends
+    {-ah::busy::%{_u}%} is not set
+    set {-ah::busy::%{_u}%} to true
+    set {_slot} to index of event-slot
+    set {_page} to {-ah::page::%{_u}%} ? 1
+    set {_mine} to {-ah::mine::%{_u}%} ? false
+    # Menus are opened a tick later, never inside the click itself
+    wait 1 tick
+    if {-ah::confirm::%{_u}%} is set:
+        set {_id} to {-ah::confirm::%{_u}%}
+        if {_slot} is 11:
+            ahBuy(player, {_id})
+            ahRefreshAll()
+            openAh(player, {_page}, {_mine})
+        else if {_slot} is 15:
+            openAh(player, {_page}, {_mine})
+    else if {_slot} < 45:
+        set {_id} to {-ah::slot::%{_u}%::%{_slot}%}
+        if {_id} is set:
+            if {ah::listing::%{_id}%::item} is not set:
+                send "%pre()%&cThat item is no longer for sale."
+                ahRefreshAll()
+            else if {ah::listing::%{_id}%::seller} is {_u}:
+                ahTakeBack(player, {_id})
+                ahRefreshAll()
+            else if player is sneaking:
+                if player has permission "ah.admin":
+                    ahStaffRemove(player, {_id})
+                    ahRefreshAll()
+                else:
+                    openAhConfirm(player, {_id})
+            else:
+                openAhConfirm(player, {_id})
+    else if {_slot} is 45:
+        openAh(player, {_page} - 1, {_mine})
+    else if {_slot} is 53:
+        openAh(player, {_page} + 1, {_mine})
+    else if {_slot} is 48:
+        if {_mine} is true:
+            openAh(player, 1, false)
+        else:
+            openAh(player, 1, true)
+    else if {_slot} is 50:
+        ahCollect(player)
+        openAh(player, {_page}, {_mine})
+    wait 2 ticks
+    delete {-ah::busy::%{_u}%}
+
+on inventory drag:
+    {-ah::open::%uuid of player%} is set
+    cancel event
+
+on inventory close:
+    set {_u} to "%uuid of player%"
+    {-ah::open::%{_u}%} is set
+    # ignore the close of the previous menu that fires while a new one opens
+    {-ah::opening::%{_u}%} is not set
+    delete {-ah::open::%{_u}%}
+    delete {-ah::gui::%{_u}%}
+    delete {-ah::confirm::%{_u}%}
+    delete {-ah::slot::%{_u}%::*}
+
+on quit:
+    set {_u} to "%uuid of player%"
+    delete {-ah::open::%{_u}%}
+    delete {-ah::gui::%{_u}%}
+    delete {-ah::confirm::%{_u}%}
+    delete {-ah::busy::%{_u}%}
+    delete {-ah::slot::%{_u}%::*}
+
+# Sales and returns that happened while the player was away
+on join:
+    set {_u} to "%uuid of player%"
+    wait 2 seconds
+    player is online
+    loop {ah::notice::%{_u}%::*}:
+        send loop-value to player
+    delete {ah::notice::%{_u}%::*}
+    set {_waiting} to size of {ah::bin::%{_u}%::*}
+    if {_waiting} > 0:
+        send "%pre()%&eYou have %{_waiting}% item(s) waiting: &f/ah collect"
+
+# Listings that ran out of time go back to their seller's /ah collect
+every 1 minute:
+    set {_now} to unix timestamp of now
+    loop {ah::active::*}:
+        if {ah::listing::%loop-value%::expires} <= {_now}:
+            add loop-value to {_expired::*}
+    loop {_expired::*}:
+        set {_seller} to {ah::listing::%loop-value%::seller}
+        set {_item} to {ah::listing::%loop-value%::item}
+        ahUnlist(loop-value)
+        add {_item} to {ah::bin::%{_seller}%::*}
+        ahTell({_seller}, "%pre()%&7Your &f%{_item}% &7did not sell. Get it back with &f/ah collect&7.")
+    ahRefreshAll()

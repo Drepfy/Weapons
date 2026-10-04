@@ -26,8 +26,10 @@ Combat timer, Ender Pearl cooldown, elytra/riptide rules and safe zones for a co
   attacker set off, and the attacker's tamed wolves. Not: mobs, falling, your own arrows or
   pearls, healing potions, or hits another plugin cancelled (for example PvP being off in a
   protected area).
-- **No restrictions**: every command works in combat, and shops, menus and other plugin
-  interfaces open normally.
+- **No commands in combat**: `/tpa`, `/tpaccept`, `/rtp`, `/spawn`, `/home`, `/ah` and every
+  other command wait until the fight is over ("You cannot use commands in combat. (42s left)").
+  Only `/combat` still works (`allowed-commands`). Staff can be given `combat.bypass.commands`.
+  Menus that are already open keep working.
 
 ### Kills
 
@@ -83,15 +85,15 @@ Creating a zone with a name that already exists replaces it.
 
 | Trying to... | What happens |
 |---|---|
-| Use commands, open shops or menus | Allowed, the timer keeps running |
+| Use commands (/tpa, /rtp, /spawn, /ah...) | Refused until the fight is over |
+| Have someone else accept an old /tpa request | The teleport scripts check the `incombat` flag and cancel it |
 | Move items, swap hands, change hotbar slots | Nothing changes |
 | Teleport or change worlds | The timer keeps running |
-| Log out | The timer is **paused** and goes on when they come back ("You are still in combat: 42s left."). Waiting it out offline does not work |
+| Log out | **They die** where they logged out and drop everything on the floor, even when keepInventory is on (legendary weapons too); their attacker gets the kill. Kicked players, and everyone when the server stops, are never killed. With `logout: keep` the timer is paused instead and goes on when they come back |
 | Server restart | Combat timers and pearl cooldowns are saved and restored |
 
-Optional: `logout: kill` also kills a player who logs out in combat (they drop their items
-where they logged out, and their attacker gets the kill). Players who are kicked, and
-everyone when the server stops, are never killed.
+Updating from an older version changes `logout: keep` to `logout: kill` and adds the command
+settings to your `config.yml` once; after that your own choices are kept.
 
 ## Commands
 
@@ -112,7 +114,9 @@ everyone when the server stops, are never killed.
 combat:
   duration: 60s
   armor: armor-pieces   # or any-item
-  logout: keep          # or kill
+  logout: kill          # or keep
+  block-commands: true
+  allowed-commands: [combat, ct, combattag]
   pearl-resets-timer: true
   elytra:
     blocked: true
@@ -133,6 +137,9 @@ messages:
 Every message can be changed (or set to `""` to turn it off). Wrong values fall back to the
 default and the console says what to fix.
 
+Scripts: while a player is in combat they have the metadata `incombat`
+(Skript: `if metadata value "incombat" of player is set:`).
+
 Other plugins: `Bukkit.getServicesManager().load(CombatPlugin.class).isInCombat(player)`,
 `combatRemaining(player)`, `pearlCooldown(player)`. While a player holds a legendary weapon
 (the Legendary plugin), its cooldown bar shows the combat time in front and Combat leaves the
@@ -146,11 +153,12 @@ cd combat
 mvn -B package   # runs the tests, writes target/Combat-<version>.jar
 ```
 
-`mvn test` runs 30 tests on a simulated server: the action bar counting down and
+`mvn test` runs 34 tests on a simulated server: the action bar counting down and
 disappearing, every hit restarting the timer, arrows, TNT, end crystals, wolves and potions
-counting (and mobs, own arrows, healing potions and cancelled hits not), commands, menus,
-item swapping, teleports and world changes not ending combat, logging out pausing the timer,
-`logout: kill` (and kicked players spared), the armored/naked kill rule (including one-hit
+counting (and mobs, own arrows, healing potions and cancelled hits not), commands refused in
+combat (and /combat and the bypass allowed), the `incombat` flag for scripts, menus, item
+swapping, teleports and world changes not ending combat, logging out killing the player and dropping everything even with keepInventory (and
+kicked players spared), `logout: keep` pausing the timer, an old config being brought up to date, the armored/naked kill rule (including one-hit
 kills, elytras and pumpkins, and a second fight going on), the pearl cooldown (both hands,
 other hotbar slots, launch blocking, reconnecting, cleared item cooldowns), a pearl starting the
 60 seconds again, elytra and riptide blocked within 15 blocks of an opponent (and allowed further

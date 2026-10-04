@@ -18,6 +18,7 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.PotionSplashEvent;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerKickEvent;
@@ -30,6 +31,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -55,6 +57,36 @@ final class CombatListener implements Listener {
     }
 
     // ---- entering combat ---------------------------------------------------------------------------
+
+    /**
+     * No commands in combat: /tpa, /rtp, /spawn, /home, /ah... all wait until the fight is over.
+     * The allowed commands (/combat) and staff with combat.bypass.commands are let through.
+     */
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onCommand(PlayerCommandPreprocessEvent event) {
+        Player player = event.getPlayer();
+        Settings.Commands rule = plugin.settings().commands();
+        if (!rule.blocked() || !plugin.isInCombat(player) || player.hasPermission("combat.bypass.commands")) {
+            return;
+        }
+        if (rule.allowed().contains(commandName(event.getMessage()))) {
+            return;
+        }
+        event.setCancelled(true);
+        plugin.refuse(player, "command-blocked", "seconds", CombatPlugin.seconds(plugin.combatRemaining(player)));
+    }
+
+    /** "/essentials:tpa Bob" → "tpa". */
+    static String commandName(String message) {
+        String text = message.trim();
+        if (text.startsWith("/")) {
+            text = text.substring(1);
+        }
+        int space = text.indexOf(' ');
+        String name = (space < 0 ? text : text.substring(0, space)).toLowerCase(Locale.ROOT);
+        int colon = name.indexOf(':');
+        return colon >= 0 ? name.substring(colon + 1) : name;
+    }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onDamage(EntityDamageByEntityEvent event) {
@@ -140,6 +172,32 @@ final class CombatListener implements Listener {
     }
 
     // ---- death and the kill rule --------------------------------------------------------------------
+
+    /**
+     * Logging out in combat: everything drops on the floor where the player logged out, even
+     * when keepInventory is on.
+     */
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onLogoutDeath(PlayerDeathEvent event) {
+        Player player = event.getEntity();
+        if (!plugin.dyingForLoggingOut(player) || !event.getKeepInventory()) {
+            return;
+        }
+        org.bukkit.enchantments.Enchantment vanishing = org.bukkit.Registry.ENCHANTMENT.get(
+                org.bukkit.NamespacedKey.minecraft("vanishing_curse"));
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item != null && !item.getType().isAir()
+                    && (vanishing == null || !item.containsEnchantment(vanishing))) {
+                event.getDrops().add(item.clone());
+            }
+        }
+        try {
+            event.getItemsToKeep().clear();
+        } catch (RuntimeException | LinkageError ignored) {
+            // Only on Paper.
+        }
+        event.setKeepInventory(false);
+    }
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onDeathFirst(PlayerDeathEvent event) {

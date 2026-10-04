@@ -434,15 +434,23 @@ class LegendaryTest {
     }
 
     @Test
-    void sellCommandsAreRefusedWhileCarryingOne() {
+    void sellCommandsAreRefusedForTheLegendaryOnly() {
         PlayerMock steve = player("Steve", 0, 0);
-        give(steve, WeaponType.GRAVEBREAKER);
-        PlayerCommandPreprocessEvent sell = new PlayerCommandPreprocessEvent(steve, "/sell hand");
-        server.getPluginManager().callEvent(sell);
-        assertTrue(sell.isCancelled());
-        PlayerCommandPreprocessEvent essentials = new PlayerCommandPreprocessEvent(steve, "/essentials:sellhand");
-        server.getPluginManager().callEvent(essentials);
-        assertTrue(essentials.isCancelled());
+        ItemStack axe = give(steve, WeaponType.GRAVEBREAKER);
+        for (String line : List.of("/sell hand", "/ah sell 1k", "/essentials:sellhand", "/auction sell 10m")) {
+            PlayerCommandPreprocessEvent held = new PlayerCommandPreprocessEvent(steve, line);
+            server.getPluginManager().callEvent(held);
+            assertTrue(held.isCancelled(), line + " with the legendary in hand");
+        }
+        // Holding something else: the auction house works for the rest of the inventory.
+        steve.getInventory().setItemInMainHand(new ItemStack(Material.DIAMOND, 16));
+        steve.getInventory().setItem(8, axe);
+        PlayerCommandPreprocessEvent diamonds = new PlayerCommandPreprocessEvent(steve, "/ah sell 1k");
+        server.getPluginManager().callEvent(diamonds);
+        assertFalse(diamonds.isCancelled(), "selling diamonds while owning a legendary");
+        PlayerCommandPreprocessEvent all = new PlayerCommandPreprocessEvent(steve, "/sellall");
+        server.getPluginManager().callEvent(all);
+        assertTrue(all.isCancelled(), "a whole-inventory sell is refused while carrying one");
         PlayerCommandPreprocessEvent spawn = new PlayerCommandPreprocessEvent(steve, "/spawn");
         server.getPluginManager().callEvent(spawn);
         assertFalse(spawn.isCancelled(), "other commands work");

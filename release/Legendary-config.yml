@@ -23,7 +23,9 @@ alt-protection:
   # An address used by more accounts than this is a shared network (school, hotel): ignored.
   max-accounts-per-ip: 3
 
-# Commands that cannot be used while carrying a legendary (selling it, auction houses...).
+# Commands that sell or list the held item (shops, auction houses): refused while a legendary
+# is in either hand. Other items can still be sold. Commands that sell the whole inventory
+# (sellall, sell all) are refused while carrying a legendary anywhere.
 # Matched against the start of the command, without the slash.
 blocked-commands:
   - "ah sell"

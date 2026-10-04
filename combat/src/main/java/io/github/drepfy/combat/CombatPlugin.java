@@ -1,5 +1,6 @@
 package io.github.drepfy.combat;
 
+import io.github.drepfy.combat.config.ConfigUpgrade;
 import io.github.drepfy.combat.config.Settings;
 import io.github.drepfy.combat.config.SettingsLoader;
 import io.github.drepfy.combat.util.ActionBar;
@@ -34,8 +35,9 @@ import java.util.function.LongSupplier;
  *   <li>Killing a player who wears armor ends your combat with them; killing a naked player
  *   does not.</li>
  *   <li>Ender Pearls have a 15 second cooldown per player.</li>
- *   <li>Both are kept on the server and survive reconnects and restarts. Commands, shops and
- *   menus are never blocked.</li>
+ *   <li>Both are kept on the server and survive reconnects and restarts.</li>
+ *   <li>No commands in combat (except /combat), and logging out in combat kills the player
+ *   (their items drop where they logged out).</li>
  * </ul>
  *
  * <p>Other plugins: {@code Bukkit.getServicesManager().load(CombatPlugin.class).isInCombat(player)}.
@@ -51,6 +53,8 @@ public class CombatPlugin extends JavaPlugin {
     /** When each player's Ender Pearl cooldown ends (wall clock, so it also runs while offline). */
     private final Map<UUID, Long> pearls = new HashMap<>();
     private final Map<UUID, Shown> shown = new HashMap<>();
+    /** Players being killed right now for logging out in combat (their items must drop). */
+    private final java.util.Set<UUID> loggingOut = new java.util.HashSet<>();
     private final Map<UUID, Long> lastRefusal = new HashMap<>();
     /** When each player was last told they cannot do something (one message a second). */
     private final Map<String, Long> lastNotice = new HashMap<>();
@@ -65,6 +69,7 @@ public class CombatPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        ConfigUpgrade.upgrade(new File(getDataFolder(), "config.yml").toPath(), getLogger());
         settings = readSettings(false);
         settings.warnings().forEach(warning -> getLogger().warning("[config] " + warning));
         io = Executors.newSingleThreadExecutor(runnable -> {
@@ -107,6 +112,7 @@ public class CombatPlugin extends JavaPlugin {
         for (Player player : Bukkit.getOnlinePlayers()) {
             tracker.pause(player.getUniqueId(), now);
             ActionBar.clear(player);
+            player.removeMetadata(IN_COMBAT, this);
         }
         io.shutdown();
         try {
@@ -146,6 +152,11 @@ public class CombatPlugin extends JavaPlugin {
         }
     }
 
+    /** Whether this death is the punishment for logging out in combat. */
+    boolean dyingForLoggingOut(Player player) {
+        return loggingOut.contains(player.getUniqueId());
+    }
+
     void loggedOut(Player player, boolean kicked) {
         long now = now();
         UUID uuid = player.getUniqueId();
@@ -159,7 +170,12 @@ public class CombatPlugin extends JavaPlugin {
                 }
             }
             getLogger().info(player.getName() + " logged out in combat and was killed.");
-            player.setHealth(0.0);
+            loggingOut.add(uuid);
+            try {
+                player.setHealth(0.0);
+            } finally {
+                loggingOut.remove(uuid);
+            }
         }
         tracker.pause(uuid, now);
         shown.remove(uuid);
@@ -215,6 +231,7 @@ public class CombatPlugin extends JavaPlugin {
                 shown.put(uuid, new Shown(seconds, now));
             }
         }
+        flagCombat(now);
         if (ticks % 5 == 0) {
             stopGliding();
         }
@@ -360,6 +377,26 @@ public class CombatPlugin extends JavaPlugin {
      * in front of its own bar, so the two never keep replacing each other.
      */
     public static final String BAR_CLAIM = "vanillasmp:actionbar";
+
+    /**
+     * Player metadata set while a player is in combat, for scripts:
+     * {@code if metadata value "incombat" of player is set} (Skript).
+     */
+    public static final String IN_COMBAT = "incombat";
+
+    /** Keeps the in-combat flag in step with the timer. */
+    private void flagCombat(long now) {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            boolean fighting = tracker.inCombat(player.getUniqueId(), now);
+            if (fighting != player.hasMetadata(IN_COMBAT)) {
+                if (fighting) {
+                    player.setMetadata(IN_COMBAT, new org.bukkit.metadata.FixedMetadataValue(this, true));
+                } else {
+                    player.removeMetadata(IN_COMBAT, this);
+                }
+            }
+        }
+    }
 
     static boolean barClaimed(Player player) {
         for (org.bukkit.metadata.MetadataValue value : player.getMetadata(BAR_CLAIM)) {

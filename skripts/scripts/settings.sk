@@ -1,0 +1,175 @@
+# ============================================================
+#  SETTINGS - every option for the server scripts lives here.
+#  After editing, run: /sk reload settings
+#
+#  Colors: use & codes (&a, &l ...) and <##RRGGBB> for hex colors.
+# ============================================================
+
+on load:
+    delete {cfg::*}
+
+    # --- General ---
+    # Bottom line of the scoreboard
+    set {cfg::scoreboard-footer} to "&7discord.gg/zhVxs8prtn"
+    # Scoreboard title (VANILLA SMP gradient)
+    set {cfg::title} to "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ"
+    set {cfg::currency} to "$"
+    # Prefix in front of every chat message
+    set {cfg::prefix} to "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ &8» &7"
+    set {cfg::starting-balance} to 0
+
+    # --- PvP ---
+    # Money for killing another player (0 = off)
+    set {cfg::player-kill-reward} to 50
+    # Money taken from the player who died in PvP (0 = off)
+    set {cfg::player-death-penalty} to 0
+
+    # --- Teleports (/tpa /rtp /spawn) ---
+    # Seconds to stand still before teleporting (0 = instant). Everyone waits, staff included (minimum 1).
+    set {cfg::tp-warmup} to 5
+    # Seconds a /tpa request stays valid
+    set {cfg::tpa-expire} to 60
+    # Cooldowns in seconds
+    set {cfg::tpa-cooldown} to 10
+    set {cfg::rtp-cooldown} to 300
+    set {cfg::spawn-cooldown} to 5
+    # /rtp picks a spot this far from 0,0 (blocks)
+    set {cfg::rtp-min} to 500
+    set {cfg::rtp-max} to 5000
+    # World used for /rtp
+    set {cfg::rtp-world} to "world"
+    # /rtp never lands within this many blocks of another player
+    set {cfg::rtp-player-distance} to 250
+
+    # --- Ranks (shown in /ranks, NOT buyable with in-game money) ---
+    # Give a rank with /setrank <player> <id> or the permission smp.rank.<id>.
+    # Multiply the money you get from mob and player kills.
+    set {cfg::store-url} to "discord.gg/zhVxs8prtn"
+    # rank(id, display name, multiplier, price shown in /ranks (real money, text), icon)
+    delete {cfg::rank::*}
+    rank("vip", "&a&lVIP", 1.5, "$5", emerald)
+    rank("elite", "&6&lELITE", 3, "$15", nether star)
+
+    # --- Mob rewards: money per kill (1 min - 7 max) ---
+    # Mobs not listed here pay nothing.
+    delete {mobreward::*}
+    set {mobreward::chicken} to 1
+    set {mobreward::cow} to 1
+    set {mobreward::pig} to 1
+    set {mobreward::sheep} to 1
+    set {mobreward::rabbit} to 1
+    set {mobreward::cod} to 1
+    set {mobreward::salmon} to 1
+    set {mobreward::squid} to 1
+    set {mobreward::zombie} to 2
+    set {mobreward::husk} to 2
+    set {mobreward::drowned} to 2
+    set {mobreward::skeleton} to 2
+    set {mobreward::stray} to 2
+    set {mobreward::spider} to 2
+    set {mobreward::silverfish} to 2
+    set {mobreward::slime} to 2
+    set {mobreward::magma cube} to 2
+    set {mobreward::zombified piglin} to 2
+    set {mobreward::creeper} to 3
+    set {mobreward::cave spider} to 3
+    set {mobreward::zombie villager} to 3
+    set {mobreward::phantom} to 3
+    set {mobreward::pillager} to 3
+    set {mobreward::bogged} to 3
+    set {mobreward::endermite} to 3
+    set {mobreward::witch} to 4
+    set {mobreward::enderman} to 4
+    set {mobreward::blaze} to 4
+    set {mobreward::guardian} to 4
+    set {mobreward::vindicator} to 4
+    set {mobreward::hoglin} to 4
+    set {mobreward::piglin} to 4
+    set {mobreward::wither skeleton} to 5
+    set {mobreward::ghast} to 5
+    set {mobreward::shulker} to 5
+    set {mobreward::breeze} to 5
+    set {mobreward::evoker} to 5
+    set {mobreward::piglin brute} to 6
+    set {mobreward::ravager} to 6
+    set {mobreward::warden} to 7
+    set {mobreward::elder guardian} to 7
+    set {mobreward::wither} to 7
+    set {mobreward::ender dragon} to 7
+
+    # --- Market ---
+    set {cfg::market-title} to "&2&lᴍᴀʀᴋᴇᴛ"
+    # Minutes between market resets (stock refills, rotation re-rolls)
+    set {cfg::market-reset-minutes} to 60
+    # Broadcast when the market resets (delete this line for no message)
+    set {cfg::market-reset-message} to "&2&lᴍᴀʀᴋᴇᴛ &7has reset! Stock refilled - &a/market"
+    # Rotation: true = every reset shows random items from the list below
+    #           false = always show every enabled item in its slot
+    set {cfg::market-rotate} to false
+    # How many random items to show when rotation is on (max 30)
+    set {cfg::market-rotate-count} to 12
+
+    # --- Auction house (/ah) ---
+    set {cfg::ah-title} to "&6&lᴀᴜᴄᴛɪᴏɴ ʜᴏᴜѕᴇ"
+    # Prices players may ask (10000000 = 10m)
+    set {cfg::ah-min-price} to 1
+    set {cfg::ah-max-price} to 10000000
+    # Items one player can have listed at the same time
+    set {cfg::ah-max-listings} to 5
+    # Hours before an unsold item goes back to its seller (/ah collect)
+    set {cfg::ah-duration-hours} to 48
+    # Percent of each sale that disappears as tax (0 = the seller gets everything)
+    set {cfg::ah-tax-percent} to 0
+
+    # marketItem(id, item, display name, amount, price, stock, slot, enabled)
+    #   amount = items given per click (1)
+    #   stock  = how many can be bought per reset (-1 = unlimited)
+    #   slot   = where it shows (inner slots only: 10-16, 19-25, 28-34, 37-43 = 28 items max). Ignored when rotation is on.
+    delete {market::*}
+    marketItem("golden_carrot", golden carrot, "&6Golden Carrot", 1, 5, 64, 10, true)
+    marketItem("xp_bottle", experience bottle, "&aBottle o' Enchanting", 1, 15, 64, 11, true)
+    marketItem("diamond", diamond, "&bDiamond", 1, 300, 32, 12, true)
+    marketItem("slime_ball", slime ball, "&aSlime Ball", 1, 5, 64, 13, true)
+    marketItem("totem", totem of undying, "&eTotem of Undying", 1, 1500, 3, 14, true)
+    marketItem("blaze_rod", blaze rod, "&6Blaze Rod", 1, 20, 32, 15, true)
+    marketItem("gold_block", gold block, "&eGold Block", 1, 250, 16, 16, true)
+    marketItem("nether_star", nether star, "&fNether Star", 1, 5000, 1, 19, true)
+    marketItem("iron_block", iron block, "&fIron Block", 1, 120, 32, 20, true)
+    marketItem("nether_wart", nether wart, "&cNether Wart", 1, 3, 64, 21, true)
+    marketItem("upgrade_template", netherite upgrade smithing template, "&dNetherite Upgrade Template", 1, 1500, 3, 22, true)
+    marketItem("netherite_ingot", netherite ingot, "&8Netherite Ingot", 1, 2000, 4, 23, true)
+    marketItem("ancient_debris", ancient debris, "&6Ancient Debris", 1, 800, 8, 24, true)
+    marketItem("enchanted_golden_apple", enchanted golden apple, "&dEnchanted Golden Apple", 1, 3000, 2, 25, true)
+    marketItem("obsidian", obsidian, "&5Obsidian", 1, 10, 64, 28, true)
+    marketItem("shulker_shell", shulker shell, "&dShulker Shell", 1, 450, 8, 29, true)
+    marketItem("steak", cooked beef, "&6Steak", 1, 3, 64, 30, true)
+    marketItem("diamond_block", diamond block, "&bDiamond Block", 1, 2700, 8, 31, true)
+    marketItem("golden_apple", golden apple, "&6Golden Apple", 1, 100, 32, 32, true)
+    marketItem("breeze_rod", breeze rod, "&bBreeze Rod", 1, 60, 16, 33, true)
+    marketItem("wither_skull", wither skeleton skull, "&8Wither Skeleton Skull", 1, 1000, 3, 34, true)
+    marketItem("oak_log", oak log, "&6Oak Log", 1, 2, 64, 0, false)
+    marketItem("netherite_scrap", netherite scrap, "&8Netherite Scrap", 1, 500, 8, 37, true)
+    marketItem("gunpowder", gunpowder, "&7Gunpowder", 1, 5, 64, 38, true)
+    marketItem("leather", leather, "&6Leather", 1, 8, 64, 0, false)
+    marketItem("glowstone", glowstone, "&eGlowstone", 1, 10, 64, 39, true)
+    marketItem("cobweb", cobweb, "&fCobweb", 1, 25, 32, 40, true)
+    marketItem("piston", piston, "&7Piston", 1, 30, 16, 41, true)
+    marketItem("dragon_breath", dragon breath, "&dDragon's Breath", 1, 400, 8, 42, true)
+    marketItem("ominous_key", ominous trial key, "&5Ominous Trial Key", 1, 2500, 2, 43, true)
+
+function rank(id: text, name: text, mult: number, price: text, icon: itemtype):
+    add {_id} to {cfg::rank::ids::*}
+    set {cfg::rank::%{_id}%::name} to {_name}
+    set {cfg::rank::%{_id}%::mult} to {_mult}
+    set {cfg::rank::%{_id}%::price} to {_price}
+    set {cfg::rank::%{_id}%::icon} to {_icon}
+
+function marketItem(id: text, item: itemtype, name: text, amount: integer, price: number, stock: integer, slot: integer, enabled: boolean):
+    add {_id} to {market::ids::*}
+    set {market::%{_id}%::item} to {_item}
+    set {market::%{_id}%::name} to {_name}
+    set {market::%{_id}%::amount} to {_amount}
+    set {market::%{_id}%::price} to {_price}
+    set {market::%{_id}%::stock} to {_stock}
+    set {market::%{_id}%::slot} to {_slot}
+    set {market::%{_id}%::enabled} to {_enabled}

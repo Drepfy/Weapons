@@ -1,0 +1,87 @@
+# ============================================================
+#  BALTOP - /baltop GUI with player heads (21 per page)
+# ============================================================
+
+function openBaltop(p: player, page: integer):
+    set {_all::*} to sorted indices of {economy::balance::*} in descending order
+    set {_pages} to max(1, ceil(size of {_all::*} / 21))
+    set {_page} to min(max(1, {_page}), {_pages})
+
+    set {_gui} to chest inventory with 6 rows named "&8&lʙᴀʟᴀɴᴄᴇ ᴛᴏᴘ"
+    set slots (integers between 0 and 53) of {_gui} to black stained glass pane named "&r"
+    set slots 45, 46, 47, 51 and 52 of {_gui} to lime stained glass pane named "&r"
+
+    set {_grid::*} to 10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33 and 34
+    loop 21 times:
+        set {_rank} to ({_page} - 1) * 21 + loop-number
+        set {_uuid} to {_all::%{_rank}%}
+        if {_uuid} is set:
+            set {_op} to {_uuid} parsed as offline player
+            set {_head} to skull of {_op}
+            if {_rank} is 1:
+                set {_c} to "&6"
+            else if {_rank} is 2:
+                set {_c} to "&f"
+            else if {_rank} is 3:
+                set {_c} to "&c"
+            else:
+                set {_c} to "&a"
+            set slot {_grid::%loop-number%} of {_gui} to {_head} named "%{_c}%#%{_rank}% &f%{_op}% &7→ &a%money({economy::balance::%{_uuid}%})%" with lore "&8▪ &fKills: &a%{economy::kills::%{_uuid}%} ? 0%" and "&8▪ &fDeaths: &c%{economy::deaths::%{_uuid}%} ? 0%"
+
+    # Your own rank
+    set {_me} to uuid of {_p}
+    loop {_all::*}:
+        if loop-value is {_me}:
+            set {_myrank} to loop-index
+    if {_myrank} is not set:
+        set {_myrank} to "?"
+    set slot 49 of {_gui} to {_p}'s skull named "&e&lYou &7- &f#%{_myrank}%" with lore "&8▪ &fBalance: &a%money(getBalance({_p}))%" and "&8▪ &fPage: &f%{_page}%/%{_pages}%"
+    if {_page} > 1:
+        set slot 48 of {_gui} to arrow named "&e« Previous page"
+    if {_page} < {_pages}:
+        set slot 50 of {_gui} to arrow named "&eNext page »"
+    set slot 53 of {_gui} to barrier named "&cClose"
+
+    set {-baltop::gui::%{_me}%} to {_gui}
+    set {-baltop::page::%{_me}%} to {_page}
+    set {-baltop::opening::%{_me}%} to true
+    set {-baltop::open::%{_me}%} to true
+    open {_gui} to {_p}
+    wait 2 ticks
+    delete {-baltop::opening::%{_me}%}
+
+command /baltop [<integer>]:
+    aliases: /balancetop, /moneytop
+    trigger:
+        openBaltop(player, arg-1 ? 1)
+
+on inventory click:
+    set {_gui} to {-baltop::gui::%uuid of player%}
+    {_gui} is set
+    {-baltop::open::%uuid of player%} is set
+    cancel event
+    set {_slot} to raw index of event-slot
+    set {_page} to {-baltop::page::%uuid of player%}
+    if {_slot} is 48:
+        openBaltop(player, {_page} - 1)
+    else if {_slot} is 50:
+        openBaltop(player, {_page} + 1)
+    else if {_slot} is 53:
+        close player's inventory
+
+on inventory drag:
+    set {_gui} to {-baltop::gui::%uuid of player%}
+    {_gui} is set
+    {-baltop::open::%uuid of player%} is set
+    cancel event
+
+on inventory close:
+    {-baltop::open::%uuid of player%} is set
+    {-baltop::opening::%uuid of player%} is not set
+    delete {-baltop::open::%uuid of player%}
+    delete {-baltop::gui::%uuid of player%}
+
+on quit:
+    delete {-baltop::open::%uuid of player%}
+    delete {-baltop::gui::%uuid of player%}
+    delete {-baltop::page::%uuid of player%}

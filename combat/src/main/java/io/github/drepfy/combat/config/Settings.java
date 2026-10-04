@@ -15,6 +15,7 @@ import java.util.Map;
 public record Settings(long combatMs,
                        ArmorRule armor,
                        LogoutRule logout,
+                       Commands commands,
                        boolean pearlResetsTimer,
                        Movement elytra,
                        Movement riptide,
@@ -26,6 +27,18 @@ public record Settings(long combatMs,
 
     public Settings {
         warnings = List.copyOf(warnings);
+    }
+
+    /**
+     * Commands while in combat.
+     *
+     * @param blocked no commands in combat (except {@code allowed}; staff with combat.bypass.commands)
+     * @param allowed command names that still work, lower case, without the slash
+     */
+    public record Commands(boolean blocked, List<String> allowed) {
+        public Commands {
+            allowed = List.copyOf(allowed);
+        }
     }
 
     /**

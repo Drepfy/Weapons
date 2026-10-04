@@ -14,6 +14,7 @@ import org.bukkit.event.Event;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -280,10 +281,10 @@ class CombatTest {
         PlayerMock alex = player("Alex");
         hit(steve, alex);
         seconds(5);
-        // Commands are never blocked, and do not end combat.
+        // Commands are refused (see commandsWaitUntilTheFightIsOver), and do not end combat.
         PlayerCommandPreprocessEvent command = new PlayerCommandPreprocessEvent(steve, "/spawn");
         server.getPluginManager().callEvent(command);
-        assertFalse(command.isCancelled(), "every command works in combat");
+        assertTrue(command.isCancelled());
         steve.performCommand("combat");
         assertTrue(has(chat(steve), "Combat: 55s left"));
         // Shops and menus open normally.
@@ -301,7 +302,11 @@ class CombatTest {
     }
 
     @Test
-    void loggingOutPausesTheTimer() {
+    void loggingOutPausesTheTimer() throws Exception {
+        java.io.File file = new java.io.File(plugin.getDataFolder(), "config.yml");
+        String yaml = java.nio.file.Files.readString(file.toPath());
+        java.nio.file.Files.writeString(file.toPath(), yaml.replace("logout: kill", "logout: keep"));
+        assertEquals(List.of(), plugin.reload());
         PlayerMock steve = player("Steve");
         PlayerMock alex = player("Alex");
         hit(steve, alex);
@@ -320,11 +325,8 @@ class CombatTest {
     }
 
     @Test
-    void loggingOutCanKill() throws Exception {
-        java.io.File file = new java.io.File(plugin.getDataFolder(), "config.yml");
-        String yaml = java.nio.file.Files.readString(file.toPath());
-        java.nio.file.Files.writeString(file.toPath(), yaml.replace("logout: keep", "logout: kill"));
-        assertEquals(List.of(), plugin.reload());
+    void loggingOutInCombatKills() {
+        assertEquals(io.github.drepfy.combat.config.Settings.LogoutRule.KILL, plugin.settings().logout(), "the default");
         PlayerMock steve = player("Steve");
         PlayerMock alex = player("Alex");
         hit(alex, steve);
@@ -404,7 +406,7 @@ class CombatTest {
         assertEquals(60_000, settings.combatMs());
         assertEquals(15_000, settings.pearlMs());
         assertEquals(io.github.drepfy.combat.config.Settings.ArmorRule.ARMOR_PIECES, settings.armor());
-        assertEquals(io.github.drepfy.combat.config.Settings.LogoutRule.KEEP, settings.logout());
+        assertEquals(io.github.drepfy.combat.config.Settings.LogoutRule.KILL, settings.logout());
         assertEquals(5, settings.warnings().size(), settings.warnings().toString());
         assertEquals(List.of(), io.github.drepfy.combat.config.SettingsLoader.load(
                 org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(new java.io.InputStreamReader(
@@ -790,5 +792,98 @@ class CombatTest {
         steve.removeMetadata(CombatPlugin.BAR_CLAIM, plugin);
         tick(1);
         assertTrue(has(bars(steve), "Combat: 57s"), "and it takes the bar back at once");
+    }
+
+    @Test
+    void commandsWaitUntilTheFightIsOver() {
+        PlayerMock steve = player("Steve");
+        PlayerMock alex = player("Alex");
+        hit(steve, alex);
+        for (String line : List.of("/rtp", "/tpa Alex", "/tpahere Alex", "/tpaccept", "/spawn", "/home",
+                "/ah sell 1k", "/essentials:tpa Alex", "/msg Alex hi")) {
+            PlayerCommandPreprocessEvent command = new PlayerCommandPreprocessEvent(steve, line);
+            server.getPluginManager().callEvent(command);
+            assertTrue(command.isCancelled(), line + " is refused in combat");
+        }
+        assertTrue(has(chat(steve), "You cannot use commands in combat. (60s left)"));
+        PlayerCommandPreprocessEvent status = new PlayerCommandPreprocessEvent(steve, "/combat");
+        server.getPluginManager().callEvent(status);
+        assertFalse(status.isCancelled(), "/combat still shows the time");
+        // Staff can be given a bypass.
+        alex.addAttachment(plugin, "combat.bypass.commands", true);
+        PlayerCommandPreprocessEvent staff = new PlayerCommandPreprocessEvent(alex, "/tpa Steve");
+        server.getPluginManager().callEvent(staff);
+        assertFalse(staff.isCancelled());
+        // After the fight everything works again.
+        seconds(60);
+        PlayerCommandPreprocessEvent after = new PlayerCommandPreprocessEvent(steve, "/rtp");
+        server.getPluginManager().callEvent(after);
+        assertFalse(after.isCancelled());
+    }
+
+    @Test
+    void scriptsCanSeeWhoIsInCombat() {
+        PlayerMock steve = player("Steve");
+        PlayerMock alex = player("Alex");
+        assertFalse(steve.hasMetadata(CombatPlugin.IN_COMBAT));
+        hit(steve, alex);
+        tick(1);
+        assertTrue(steve.hasMetadata(CombatPlugin.IN_COMBAT), "Skript: metadata value \"incombat\" of player is set");
+        seconds(60);
+        assertFalse(steve.hasMetadata(CombatPlugin.IN_COMBAT));
+    }
+
+    @Test
+    void anOldConfigIsBroughtUpToDate() throws Exception {
+        String old = new String(CombatTest.class.getResourceAsStream("/config.yml").readAllBytes(),
+                java.nio.charset.StandardCharsets.UTF_8)
+                .replace("logout: kill", "logout: keep")
+                .replaceAll("(?m)^  # No commands in combat.*\\R(^  #.*\\R)?^  block-commands: true\\R^  allowed-commands: .*\\R", "");
+        assertFalse(old.contains("block-commands"), "an old config");
+        String upgraded = io.github.drepfy.combat.config.ConfigUpgrade.upgrade(old);
+        org.bukkit.configuration.file.YamlConfiguration yaml = new org.bukkit.configuration.file.YamlConfiguration();
+        yaml.loadFromString(upgraded);
+        io.github.drepfy.combat.config.Settings settings = io.github.drepfy.combat.config.SettingsLoader.load(yaml);
+        assertEquals(List.of(), settings.warnings());
+        assertEquals(io.github.drepfy.combat.config.Settings.LogoutRule.KILL, settings.logout());
+        assertTrue(settings.commands().blocked());
+        assertEquals(upgraded, io.github.drepfy.combat.config.ConfigUpgrade.upgrade(upgraded), "only once");
+        String chosen = upgraded.replace("block-commands: true", "block-commands: false").replace("logout: kill", "logout: keep");
+        assertEquals(chosen, io.github.drepfy.combat.config.ConfigUpgrade.upgrade(chosen), "later choices are kept");
+    }
+
+    @Test
+    void loggingOutDropsEverythingEvenWithKeepInventory() {
+        PlayerMock steve = player("Steve");
+        PlayerMock alex = player("Alex");
+        steve.getInventory().addItem(new ItemStack(Material.DIAMOND, 12), new ItemStack(Material.NETHERITE_INGOT, 2));
+        List<PlayerDeathEvent> deaths = new ArrayList<>();
+        server.getPluginManager().registerEvents(new org.bukkit.event.Listener() {
+            // What a server with the keepInventory game rule does: keep everything, drop nothing.
+            @org.bukkit.event.EventHandler(priority = org.bukkit.event.EventPriority.LOWEST)
+            public void keepInventory(PlayerDeathEvent event) {
+                event.setKeepInventory(true);
+                event.getDrops().clear();
+            }
+
+            @org.bukkit.event.EventHandler(priority = org.bukkit.event.EventPriority.MONITOR)
+            public void onDeath(PlayerDeathEvent event) {
+                deaths.add(event);
+            }
+        }, plugin);
+        hit(alex, steve);
+        steve.disconnect();
+        assertEquals(1, deaths.size());
+        PlayerDeathEvent death = deaths.get(0);
+        assertFalse(death.getKeepInventory(), "the loot is not kept");
+        assertTrue(death.getDrops().stream().anyMatch(item -> item.getType() == Material.DIAMOND
+                && item.getAmount() == 12), "it drops on the floor: " + death.getDrops());
+        assertTrue(death.getDrops().stream().anyMatch(item -> item.getType() == Material.NETHERITE_INGOT));
+        // A normal death still follows keepInventory.
+        PlayerMock sam = player("Sam");
+        sam.getInventory().addItem(new ItemStack(Material.DIAMOND, 3));
+        sam.setHealth(0);
+        assertTrue(deaths.get(deaths.size() - 1).getKeepInventory());
+        assertTrue(deaths.get(deaths.size() - 1).getDrops().isEmpty());
     }
 }

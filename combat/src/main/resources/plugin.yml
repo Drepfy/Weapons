@@ -19,3 +19,6 @@ permissions:
   combat.admin:
     description: /combat info, tag, untag, zone (safe zones around spawn) and reload.
     default: op
+  combat.bypass.commands:
+    description: May use every command while in combat (for staff). Nobody has it by default.
+    default: false

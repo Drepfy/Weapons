@@ -10,10 +10,14 @@ combat:
   #   any-item:     anything in those four slots counts
   armor: armor-pieces
   # Logging out never ends combat: the timer is paused and continues when the player is back.
-  #   keep: nothing else happens (default)
-  #   kill: the player also dies where they logged out and drops their items (not when they
+  #   keep: nothing else happens
+  #   kill: the player also dies where they logged out and drops their items (default; not when they
   #         are kicked or the server stops)
-  logout: keep
+  logout: kill
+  # No commands in combat (/tpa, /rtp, /spawn, /ah...). The ones listed in allowed-commands
+  # still work. Staff with the permission combat.bypass.commands can use every command.
+  block-commands: true
+  allowed-commands: [combat, ct, combattag]
   # Throwing an Ender Pearl in combat starts the combat time again (back to 60 seconds).
   pearl-resets-timer: true
   # No elytra gliding in combat. Players already gliding come down.
@@ -50,6 +54,7 @@ messages:
   combat-end: "&aYou are no longer in combat."
   combat-rejoin: "&cYou are still in combat: &f{seconds}s&c left."
   combat-logout-kill: "&c{player} logged out during combat and died."
+  command-blocked: "&cYou cannot use commands in combat. &7({seconds}s left)"
   pearl-cooldown: "&cYou can use an Ender Pearl again in &f{seconds}s&c."
   elytra-blocked: "&cYou cannot glide with an elytra in combat."
   riptide-blocked: "&cYou cannot use riptide in combat."
