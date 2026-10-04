@@ -6,7 +6,7 @@ Skript add-ons for the server, one file per feature:
 |---|---|
 | `scripts/settings.sk` | **All settings**: server IP, scoreboard title, currency, PvP rewards, mob rewards, market items, reset timer |
 | `scripts/economy.sk` | Persistent balances, `/balance`, `/pay`, `/eco` |
-| `scripts/scoreboard.sk` | Sidebar: money, kills, deaths, playtime, players online, market reset countdown, auctions (updates every second) |
+| `scripts/scoreboard.sk` | Small sidebar: money, kills, deaths, playtime, players online, market reset countdown (updates every second) |
 | `scripts/killrewards.sk` | Money for mob / player kills, kill & death tracking |
 | `scripts/baltop.sk` | `/baltop` GUI with player heads, ranks and pages |
 | `scripts/teleport.sk` | `/tpa`, `/tpahere`, `/tpaccept`, `/tpdeny`, `/tpacancel`, `/tptoggle`, `/rtp`, `/spawn`, `/setspawn`. A teleport is cancelled if the player gets into combat during the warmup |
