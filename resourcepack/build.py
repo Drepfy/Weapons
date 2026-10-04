@@ -53,8 +53,7 @@ def files():
     # ---- Legendary weapons ----
     for item, weapons in (('netherite_sword', SWORDS), ('netherite_axe', AXES)):
         for _, name in weapons:
-            out[f'assets/legendary/textures/item/{name}.png'] = textures.png(textures.grid(name),
-                                                                          textures.PALETTES[name])
+            out[f'assets/legendary/textures/item/{name}.png'] = textures.png(name)
             out[f'assets/legendary/models/item/{name}.json'] = as_json(
                 {'parent': 'minecraft:item/handheld', 'textures': {'layer0': f'legendary:item/{name}'}})
         # 1.20 - 1.21.3: model overrides
@@ -82,32 +81,21 @@ def dispatch(item, entries):
 
 
 def icon():
-    """64x64: Kurogane and Starforged crossed, on the night sky."""
-    size, scale = 64, 4
-    sky = (16, 14, 40)
-    pixels = [[sky] * size for _ in range(size)]
+    """64x64: Kurogane and Starforged crossed, on a dark background."""
+    size, scale = 64, 2
+    pixels = [[(24, 22, 32)] * size for _ in range(size)]
     for name, mirror in (('starforged', True), ('kurogane', False)):
-        rows = textures.grid(name)
-        palette = textures.PALETTES[name]
-        for y in range(16):
-            for x in range(16):
-                rgb = palette.get(rows[y][x])
+        rows = textures.rows(name)
+        for y in range(textures.SIZE):
+            for x in range(textures.SIZE):
+                rgb = rows[y][x]
                 if rgb is None:
                     continue
-                px = (15 - x) if mirror else x
+                px = (textures.SIZE - 1 - x) if mirror else x
                 for dy in range(scale):
                     for dx in range(scale):
                         pixels[y * scale + dy][px * scale + dx] = rgb
-    raw = b''.join(b'\x00' + b''.join(bytes(p + (255,)) for p in row) for row in pixels)
-    import struct
-    import zlib
-
-    def chunk(kind, data):
-        body = kind + data
-        return struct.pack('>I', len(data)) + body + struct.pack('>I', zlib.crc32(body) & 0xFFFFFFFF)
-
-    header = struct.pack('>IIBBBBB', size, size, 8, 6, 0, 0, 0)
-    return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', header) + chunk(b'IDAT', zlib.compress(raw, 9)) + chunk(b'IEND', b'')
+    return textures.pix.png_bytes(pixels)
 
 
 def main():
