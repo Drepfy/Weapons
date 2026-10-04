@@ -4,7 +4,7 @@ Anti-cheat and moderation for a Spigot/Paper SMP (built for **ᴠᴀɴɪʟʟᴀ 
 
 > This repository also has the server's **[Lifesteal plugin](lifesteal/README.md)**
 > (`lifesteal/`, released as `release/Lifesteal.jar`) and **[Combat plugin](combat/README.md)**
-> (combat timer and Ender Pearl cooldown; `combat/`, released as `release/Combat.jar`).
+> (combat timer, Ender Pearl cooldown, elytra/riptide rules and spawn safe zones; `combat/`, released as `release/Combat.jar`).
 
 - **20 server-side checks**: speed, flight (incl. spider and walking on water),
   step, NoFall, timer, NoSlow, anti-knockback, reach, kill aura, no-swing,

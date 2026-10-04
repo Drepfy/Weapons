@@ -54,8 +54,12 @@ final class CombatCommand implements CommandExecutor, TabCompleter {
             }
             return true;
         }
+        if (sub.equals("zone")) {
+            zone(sender, args, label);
+            return true;
+        }
         if (args.length < 2 || !List.of("info", "tag", "untag").contains(sub)) {
-            send(sender, "&cUsage: /" + label + " [info|tag|untag <player> | reload]");
+            send(sender, "&cUsage: /" + label + " [info|tag|untag <player> | zone | reload]");
             return true;
         }
         Player target = Bukkit.getPlayerExact(args[1]);
@@ -98,6 +102,96 @@ final class CombatCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    /**
+     * {@code /combat zone pos1|pos2}, {@code create <name> [radius]}, {@code delete <name>}, {@code list}.
+     * Zones go from bedrock to the sky.
+     */
+    private void zone(CommandSender sender, String[] args, String label) {
+        String action = args.length > 1 ? args[1].toLowerCase(Locale.ROOT) : "";
+        ZoneStore zones = plugin.zones();
+        switch (action) {
+            case "list" -> {
+                List<SafeZone> all = zones.all();
+                send(sender, all.isEmpty() ? "&7There are no safe zones. Make one with &f/" + label
+                        + " zone create <name> <radius>" : "&7Safe zones (" + all.size() + "):");
+                for (SafeZone zone : all) {
+                    sender.sendMessage(Text.color("  &f") + zone.describe());
+                }
+            }
+            case "pos1", "pos2" -> {
+                if (!(sender instanceof Player player)) {
+                    send(sender, "&cOnly players can pick corners.");
+                    return;
+                }
+                org.bukkit.Location[] corners = plugin.selection(player);
+                org.bukkit.Location here = player.getLocation().getBlock().getLocation();
+                corners[action.equals("pos1") ? 0 : 1] = here;
+                send(sender, "&7Corner " + action.charAt(3) + " set to &f" + here.getBlockX() + " " + here.getBlockZ()
+                        + "&7.");
+            }
+            case "create" -> {
+                if (args.length < 3 || args.length > 4 || !args[2].matches("[A-Za-z0-9_-]{1,32}")) {
+                    send(sender, "&cUsage: /" + label + " zone create <name> [radius]  &7(name: letters, numbers, - and _)");
+                    return;
+                }
+                if (!(sender instanceof Player player)) {
+                    send(sender, "&cOnly players can create zones (they are made where you stand).");
+                    return;
+                }
+                SafeZone zone;
+                if (args.length == 4) {
+                    int radius;
+                    try {
+                        radius = Integer.parseInt(args[3]);
+                    } catch (NumberFormatException e) {
+                        radius = -1;
+                    }
+                    if (radius < 1 || radius > 100_000) {
+                        send(sender, "&c'" + args[3] + "' is not a radius (a whole number of blocks, e.g. 50).");
+                        return;
+                    }
+                    org.bukkit.Location here = player.getLocation();
+                    zone = SafeZone.of(args[2], player.getWorld().getName(), here.getBlockX() - radius,
+                            here.getBlockZ() - radius, here.getBlockX() + radius, here.getBlockZ() + radius);
+                } else {
+                    org.bukkit.Location[] corners = plugin.selection(player);
+                    if (corners[0] == null || corners[1] == null) {
+                        send(sender, "&cStand on one corner and use &f/" + label + " zone pos1&c, then on the opposite "
+                                + "corner &f/" + label + " zone pos2&c. Or give a radius: &f/" + label
+                                + " zone create " + args[2] + " 50");
+                        return;
+                    }
+                    if (!corners[0].getWorld().equals(corners[1].getWorld())) {
+                        send(sender, "&cBoth corners must be in the same world.");
+                        return;
+                    }
+                    zone = SafeZone.of(args[2], corners[0].getWorld().getName(), corners[0].getBlockX(),
+                            corners[0].getBlockZ(), corners[1].getBlockX(), corners[1].getBlockZ());
+                }
+                boolean replaced = zones.get(zone.name()) != null;
+                zones.put(zone);
+                send(sender, "&aSafe zone " + (replaced ? "updated" : "created") + ": &f" + zone.describe()
+                        + "&a. Players in combat cannot enter it.");
+            }
+            case "delete" -> {
+                if (args.length != 3) {
+                    send(sender, "&cUsage: /" + label + " zone delete <name>");
+                } else if (zones.remove(args[2])) {
+                    send(sender, "&7Safe zone &f" + args[2] + " &7deleted.");
+                } else {
+                    send(sender, "&cThere is no safe zone called &f" + args[2] + "&c.");
+                }
+            }
+            default -> {
+                send(sender, "&7Safe zones: players in combat cannot enter them.");
+                sender.sendMessage(Text.color("  &f/" + label + " zone create <name> <radius> &8- &7a square around you"));
+                sender.sendMessage(Text.color("  &f/" + label + " zone pos1&7, &f/" + label + " zone pos2&7, then &f/"
+                        + label + " zone create <name> &8- &7between two corners"));
+                sender.sendMessage(Text.color("  &f/" + label + " zone list&7, &f/" + label + " zone delete <name>"));
+            }
+        }
+    }
+
     private void status(CommandSender sender, Player player) {
         long combat = plugin.combatRemaining(player);
         send(sender, combat > 0 ? Text.format(plugin.message("status-combat"), "seconds", CombatPlugin.seconds(combat))
@@ -118,7 +212,19 @@ final class CombatCommand implements CommandExecutor, TabCompleter {
             return options;
         }
         if (args.length == 1) {
-            options.addAll(List.of("info", "tag", "untag", "reload"));
+            options.addAll(List.of("info", "tag", "untag", "zone", "reload"));
+        } else if (args[0].equalsIgnoreCase("zone")) {
+            if (args.length == 2) {
+                options.addAll(List.of("create", "pos1", "pos2", "delete", "list"));
+            } else if (args.length == 3 && args[1].equalsIgnoreCase("delete")) {
+                for (SafeZone zone : plugin.zones().all()) {
+                    options.add(zone.name());
+                }
+            } else if (args.length == 3 && args[1].equalsIgnoreCase("create")) {
+                options.add("spawn");
+            } else if (args.length == 4 && args[1].equalsIgnoreCase("create")) {
+                options.addAll(List.of("25", "50", "100"));
+            }
         } else if (args.length == 2 && !args[0].equalsIgnoreCase("reload")) {
             for (Player player : Bukkit.getOnlinePlayers()) {
                 options.add(player.getName());

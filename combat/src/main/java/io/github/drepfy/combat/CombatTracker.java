@@ -60,6 +60,14 @@ public final class CombatTracker {
         return remaining(player, now) > 0;
     }
 
+    /** Starts the time again for every fight the player is in (not for players out of combat). */
+    public void refresh(UUID player, long now, long durationMs) {
+        Combat combat = combats.get(player);
+        if (combat != null && combat.pausedAt < 0 && combat.remaining(now) > 0) {
+            combat.ends.replaceAll((opponent, end) -> Math.max(end, now + durationMs));
+        }
+    }
+
     /** Ends the combat with one opponent (the other fights go on). */
     public void removeOpponent(UUID player, UUID opponent) {
         Combat combat = combats.get(player);

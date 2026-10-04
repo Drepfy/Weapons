@@ -25,6 +25,9 @@ public final class SettingsLoader {
         m.put("combat-rejoin", "&cYou are still in combat: &f{seconds}s&c left.");
         m.put("combat-logout-kill", "&c{player} logged out during combat and died.");
         m.put("pearl-cooldown", "&cYou can use an Ender Pearl again in &f{seconds}s&c.");
+        m.put("elytra-blocked", "&cYou cannot glide with an elytra in combat.");
+        m.put("riptide-blocked", "&cYou cannot use riptide in combat.");
+        m.put("zone-blocked", "&cYou cannot enter &f{zone} &cin combat. &7({seconds}s left)");
         m.put("status-combat", "&7Combat: &c{seconds}s left");
         m.put("status-no-combat", "&7Combat: &anot in combat");
         m.put("status-pearl", "&7Ender Pearl: &c{seconds}s");
@@ -43,8 +46,15 @@ public final class SettingsLoader {
         long combat = duration(root, "combat.duration", 60_000L, 1_000L, warnings);
         Settings.ArmorRule armor = choice(root, "combat.armor", Settings.ArmorRule.ARMOR_PIECES, warnings);
         Settings.LogoutRule logout = choice(root, "combat.logout", Settings.LogoutRule.KEEP, warnings);
+        boolean pearlResets = bool(root, "combat.pearl-resets-timer", true, warnings);
+        Settings.Movement elytra = new Settings.Movement(bool(root, "combat.elytra.blocked", true, warnings),
+                number(root, "combat.elytra.radius", 15.0, 0.0, 1000.0, warnings));
+        Settings.Movement riptide = new Settings.Movement(bool(root, "combat.riptide.blocked", true, warnings),
+                number(root, "combat.riptide.radius", 15.0, 0.0, 1000.0, warnings));
         long pearl = duration(root, "ender-pearl.cooldown", 15_000L, 0L, warnings);
         boolean overlay = bool(root, "ender-pearl.show-on-item", true, warnings);
+        Settings.Zones zones = new Settings.Zones(bool(root, "safe-zones.show-border", true, warnings),
+                number(root, "safe-zones.border-distance", 8.0, 1.0, 64.0, warnings));
         Map<String, String> messages = new HashMap<>();
         for (Map.Entry<String, String> entry : DEFAULT_MESSAGES.entrySet()) {
             Object value = root.get("messages." + entry.getKey());
@@ -54,7 +64,27 @@ public final class SettingsLoader {
         if (prefix != null) {
             messages.put("prefix", prefix.toString());
         }
-        return new Settings(combat, armor, logout, pearl, overlay, new Settings.Messages(messages), warnings);
+        return new Settings(combat, armor, logout, pearlResets, elytra, riptide, pearl, overlay, zones,
+                new Settings.Messages(messages), warnings);
+    }
+
+    private static double number(ConfigurationSection root, String path, double def, double min, double max,
+                                 List<String> warnings) {
+        Object value = root.get(path);
+        if (value == null) {
+            return def;
+        }
+        try {
+            double parsed = value instanceof Number number ? number.doubleValue() : Double.parseDouble(value.toString());
+            if (parsed >= min && parsed <= max) {
+                return parsed;
+            }
+        } catch (NumberFormatException ignored) {
+            // Reported below.
+        }
+        warnings.add(path + " must be a number from " + (long) min + " to " + (long) max + " (got '" + value
+                + "'); using " + (long) def + ".");
+        return def;
     }
 
     private static long duration(ConfigurationSection root, String path, long def, long min, List<String> warnings) {

@@ -14,12 +14,33 @@ combat:
   #   kill: the player also dies where they logged out and drops their items (not when they
   #         are kicked or the server stops)
   logout: keep
+  # Throwing an Ender Pearl in combat starts the combat time again (back to 60 seconds).
+  pearl-resets-timer: true
+  # No elytra gliding in combat. Players already gliding come down.
+  elytra:
+    blocked: true
+    # Only while a player you are fighting is within this many blocks. 0 = for the whole combat.
+    radius: 15
+  # No riptide tridents in combat (throwing tridents as a weapon is still fine).
+  riptide:
+    blocked: true
+    radius: 15
 
 ender-pearl:
   # Time between two Ender Pearls, per player. 0s = no cooldown.
   cooldown: 15s
   # Show the cooldown on the pearl in the hotbar (the grey sweep).
   show-on-item: true
+
+# Safe zones, such as spawn: players in combat cannot get in by walking, flying, riding,
+# Ender Pearls, chorus fruit, portals or teleports (/spawn, /tpa...). Players already inside
+# can stay and leave. Make one in game with /combat zone create spawn 50 (50 blocks out from
+# where you stand, every direction, full height), or stand on one corner and use /combat zone pos1,
+# on the opposite corner /combat zone pos2, then /combat zone create spawn. Zones are kept in zones.yml.
+safe-zones:
+  # Show a red wall of particles to players in combat who come close.
+  show-border: true
+  border-distance: 8
 
 # {seconds} = seconds left. Set a message to "" to turn it off.
 messages:
@@ -30,6 +51,9 @@ messages:
   combat-rejoin: "&cYou are still in combat: &f{seconds}s&c left."
   combat-logout-kill: "&c{player} logged out during combat and died."
   pearl-cooldown: "&cYou can use an Ender Pearl again in &f{seconds}s&c."
+  elytra-blocked: "&cYou cannot glide with an elytra in combat."
+  riptide-blocked: "&cYou cannot use riptide in combat."
+  zone-blocked: "&cYou cannot enter &f{zone} &cin combat. &7({seconds}s left)"
   status-combat: "&7Combat: &c{seconds}s left"
   status-no-combat: "&7Combat: &anot in combat"
   status-pearl: "&7Ender Pearl: &c{seconds}s"

@@ -544,6 +544,211 @@ class CombatTest {
         assertTrue(throwPearl(steve).isCancelled(), "the server still refuses");
     }
 
+    // ---- elytra, riptide and pearls in combat --------------------------------------------------------------------
+
+    private boolean glide(PlayerMock player) {
+        org.bukkit.event.entity.EntityToggleGlideEvent glide = new org.bukkit.event.entity.EntityToggleGlideEvent(player, true);
+        server.getPluginManager().callEvent(glide);
+        return !glide.isCancelled();
+    }
+
+    @Test
+    void noElytraNearSomeoneYouAreFighting() {
+        PlayerMock steve = player("Steve");
+        PlayerMock alex = player("Alex");
+        assertTrue(glide(steve), "out of combat an elytra works");
+        hit(alex, steve);
+        alex.teleport(new Location(world, 10.5, 64, 0.5));
+        assertFalse(glide(steve), "Alex is 10 blocks away");
+        assertTrue(has(chat(steve), "You cannot glide with an elytra in combat."));
+        alex.teleport(new Location(world, 20.5, 64, 0.5));
+        assertTrue(glide(steve), "20 blocks away: allowed (radius 15)");
+
+        // Someone already gliding comes down when the fight gets close.
+        steve.setGliding(true);
+        alex.teleport(new Location(world, 5.5, 64, 0.5));
+        tick(5);
+        assertFalse(steve.isGliding());
+    }
+
+    @Test
+    void radiusZeroBlocksTheElytraForTheWholeCombat() throws Exception {
+        java.io.File file = new java.io.File(plugin.getDataFolder(), "config.yml");
+        String yaml = java.nio.file.Files.readString(file.toPath());
+        String edited = yaml.replaceFirst("(elytra:\\R\\s+blocked: true\\R(?:\\s*#[^\\n]*\\R)?\\s+)radius: 15",
+                "$1radius: 0");
+        assertFalse(edited.equals(yaml), "the config was edited");
+        java.nio.file.Files.writeString(file.toPath(), edited);
+        assertEquals(List.of(), plugin.reload());
+        PlayerMock steve = player("Steve");
+        PlayerMock alex = player("Alex");
+        hit(alex, steve);
+        alex.teleport(new Location(world, 500.5, 64, 0.5));
+        assertFalse(glide(steve), "far away, still in combat");
+    }
+
+    @Test
+    void noRiptideNearSomeoneYouAreFighting() {
+        PlayerMock steve = player("Steve");
+        PlayerMock alex = player("Alex");
+        ItemStack riptide = new ItemStack(Material.TRIDENT);
+        riptide.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.RIPTIDE, 3);
+        ItemStack plain = new ItemStack(Material.TRIDENT);
+        assertEquals(Event.Result.DEFAULT, useTrident(steve, riptide), "out of combat it works");
+        hit(alex, steve);
+        assertEquals(Event.Result.DENY, useTrident(steve, riptide));
+        assertTrue(has(chat(steve), "You cannot use riptide in combat."));
+        assertEquals(Event.Result.DEFAULT, useTrident(steve, plain), "throwing a trident at someone is fine");
+        alex.teleport(new Location(world, 30.5, 64, 0.5));
+        assertEquals(Event.Result.DEFAULT, useTrident(steve, riptide), "30 blocks away");
+    }
+
+    private Event.Result useTrident(PlayerMock player, ItemStack trident) {
+        player.getInventory().setItemInMainHand(trident);
+        PlayerInteractEvent use = new PlayerInteractEvent(player, Action.RIGHT_CLICK_AIR, trident, null,
+                BlockFace.SELF, EquipmentSlot.HAND);
+        server.getPluginManager().callEvent(use);
+        return use.useItemInHand();
+    }
+
+    @Test
+    void anEnderPearlStartsTheSixtySecondsAgain() {
+        PlayerMock steve = player("Steve");
+        PlayerMock alex = player("Alex");
+        hit(steve, alex);
+        seconds(30);
+        assertEquals(30, left(steve));
+        throwPearl(steve);
+        assertEquals(60, left(steve), "back to 60");
+        assertEquals(30, left(alex), "only for the one who threw it");
+
+        PlayerMock sam = player("Sam");
+        throwPearl(sam);
+        assertFalse(inCombat(sam), "a pearl out of combat does not start combat");
+    }
+
+    // ---- safe zones -----------------------------------------------------------------------------------------------
+
+    private PlayerMock spawnZone() {
+        PlayerMock staff = player("Staff");
+        staff.setOp(true);
+        staff.teleport(new Location(world, 0.5, 64, 0.5));
+        staff.performCommand("combat zone create spawn 10");
+        assertTrue(has(chat(staff), "Safe zone created: spawn (world, -10 -10 to 10 10)"));
+        staff.teleport(new Location(world, 500.5, 64, 500.5));
+        return staff;
+    }
+
+    private boolean move(PlayerMock player, double x, double z) {
+        Location from = player.getLocation();
+        Location to = new Location(world, x, 64, z);
+        org.bukkit.event.player.PlayerMoveEvent move = new org.bukkit.event.player.PlayerMoveEvent(player, from, to);
+        server.getPluginManager().callEvent(move);
+        if (!move.isCancelled()) {
+            player.setLocation(to);
+        }
+        return !move.isCancelled();
+    }
+
+    @Test
+    void playersInCombatCannotEnterSpawn() {
+        spawnZone();
+        PlayerMock steve = player("Steve");
+        PlayerMock alex = player("Alex");
+        steve.teleport(new Location(world, 11.5, 64, 0.5));
+        alex.teleport(new Location(world, 30.5, 64, 0.5));
+        assertTrue(move(steve, 10.5, 0.5), "out of combat anyone walks in");
+        assertTrue(move(steve, 11.5, 0.5), "and out");
+        hit(alex, steve);
+        chat(steve);
+        assertFalse(move(steve, 10.5, 0.5), "in combat: refused at the border");
+        assertTrue(has(chat(steve), "You cannot enter spawn in combat. (60s left)"));
+        assertTrue(steve.getVelocity().getX() > 0, "pushed back out");
+        assertTrue(move(steve, 11.5, 30.5), "walking along outside is fine");
+
+        // Ender Pearls, /spawn, portals...: every teleport into the zone.
+        org.bukkit.event.player.PlayerTeleportEvent pearl = new org.bukkit.event.player.PlayerTeleportEvent(steve,
+                steve.getLocation(), new Location(world, 0.5, 64, 0.5),
+                org.bukkit.event.player.PlayerTeleportEvent.TeleportCause.ENDER_PEARL);
+        server.getPluginManager().callEvent(pearl);
+        assertTrue(pearl.isCancelled());
+        org.bukkit.event.player.PlayerTeleportEvent command = new org.bukkit.event.player.PlayerTeleportEvent(steve,
+                steve.getLocation(), new Location(world, 0.5, 64, 0.5),
+                org.bukkit.event.player.PlayerTeleportEvent.TeleportCause.COMMAND);
+        server.getPluginManager().callEvent(command);
+        assertTrue(command.isCancelled(), "/spawn while in combat");
+
+        seconds(60);
+        assertTrue(move(steve, 10.5, 0.5), "after combat it is open again");
+    }
+
+    @Test
+    void playersAlreadyInsideCanStayAndLeave() {
+        spawnZone();
+        PlayerMock steve = player("Steve");
+        PlayerMock alex = player("Alex");
+        steve.teleport(new Location(world, 5.5, 64, 0.5));
+        hit(alex, steve);
+        assertTrue(move(steve, 6.5, 0.5), "moving inside");
+        assertTrue(move(steve, 12.5, 0.5), "walking out");
+        assertFalse(move(steve, 9.5, 0.5), "but not back in");
+    }
+
+    @Test
+    void ridingIntoSpawnTakesThePlayerOff() {
+        spawnZone();
+        PlayerMock steve = player("Steve");
+        PlayerMock alex = player("Alex");
+        org.bukkit.entity.Boat boat = (org.bukkit.entity.Boat) world.spawnEntity(new Location(world, 11.5, 64, 0.5),
+                EntityType.OAK_BOAT);
+        steve.teleport(new Location(world, 11.5, 64, 0.5));
+        boat.addPassenger(steve);
+        hit(alex, steve);
+        server.getPluginManager().callEvent(new org.bukkit.event.vehicle.VehicleMoveEvent(boat,
+                new Location(world, 11.5, 64, 0.5), new Location(world, 10.5, 64, 0.5)));
+        assertFalse(boat.getPassengers().contains(steve), "taken off the boat");
+        assertFalse(plugin.zones().get("spawn").contains(steve.getLocation()), "and left outside");
+        assertTrue(has(chat(steve), "You cannot enter spawn in combat."));
+    }
+
+    @Test
+    void zonesAreMadeBetweenTwoCornersAndKept() {
+        PlayerMock staff = player("Staff");
+        staff.setOp(true);
+        staff.teleport(new Location(world, -20.5, 70, 15.5));
+        staff.performCommand("combat zone pos1");
+        staff.teleport(new Location(world, 40.5, 64, -5.5));
+        staff.performCommand("combat zone pos2");
+        staff.performCommand("combat zone create Spawn");
+        assertTrue(has(chat(staff), "Safe zone created: Spawn (world, -21 -6 to 40 15)"));
+        staff.performCommand("combat zone list");
+        assertTrue(has(chat(staff), "Spawn (world, -21 -6 to 40 15)"));
+
+        ZoneStore reloaded = new ZoneStore(plugin.getDataFolder().toPath().resolve("zones.yml"),
+                java.util.logging.Logger.getLogger("test"));
+        assertEquals(1, reloaded.all().size(), "saved in zones.yml");
+        assertTrue(reloaded.at(new Location(world, 40.9, 200, 15.9)) != null, "corners are inside, any height");
+        assertTrue(reloaded.at(new Location(world, 41.1, 64, 0)) == null);
+
+        staff.performCommand("combat zone delete spawn");
+        assertTrue(has(chat(staff), "Safe zone spawn deleted."));
+        assertTrue(plugin.zones().all().isEmpty());
+
+        PlayerMock player = player("Player");
+        player.performCommand("combat zone create mine 5");
+        assertTrue(plugin.zones().all().isEmpty(), "only staff");
+    }
+
+    @Test
+    void zoneEdges() {
+        SafeZone zone = SafeZone.of("spawn", "world", 10, 10, -10, -10);
+        assertTrue(zone.contains(-10.0, 10.99));
+        assertFalse(zone.contains(11.0, 0));
+        assertEquals(0.0, zone.distance(0, 0));
+        assertEquals(4.0, zone.distance(15, 0), 1e-9);
+        assertEquals(5.0, zone.distance(-13, 15), 1e-9);
+    }
+
     // ---- staff ---------------------------------------------------------------------------------------------------
 
     @Test

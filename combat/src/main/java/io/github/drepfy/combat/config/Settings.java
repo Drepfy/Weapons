@@ -15,13 +15,35 @@ import java.util.Map;
 public record Settings(long combatMs,
                        ArmorRule armor,
                        LogoutRule logout,
+                       boolean pearlResetsTimer,
+                       Movement elytra,
+                       Movement riptide,
                        long pearlMs,
                        boolean pearlOverlay,
+                       Zones zones,
                        Messages messages,
                        List<String> warnings) {
 
     public Settings {
         warnings = List.copyOf(warnings);
+    }
+
+    /**
+     * Elytra or riptide while in combat.
+     *
+     * @param blocked refused while in combat
+     * @param radius  only while a player you are fighting is this close (blocks); 0 = for the whole combat
+     */
+    public record Movement(boolean blocked, double radius) {
+    }
+
+    /**
+     * Safe zones (spawn) that players in combat cannot enter.
+     *
+     * @param showBorder     show a red particle wall to players in combat near a zone
+     * @param borderDistance how close (blocks) before the wall shows
+     */
+    public record Zones(boolean showBorder, double borderDistance) {
     }
 
     /** What counts as wearing armor when you kill someone. */

@@ -52,7 +52,11 @@ public class CombatPlugin extends JavaPlugin {
     private final Map<UUID, Long> pearls = new HashMap<>();
     private final Map<UUID, Shown> shown = new HashMap<>();
     private final Map<UUID, Long> lastRefusal = new HashMap<>();
+    /** When each player was last told they cannot do something (one message a second). */
+    private final Map<String, Long> lastNotice = new HashMap<>();
+    private final Map<UUID, org.bukkit.Location[]> selections = new HashMap<>();
     private CombatListener combatListener;
+    private ZoneStore zones;
     private DataFile data;
     private ExecutorService io;
     private boolean dirty;
@@ -71,9 +75,11 @@ public class CombatPlugin extends JavaPlugin {
         data = new DataFile(getDataFolder().toPath().resolve("data.yml"), getLogger());
         data.load(tracker, pearls, now());
 
+        zones = new ZoneStore(getDataFolder().toPath().resolve("zones.yml"), getLogger());
         combatListener = new CombatListener(this);
         getServer().getPluginManager().registerEvents(combatListener, this);
         getServer().getPluginManager().registerEvents(new PearlListener(this), this);
+        getServer().getPluginManager().registerEvents(new MovementListener(this), this);
         CombatCommand command = new CombatCommand(this);
         PluginCommand pluginCommand = getCommand("combat");
         if (pluginCommand != null) {
@@ -88,7 +94,8 @@ public class CombatPlugin extends JavaPlugin {
         Bukkit.getScheduler().runTaskTimer(this, this::tick, 1L, 1L);
         getLogger().info("Enabled: combat " + settings.combatMs() / 1000 + "s, Ender Pearl cooldown "
                 + settings.pearlMs() / 1000 + "s, logging out in combat: "
-                + settings.logout().name().toLowerCase(java.util.Locale.ROOT) + ".");
+                + settings.logout().name().toLowerCase(java.util.Locale.ROOT) + ", " + zones.all().size()
+                + " safe zone(s).");
     }
 
     @Override
@@ -157,6 +164,7 @@ public class CombatPlugin extends JavaPlugin {
         tracker.pause(uuid, now);
         shown.remove(uuid);
         lastRefusal.remove(uuid);
+        lastNotice.keySet().removeIf(key -> key.startsWith(uuid + ":"));
         dirty = true;
     }
 
@@ -200,10 +208,93 @@ public class CombatPlugin extends JavaPlugin {
                 shown.put(uuid, new Shown(seconds, now));
             }
         }
+        if (ticks % 5 == 0) {
+            stopGliding();
+        }
+        if (ticks % 10 == 0 && settings.zones().showBorder() && !zones.all().isEmpty()) {
+            showBorders();
+        }
         if (++ticks % 100 == 0) {
             combatListener.forgetOld(now);
             pearls.values().removeIf(until -> until <= now);
             save();
+        }
+    }
+
+    // ---- movement in combat ------------------------------------------------------------------------------
+
+    /** Whether an elytra or riptide is refused right now: in combat, and (with a radius) near an opponent. */
+    boolean movementBlocked(Player player, Settings.Movement rule) {
+        if (!rule.blocked() || !isInCombat(player)) {
+            return false;
+        }
+        return rule.radius() <= 0 || opponentWithin(player, rule.radius());
+    }
+
+    /** Whether a player this one is fighting is within {@code radius} blocks. */
+    boolean opponentWithin(Player player, double radius) {
+        org.bukkit.Location at = player.getLocation();
+        for (UUID opponent : tracker.opponents(player.getUniqueId(), now()).keySet()) {
+            Player other = opponent.equals(CombatTracker.STAFF) ? null : Bukkit.getPlayer(opponent);
+            if (other != null && other.getWorld().equals(player.getWorld())
+                    && other.getLocation().distanceSquared(at) <= radius * radius) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Players who were already gliding when the rule started to apply come down. */
+    private void stopGliding() {
+        for (UUID uuid : new ArrayList<>(tracker.players())) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null && player.isGliding() && movementBlocked(player, settings.elytra())) {
+                player.setGliding(false);
+                refuse(player, "elytra-blocked");
+            }
+        }
+    }
+
+    /** Tells the player once a second at most (holding the button would spam otherwise). */
+    void refuse(Player player, String key, Object... pairs) {
+        long now = now();
+        String id = player.getUniqueId() + ":" + key;
+        Long last = lastNotice.get(id);
+        if (last == null || now - last >= 1000 || now < last) {
+            lastNotice.put(id, now);
+            send(player, key, pairs);
+        }
+    }
+
+    void refuseZone(Player player, SafeZone zone) {
+        refuse(player, "zone-blocked", "zone", zone.name(), "seconds", seconds(combatRemaining(player)));
+    }
+
+    ZoneStore zones() {
+        return zones;
+    }
+
+    /** {@code /combat zone pos1|pos2}: the corners picked by each staff member. */
+    org.bukkit.Location[] selection(Player player) {
+        return selections.computeIfAbsent(player.getUniqueId(), key -> new org.bukkit.Location[2]);
+    }
+
+    /** A red wall of particles where a player in combat is close to a safe zone (only they see it). */
+    private void showBorders() {
+        double reach = settings.zones().borderDistance();
+        for (UUID uuid : new ArrayList<>(tracker.players())) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player == null || !isInCombat(player)) {
+                continue;
+            }
+            org.bukkit.Location at = player.getLocation();
+            for (SafeZone zone : zones.all()) {
+                if (!zone.world().equals(player.getWorld().getName()) || zone.contains(at)
+                        || zone.distance(at.getX(), at.getZ()) > reach) {
+                    continue;
+                }
+                Border.draw(player, zone, reach);
+            }
         }
     }
 
@@ -221,6 +312,10 @@ public class CombatPlugin extends JavaPlugin {
             return;
         }
         pearls.put(player.getUniqueId(), now() + cooldown);
+        if (settings.pearlResetsTimer()) {
+            // Pearling away does not run the clock down: the 60 seconds start again.
+            tracker.refresh(player.getUniqueId(), now(), settings.combatMs());
+        }
         dirty = true;
         showPearlCooldown(player, cooldown);
         // The game sets its own 1 second cooldown after the throw; replace it with ours.
