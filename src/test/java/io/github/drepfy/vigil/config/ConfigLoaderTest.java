@@ -199,6 +199,51 @@ class ConfigLoaderTest {
     }
 
     @Test
+    void discordBotSettingsAreChecked() throws Exception {
+        Settings settings = ConfigLoader.load(yaml("""
+                discord:
+                  bot:
+                    enabled: true
+                    token: "Bot abc.def.ghi"
+                    server-id: 123456789012345678
+                    staff-roles: ["<@&223456789012345678>", 323456789012345678, Moderators]
+                    punishments-channel: "#bans"
+                    alerts-channel: "423456789012345678"
+                    read-messages: false
+                tickets:
+                  reports: false
+                  keep-closed: perm
+                """));
+        Settings.Bot bot = settings.discord().bot();
+        assertTrue(bot.active());
+        assertEquals("abc.def.ghi", bot.token(), "a pasted 'Bot ' prefix is removed");
+        assertEquals("123456789012345678", bot.serverId(), "numbers without quotes work");
+        assertEquals(List.of("223456789012345678", "323456789012345678"), bot.staffRoles());
+        assertEquals("", bot.punishmentsChannel(), "a channel name instead of an ID is not used");
+        assertEquals("423456789012345678", bot.alertsChannel());
+        assertFalse(bot.readMessages());
+        assertTrue(bot.pingStaff());
+        assertFalse(bot.toString().contains("abc.def.ghi"), "the token never shows up in logs");
+        String warnings = settings.warnings().toString();
+        assertTrue(warnings.contains("staff-roles: 'Moderators'"), warnings);
+        assertTrue(warnings.contains("punishments-channel must be a Discord ID"), warnings);
+        assertTrue(settings.tickets().enabled());
+        assertFalse(settings.tickets().reports());
+        assertEquals(Durations.PERMANENT, settings.tickets().keepClosedMs());
+
+        Settings noServer = ConfigLoader.load(yaml("""
+                discord:
+                  bot: {enabled: true, token: abc}
+                """));
+        assertFalse(noServer.discord().bot().active());
+        assertTrue(noServer.warnings().toString().contains("server-id is not set"), noServer.warnings().toString());
+        Settings defaults = ConfigLoader.load(bundled());
+        assertFalse(defaults.discord().bot().active(), "off until set up");
+        assertEquals(30L * 24 * 3600 * 1000, defaults.tickets().keepClosedMs());
+        assertEquals("Watching {online} players", defaults.discord().bot().status());
+    }
+
+    @Test
     void warnTimeLimitsAreValidated() throws Exception {
         Settings custom = ConfigLoader.load(yaml("""
                 moderation:

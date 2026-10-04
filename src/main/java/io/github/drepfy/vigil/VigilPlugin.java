@@ -32,6 +32,7 @@ import io.github.drepfy.vigil.config.Settings;
 import io.github.drepfy.vigil.data.FlagRecord;
 import io.github.drepfy.vigil.data.PlayerData;
 import io.github.drepfy.vigil.data.PlayerDataManager;
+import io.github.drepfy.vigil.discord.DiscordBot;
 import io.github.drepfy.vigil.env.BlockTraits;
 import io.github.drepfy.vigil.env.DisturbanceRegistry;
 import io.github.drepfy.vigil.env.BlockHider;
@@ -52,6 +53,8 @@ import io.github.drepfy.vigil.storage.IoExecutor;
 import io.github.drepfy.vigil.storage.PlayerRecord;
 import io.github.drepfy.vigil.storage.PlayerRecordStore;
 import io.github.drepfy.vigil.task.TickTask;
+import io.github.drepfy.vigil.ticket.TicketCommand;
+import io.github.drepfy.vigil.ticket.TicketService;
 import io.github.drepfy.vigil.task.TpsMonitor;
 import io.github.drepfy.vigil.util.Clock;
 import io.github.drepfy.vigil.violation.AlertService;
@@ -107,6 +110,8 @@ public class VigilPlugin extends JavaPlugin {
     private BlockHider blockHider;
     private AutoBanService autoBan;
     private DiscordNotifier discord;
+    private TicketService tickets;
+    private DiscordBot bot;
     private BukkitTask tickTask;
     private boolean started;
 
@@ -189,6 +194,23 @@ public class VigilPlugin extends JavaPlugin {
             }
         }
 
+        tickets = new TicketService(getLogger(), io, dataDir.resolve("data").resolve("tickets.yml"),
+                uuid -> Bukkit.getPlayer(uuid) != null, settings.tickets().keepClosedMs());
+        TicketCommand ticketCommand = new TicketCommand(this, this::settings, tickets);
+        tickets.addObserver(ticketCommand);
+        pm.registerEvents(ticketCommand, this);
+        for (String name : List.of("ticket", "tickets", "report")) {
+            PluginCommand ticketPluginCommand = getCommand(name);
+            if (ticketPluginCommand != null) {
+                ticketPluginCommand.setExecutor(ticketCommand);
+                ticketPluginCommand.setTabCompleter(ticketCommand);
+            }
+        }
+        bot = new DiscordBot(this, this::settings, moderation, tickets, tps::tps, getLogger());
+        discord.setBot(bot);
+        pm.registerEvents(bot, this);
+        bot.start();
+
         PluginCommand command = getCommand("ac");
         if (command != null) {
             VigilCommand executor = new VigilCommand(this);
@@ -221,13 +243,20 @@ public class VigilPlugin extends JavaPlugin {
         getLogger().info("Enabled: " + enabledChecks() + " of " + CheckType.values().length + " checks active"
                 + (settings.general().passiveMode() ? " (passive mode: no setbacks, no bans)" : "")
                 + ", auto-ban " + (autoBanSettings.enabled() && !settings.general().passiveMode() ? "ON" : "off")
-                + ". Staff commands: /ac, /ban, /mute, /warn, /kick (and /unban, /unmute, /unwarn).");
+                + ". Staff commands: /ac, /ban, /mute, /warn, /kick (and /unban, /unmute, /unwarn), /tickets.");
     }
 
     @Override
     public void onDisable() {
         if (tickTask != null) {
             tickTask.cancel();
+        }
+        if (bot != null) {
+            try {
+                bot.stop();
+            } catch (Throwable t) {
+                getLogger().log(Level.WARNING, "Could not stop the Discord bot cleanly", t);
+            }
         }
         if (blockHider != null) {
             try {
@@ -257,6 +286,7 @@ public class VigilPlugin extends JavaPlugin {
             // The IO thread has stopped: write whatever is still dirty synchronously.
             records.saveAllNow(pending);
             moderation.saveNow();
+            tickets.saveNow();
             killAura.clear();
             noSwing.clear();
             players.clear();
@@ -385,7 +415,7 @@ public class VigilPlugin extends JavaPlugin {
         }
         List<YamlConfiguration> older = new ArrayList<>();
         for (String name : List.of("upgrade/config-2.2.yml", "upgrade/config-2.3.yml",
-                "upgrade/config-2.4.yml")) {
+                "upgrade/config-2.4.yml", "upgrade/config-2.5.yml")) {
             java.io.InputStream stream = getResource(name);
             if (stream == null) {
                 continue;
@@ -451,6 +481,9 @@ public class VigilPlugin extends JavaPlugin {
         Settings fresh = readSettings(settings);
         settings = fresh;
         checks.resetBreakers();
+        if (bot != null) {
+            bot.reload();
+        }
         logWarnings(fresh.warnings());
         return fresh.warnings();
     }
@@ -578,6 +611,15 @@ public class VigilPlugin extends JavaPlugin {
 
     public AutoBanService autoBan() {
         return autoBan;
+    }
+
+    public TicketService tickets() {
+        return tickets;
+    }
+
+    /** The Discord bot (idle unless discord.bot is set up). */
+    public DiscordBot discordBot() {
+        return bot;
     }
 
     /** Anti-ESP / anti-xray block hiding, or {@code null} when not on Paper. */

@@ -225,6 +225,41 @@ and Flight never flagged. Cause, found by making the tests behave like Paper:
   action bars parse it). 2.4 configs are upgraded (bundled `upgrade/config-2.4.yml`).
 - Tests: 131.
 
+## 2.6.0: Discord bot and tickets
+
+- **Tickets** (`ticket/`): `/ticket`, `/report`, `/tickets` with claim, close and
+  teleport; `data/tickets.yml` (atomic writes, corrupt file moved aside, closed
+  tickets purged after `tickets.keep-closed`). Observers tell in-game staff, the
+  player (also after a relog: unread replies and closes) and the Discord bot about
+  every change.
+- **Discord bot** (`discord/`), no extra libraries:
+  - `DiscordRest`: one background thread, per-route rate limits
+    (`X-RateLimit-*`), 429 retry, retries on 502-504 and connection errors,
+    multipart upload for transcripts.
+  - `DiscordGateway`: Java's WebSocket; hello, identify, heartbeats with dead
+    connection detection, resume (op 6 to `resume_gateway_url`) after drops and
+    op 7, fresh identify after op 9 / 4007 / 4009, backoff 1-60 s, stops on 4004
+    and similar, retries without Message Content after 4014. The connection is
+    stored the moment it opens (Discord's first message arrives right away; it
+    could otherwise be handled first and the login silently skipped).
+  - `DiscordInteractions`: guild slash commands (registered on READY),
+    autocomplete (staff only), buttons, ticket forms (also the newer "label"
+    layout). Staff = a staff role or Administrator. Punishment commands run the
+    real `ModerationCommand` through a proxy `CommandSender` (`RemoteSender`,
+    `RemoteStaff` marker: staff name "Bob (Discord)", cannot punish
+    `vigil.protect`).
+  - `DiscordTickets`: private channels with permission overwrites, intro with
+    Claim/Close, messages both ways (`TicketMessage.Origin` prevents echoes),
+    channel deleted 10 s after close, transcript to the log channel, channel
+    deleted on Discord closes the ticket, catch-up after reconnecting.
+  - Punishments and alerts go to the bot's channels when set, else the webhook
+    (`DiscordNotifier.BotChannel`). Chat bridge with batching; text from Discord
+    is shown as typed (no colour codes) and never pings.
+- Settings: `discord.bot` (IDs validated, `Bot ` prefix removed, token never in
+  `toString`), `tickets`; 2.5 configs upgraded with comments
+  (`upgrade/config-2.5.yml`).
+- Tests: 179 (fake Discord HTTP server, fake WebSocket, ticket scenarios).
+
 ## Remaining / next steps
 
 - Validate on a live server with a hacked client on an alt (see the README
@@ -232,6 +267,8 @@ and Flight never flagged. Cause, found by making the tests behave like Paper:
 - Prediction-based movement (Grim style) would catch subtle speed and strafe
   cheats, but it is a large project.
 - Moderation ideas: IP bans and alt detection.
+- Discord: linking Discord accounts to Minecraft accounts (so ban appeals can be
+  verified), and DMs to people whose ticket was closed.
 - Without Paper's client tick events (Spigot, Paper before 1.21.2) a flyer who hovers
   completely still sends no move events, so its airtime is not counted.
 - When `auto-ban.command` hands bans to another plugin, Vigil doesn't store them,

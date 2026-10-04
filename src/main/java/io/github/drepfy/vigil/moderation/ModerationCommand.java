@@ -48,7 +48,8 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> WARN_TIME_SUGGESTIONS = List.of("1h", "6h", "12h", "1d", "3d", "7d", "10d");
 
-    private record Target(UUID uuid, String name, Player online) {
+    /** A player to punish: online, or known to the server from an earlier visit. */
+    public record Target(UUID uuid, String name, Player online) {
     }
 
     private final Plugin plugin;
@@ -380,15 +381,15 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
     // ---- helpers -----------------------------------------------------------------------------------
 
     private boolean mayPunish(CommandSender sender, Target target) {
-        if (sender instanceof Player player) {
-            if (player.getUniqueId().equals(target.uuid())) {
-                send(sender, "&cYou cannot punish yourself.");
-                return false;
-            }
-            if (target.online() != null && target.online().hasPermission(EXEMPT_PERMISSION)) {
-                send(sender, Text.replace(message("cannot-punish"), "player", target.name()));
-                return false;
-            }
+        if (sender instanceof Player player && player.getUniqueId().equals(target.uuid())) {
+            send(sender, "&cYou cannot punish yourself.");
+            return false;
+        }
+        // Only the server console may punish protected players; staff in game and on Discord may not.
+        if ((sender instanceof Player || sender instanceof RemoteStaff)
+                && target.online() != null && target.online().hasPermission(EXEMPT_PERMISSION)) {
+            send(sender, Text.replace(message("cannot-punish"), "player", target.name()));
+            return false;
         }
         return true;
     }
@@ -400,8 +401,8 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
         return input.isBlank() ? message("no-reason") : input;
     }
 
-    /** Resolves an online player, a UUID, or a player who joined before (no web lookup). */
-    private static Target resolve(String input) {
+    /** Resolves an online player, a UUID, or a player who joined before (no web lookup). Server thread. */
+    public static Target resolve(String input) {
         Player online = Bukkit.getPlayerExact(input);
         if (online != null) {
             return new Target(online.getUniqueId(), online.getName(), online);
@@ -439,7 +440,10 @@ public final class ModerationCommand implements CommandExecutor, TabCompleter {
     }
 
     private static String staffName(CommandSender sender) {
-        return sender instanceof Player player ? player.getName() : "Console";
+        if (sender instanceof Player player) {
+            return player.getName();
+        }
+        return sender instanceof RemoteStaff remote ? remote.staffName() : "Console";
     }
 
     private static String join(String[] args, int from) {

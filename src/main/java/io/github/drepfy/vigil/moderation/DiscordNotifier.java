@@ -1,6 +1,9 @@
 package io.github.drepfy.vigil.moderation;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import io.github.drepfy.vigil.config.Settings;
+import io.github.drepfy.vigil.util.Text;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -18,19 +21,30 @@ import java.util.function.Supplier;
 import java.util.logging.Logger;
 
 /**
- * Posts punishments (and, if enabled, anti-cheat alerts) to a Discord channel through a
- * webhook. Off until {@code discord.webhook} is set. Sending happens on a background
- * thread with a small queue; if Discord is slow or down, messages are dropped and the
- * server is never affected.
+ * Posts punishments (and, if enabled, anti-cheat alerts) to Discord: through the bot when
+ * it has a channel for them, otherwise through the webhook. Sending happens on a
+ * background thread with a small queue; if Discord is slow or down, messages are dropped
+ * and the server is never affected.
  */
 public final class DiscordNotifier {
 
-    private static final int RED = 0xE74C3C;
-    private static final int DARK_RED = 0x992D22;
-    private static final int ORANGE = 0xE67E22;
-    private static final int YELLOW = 0xF1C40F;
-    private static final int BLUE = 0x3498DB;
-    private static final int GREEN = 0x2ECC71;
+    /** Where the bot posts. Implemented by the Discord bot. */
+    public interface BotChannel {
+        /** @return false when the bot has no punishments channel (the webhook is used then) */
+        boolean postPunishment(JsonObject embed);
+
+        /** @return false when the bot has no alerts channel (the webhook is used then) */
+        boolean postAlert(JsonObject embed);
+    }
+
+    public static final int RED = 0xE74C3C;
+    public static final int DARK_RED = 0x992D22;
+    public static final int ORANGE = 0xE67E22;
+    public static final int YELLOW = 0xF1C40F;
+    public static final int BLUE = 0x3498DB;
+    public static final int GREEN = 0x2ECC71;
+    /** Discord's limit for an embed field. */
+    private static final int FIELD_LIMIT = 1000;
     private static final long ERROR_LOG_INTERVAL_MS = 60_000;
 
     private final Supplier<Settings> settings;
@@ -38,6 +52,7 @@ public final class DiscordNotifier {
     private final ThreadPoolExecutor executor;
     private volatile HttpClient client;
     private volatile long lastErrorLogMs;
+    private volatile BotChannel bot;
 
     public DiscordNotifier(Supplier<Settings> settings, Logger logger) {
         this.settings = settings;
@@ -50,34 +65,54 @@ public final class DiscordNotifier {
         this.executor.allowCoreThreadTimeOut(true);
     }
 
+    public void setBot(BotChannel bot) {
+        this.bot = bot;
+    }
+
     /** A punishment was given or lifted. */
     public void punishment(Punishment punishment) {
         Settings config = settings.get();
         Settings.Discord discord = config.discord();
         boolean autoBan = ModerationListener.ANTI_CHEAT_STAFF.equals(punishment.staff());
-        if (!discord.enabled() || (autoBan ? !discord.autoBans() : !discord.punishments())) {
+        if (autoBan ? !discord.autoBans() : !discord.punishments()) {
             return;
         }
-        post(discord.webhookUrl(), punishmentJson(punishment, config.messages().get("permanent")));
+        JsonObject embed = punishmentEmbed(punishment, config.messages().get("permanent"));
+        BotChannel channel = bot;
+        if (channel != null && channel.postPunishment(embed)) {
+            return;
+        }
+        if (discord.enabled()) {
+            post(discord.webhookUrl(), webhookPayload(embed));
+        }
     }
 
     /** An anti-cheat alert that staff saw in game. */
     public void alert(String player, String reason, String vl, String detail) {
-        Settings.Discord discord = settings.get().discord();
-        if (!discord.enabled() || !discord.alerts()) {
-            return;
-        }
         List<String[]> fields = new ArrayList<>();
         fields.add(new String[] {"VL", vl});
         fields.add(new String[] {"Evidence", detail});
-        post(discord.webhookUrl(), json(player + " was flagged for " + reason, ORANGE, fields));
+        JsonObject embed = embed(player + " was flagged for " + reason, ORANGE, fields);
+        BotChannel channel = bot;
+        if (channel != null && channel.postAlert(embed)) {
+            return;
+        }
+        Settings.Discord discord = settings.get().discord();
+        if (discord.enabled() && discord.alerts()) {
+            post(discord.webhookUrl(), webhookPayload(embed));
+        }
     }
 
     public void shutdown() {
         executor.shutdownNow();
     }
 
+    /** The webhook message for a punishment (for tests and the webhook). */
     static String punishmentJson(Punishment p, String permanent) {
+        return webhookPayload(punishmentEmbed(p, permanent)).toString();
+    }
+
+    public static JsonObject punishmentEmbed(Punishment p, String permanent) {
         List<String[]> fields = new ArrayList<>();
         String title;
         int color;
@@ -111,50 +146,51 @@ public final class DiscordNotifier {
         if (lifted) {
             fields.add(new String[] {"Lifted by", p.revokedBy() + (p.revokeReason() != null ? ": " + p.revokeReason() : "")});
         }
-        return json(title, color, fields);
+        return embed(title, color, fields);
     }
 
-    static String json(String title, int color, List<String[]> fields) {
-        StringBuilder json = new StringBuilder("{\"username\":\"Vigil\",\"allowed_mentions\":{\"parse\":[]},\"embeds\":[{");
-        json.append("\"title\":").append(quote(title)).append(",\"color\":").append(color)
-                .append(",\"timestamp\":").append(quote(Instant.now().toString())).append(",\"fields\":[");
-        for (int i = 0; i < fields.size(); i++) {
-            String[] field = fields.get(i);
-            json.append(i == 0 ? "" : ",").append("{\"name\":").append(quote(field[0])).append(",\"value\":")
-                    .append(quote(field[1] == null || field[1].isBlank() ? "-" : field[1])).append(",\"inline\":true}");
+    /** An embed with inline fields; colour codes are removed and long text is cut. */
+    public static JsonObject embed(String title, int color, List<String[]> fields) {
+        JsonObject embed = new JsonObject();
+        embed.addProperty("title", clean(title, 250));
+        embed.addProperty("color", color);
+        embed.addProperty("timestamp", Instant.now().toString());
+        JsonArray list = new JsonArray();
+        for (String[] field : fields) {
+            JsonObject entry = new JsonObject();
+            entry.addProperty("name", clean(field[0], 250));
+            String value = clean(field[1], FIELD_LIMIT);
+            entry.addProperty("value", value.isBlank() ? "-" : value);
+            entry.addProperty("inline", true);
+            list.add(entry);
         }
-        return json.append("]}]}").toString();
+        embed.add("fields", list);
+        return embed;
     }
 
-    /** JSON string literal; colour codes are removed, text is cut to Discord's field limit. */
-    static String quote(String text) {
-        String clean = io.github.drepfy.vigil.util.Text.strip(text);
-        if (clean.length() > 1000) {
-            clean = clean.substring(0, 1000) + "...";
-        }
-        StringBuilder out = new StringBuilder("\"");
-        for (char c : clean.toCharArray()) {
-            switch (c) {
-                case '"' -> out.append("\\\"");
-                case '\\' -> out.append("\\\\");
-                case '\n' -> out.append("\\n");
-                case '\r' -> out.append("\\r");
-                case '\t' -> out.append("\\t");
-                default -> {
-                    if (c < 0x20) {
-                        out.append(String.format("\\u%04x", (int) c));
-                    } else {
-                        out.append(c);
-                    }
-                }
-            }
-        }
-        return out.append('"').toString();
+    /** No colour codes, at most {@code max} characters. */
+    public static String clean(String text, int max) {
+        String clean = Text.strip(text);
+        return clean.length() > max ? clean.substring(0, max) + "..." : clean;
     }
 
-    private void post(String url, String body) {
+    /** No pings: a reason like "@everyone" is shown, never mentioned. */
+    static JsonObject webhookPayload(JsonObject embed) {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("username", "Vigil");
+        JsonObject mentions = new JsonObject();
+        mentions.add("parse", new JsonArray());
+        payload.add("allowed_mentions", mentions);
+        JsonArray embeds = new JsonArray();
+        embeds.add(embed);
+        payload.add("embeds", embeds);
+        return payload;
+    }
+
+    private void post(String url, JsonObject body) {
+        String text = body.toString();
         try {
-            executor.execute(() -> send(url, body));
+            executor.execute(() -> send(url, text));
         } catch (RejectedExecutionException e) {
             // Queue full or shutting down: drop it.
         }

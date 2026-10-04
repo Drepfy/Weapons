@@ -27,7 +27,7 @@ class ConfigUpgraderTest {
 
     private static List<YamlConfiguration> older() throws Exception {
         return List.of(resource("/upgrade/config-2.2.yml"), resource("/upgrade/config-2.3.yml"),
-                resource("/upgrade/config-2.4.yml"));
+                resource("/upgrade/config-2.4.yml"), resource("/upgrade/config-2.5.yml"));
     }
 
     /** Saves and reloads, like the plugin does, so the result must also survive YAML. */
@@ -108,6 +108,26 @@ class ConfigUpgraderTest {
         assertTrue(upgraded.messages().get("auto-banned").contains("V\u026a\u0262\u026a\u029f"),
                 "the banner shows the small-caps name");
         assertFalse(upgraded.messages().get("auto-banned").contains("{brand}"), "{brand} is filled in");
+    }
+
+    @Test
+    void config25GetsTheBotAndTickets() throws Exception {
+        YamlConfiguration old = resource("/upgrade/config-2.5.yml");
+        old.set("discord.webhook", "https://discord.com/api/webhooks/1/abc");
+        List<String> changes = ConfigUpgrader.upgrade(old, resource("/config.yml"), older());
+        assertTrue(changes.contains("discord.bot"), changes.toString());
+        assertTrue(changes.contains("tickets"), changes.toString());
+        assertTrue(changes.contains("messages.ticket-opened"), changes.toString());
+        YamlConfiguration saved = roundTrip(old);
+        assertEquals("https://discord.com/api/webhooks/1/abc", saved.getString("discord.webhook"), "kept");
+        assertTrue(saved.saveToString().contains("Message Content Intent"), "the new options come with their comments");
+        Settings upgraded = ConfigLoader.load(saved);
+        assertEquals(List.of(), upgraded.warnings());
+        Settings fresh = ConfigLoader.load(resource("/config.yml"));
+        assertEquals(fresh.discord().bot(), upgraded.discord().bot());
+        assertEquals(fresh.tickets(), upgraded.tickets());
+        assertEquals(fresh.messages(), upgraded.messages());
+        assertEquals(List.of(), ConfigUpgrader.upgrade(saved, resource("/config.yml"), older()), "only once");
     }
 
     @Test

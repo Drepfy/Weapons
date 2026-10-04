@@ -19,6 +19,7 @@ public final class Text {
     private static final Pattern GRADIENT = Pattern.compile(
             "<gradient:(#[0-9A-Fa-f]{6}(?::#[0-9A-Fa-f]{6})+)>(.*?)</gradient>", Pattern.DOTALL);
     private static final Pattern HEX = Pattern.compile("&#([0-9A-Fa-f]{6})");
+    private static final Pattern PLACEHOLDER = Pattern.compile("\\{([a-z-]+)\\}");
 
     private Text() {
     }
@@ -47,6 +48,44 @@ public final class Text {
             result = result.replace("{" + pairs[i] + "}", String.valueOf(pairs[i + 1]));
         }
         return result;
+    }
+
+    /**
+     * Colours a message, then fills in its placeholders in one pass. For text typed by
+     * players or Discord users: their {@code &} codes and {@code {placeholders}} stay as typed.
+     */
+    public static String colorWith(String template, Object... pairs) {
+        String colored = color(template);
+        Matcher matcher = PLACEHOLDER.matcher(colored);
+        StringBuilder out = new StringBuilder();
+        while (matcher.find()) {
+            String value = null;
+            for (int i = 0; i + 1 < pairs.length; i += 2) {
+                if (matcher.group(1).equals(pairs[i])) {
+                    value = String.valueOf(pairs[i + 1]);
+                    break;
+                }
+            }
+            matcher.appendReplacement(out, Matcher.quoteReplacement(value != null ? value : matcher.group()));
+        }
+        matcher.appendTail(out);
+        return out.toString();
+    }
+
+    /** Text from outside the game: no colour codes, line breaks or control characters, at most {@code max} long. */
+    public static String plain(String text, int max) {
+        if (text == null) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder();
+        text.codePoints().forEach(c -> {
+            if (c == '§') {
+                return;
+            }
+            out.appendCodePoint(Character.isISOControl(c) ? ' ' : c);
+        });
+        String result = out.toString().replaceAll(" {2,}", " ").trim();
+        return result.length() > max ? result.substring(0, max).trim() + "..." : result;
     }
 
     /** Removes colour codes, hex colours and gradient tags (for logs and Discord). */

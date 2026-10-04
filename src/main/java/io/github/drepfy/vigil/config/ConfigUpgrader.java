@@ -33,7 +33,9 @@ public final class ConfigUpgrader {
             "moderation.warn-escalation",
             "moderation.warn-time",
             "moderation.reasons.unwarn",
-            "discord");
+            "discord",
+            "discord.bot",
+            "tickets");
 
     /** Ban presets of 2.0-2.2 (one time each). */
     private static final Map<String, String> OLD_BAN_PRESETS = pairs(
@@ -147,6 +149,10 @@ public final class ConfigUpgrader {
         Object value = defaults.get(path);
         if (value instanceof ConfigurationSection section) {
             current.createSection(path, section.getValues(true));
+            // The comments inside explain the new options.
+            for (String key : section.getKeys(true)) {
+                current.setComments(path + "." + key, defaults.getComments(path + "." + key));
+            }
         } else {
             current.set(path, value);
         }

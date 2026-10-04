@@ -8,8 +8,8 @@ load: POSTWORLD
 
 commands:
   ac:
-    description: Anti-cheat staff command (alerts, check, reset, debug, reload).
-    usage: /<command> [alerts|check|reset|debug|reload]
+    description: Anti-cheat staff command (alerts, check, reload, preview).
+    usage: /<command> [alerts|check|reload|preview]
     aliases: [anticheat, vigil]
   ban:
     description: Ban a player (optionally for a duration, e.g. 7d).
@@ -41,6 +41,19 @@ commands:
     description: Kick a player.
     usage: /<command> <player> [reason]
     permission: vigil.kick
+  ticket:
+    description: Open a ticket with staff, or answer your open ticket.
+    usage: /<command> <message> | reply [id] <message> | view [id] | close [id] | list
+    aliases: [support]
+    permission: vigil.ticket
+  report:
+    description: Report a player to staff.
+    usage: /<command> <player> <reason>
+    permission: vigil.report
+  tickets:
+    description: "Staff: see and answer tickets."
+    usage: /<command> [list|view|reply|claim|close|tp] <id> ...
+    permission: vigil.tickets
 
 # Every node below shows up in LuckPerms (tab completion and the web editor).
 permissions:
@@ -51,11 +64,12 @@ permissions:
       vigil.staff: true
       vigil.admin: true
   vigil.staff:
-    description: "Moderator set: alerts, /ac check and every punishment command."
+    description: "Moderator set: alerts, /ac check, tickets and every punishment command."
     default: op
     children:
       vigil.alerts: true
       vigil.check: true
+      vigil.tickets: true
       vigil.ban: true
       vigil.unban: true
       vigil.mute: true
@@ -102,6 +116,15 @@ permissions:
   vigil.kick:
     description: Use /kick.
     default: op
+  vigil.tickets:
+    description: See, answer, claim and close tickets (/tickets), and hear about new ones.
+    default: op
+  vigil.ticket:
+    description: Open tickets with /ticket.
+    default: true
+  vigil.report:
+    description: Report players with /report.
+    default: true
   vigil.protect:
     description: Cannot be punished by staff commands and is never banned automatically (still flagged).
     default: false

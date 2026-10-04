@@ -238,9 +238,15 @@ class ModerationTest {
 
     @Test
     void discordMessagesAreValidJsonWithoutPings() {
-        assertEquals("\"Say \\\"hi\\\"\\nnow\"", DiscordNotifier.quote("&cSay \"hi\"\nnow"));
-        assertEquals("\"\\u0001\"", DiscordNotifier.quote("\u0001"));
-        assertTrue(DiscordNotifier.quote("x".repeat(5000)).length() < 1100, "long text is cut");
+        assertEquals("Say \"hi\"\nnow", DiscordNotifier.clean("&cSay \"hi\"\nnow", 1000), "colours are removed");
+        assertTrue(DiscordNotifier.clean("x".repeat(5000), 1000).length() < 1100, "long text is cut");
+        JsonObject quoted = JsonParser.parseString(DiscordNotifier.webhookPayload(DiscordNotifier.embed("t", 1,
+                java.util.Collections.singletonList(new String[] {"Say \"hi\"\nnow \u0001", "x".repeat(5000)})))
+                .toString()).getAsJsonObject();
+        JsonObject field = quoted.getAsJsonArray("embeds").get(0).getAsJsonObject().getAsJsonArray("fields").get(0)
+                .getAsJsonObject();
+        assertEquals("Say \"hi\"\nnow \u0001", field.get("name").getAsString(), "survives JSON");
+        assertTrue(field.get("value").getAsString().length() <= 1003, "Discord's field limit");
 
         Punishment ban = new Punishment(12, PunishmentType.BAN, UUID.randomUUID(), "Steve", "Cheating \"fly\" @everyone",
                 "Mod", System.currentTimeMillis(), 30 * DAY, false, null, null, 0L);

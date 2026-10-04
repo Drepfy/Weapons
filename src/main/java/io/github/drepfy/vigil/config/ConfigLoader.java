@@ -167,6 +167,32 @@ public final class ConfigLoader {
         messages.put("never", "Never");
         messages.put("presets-header", "&7Preset reasons &8(time for the 1st, 2nd, 3rd offence...)&7:");
         messages.put("warn-escalation-reason", "Too many warnings ({count})");
+        // Tickets. Placeholders: {id} {player} {author} {message} {category} {staff} {reason} {count}
+        messages.put("ticket-usage", "&7Need help? Open a ticket with staff: &f/ticket <message>");
+        messages.put("ticket-opened", "&aYour ticket &f#{id} &ahas been opened. Staff will reply as soon as possible.");
+        messages.put("ticket-added", "&7Your message was added to ticket &f#{id}&7.");
+        messages.put("ticket-reply", "&8[&bTicket #{id}&8] &f{author}&7: &f{message}");
+        messages.put("ticket-staff-new", "&8[&bTicket #{id}&8] &f{player} &7opened a ticket &8({category})&7: &f{message}");
+        messages.put("ticket-staff-message", "&8[&bTicket #{id}&8] &f{author}&7: &f{message}");
+        messages.put("ticket-claimed", "&7Ticket &f#{id} &7is now handled by &f{staff}&7.");
+        messages.put("ticket-closed", "&7Ticket &f#{id} &7has been closed.");
+        messages.put("ticket-closed-notify", "&7Your ticket &f#{id} &7was closed by &f{staff}&7. &8({reason})");
+        messages.put("ticket-none", "&7You have no open tickets.");
+        messages.put("ticket-not-found", "&cTicket not found: &f{id}");
+        messages.put("ticket-choose", "&7You have more than one open ticket. Add its number, for example: &f/ticket reply {id} <message>");
+        messages.put("ticket-unread", "&7You have a new reply on ticket &f#{id}&7. Use &f/ticket view {id} &7to read it.");
+        messages.put("ticket-cooldown", "&cPlease wait a moment before sending another message.");
+        messages.put("ticket-full", "&cThis ticket is full. Please open a new one.");
+        messages.put("ticket-too-many", "&cYou already have {count} open tickets. Please wait for staff to answer them.");
+        messages.put("tickets-header", "&7Open tickets &8({count})&7:");
+        messages.put("tickets-empty", "&7There are no open tickets.");
+        messages.put("tickets-open-join", "&7Open tickets waiting for staff: &f{count}&7. Use &f/tickets &7to see them.");
+        messages.put("tickets-disabled", "&cTickets are turned off on this server.");
+        messages.put("report-usage", "&7Report a player to staff: &f/report <player> <reason>");
+        messages.put("report-sent", "&aThank you. Your report about &f{player} &ahas been sent to staff as ticket &f#{id}&a.");
+        messages.put("report-self", "&cYou cannot report yourself.");
+        // Discord chat shown in game. Placeholders: {name} {message}
+        messages.put("discord-chat", "&9Discord &8| &f{name}&7: {message}");
         DEFAULT_MESSAGES = java.util.Collections.unmodifiableMap(messages);
     }
 
@@ -430,10 +456,17 @@ public final class ConfigLoader {
                 r.string("discord.webhook", "").trim(),
                 r.bool("discord.send-punishments", true),
                 r.bool("discord.send-auto-bans", true),
-                r.bool("discord.send-alerts", false));
+                r.bool("discord.send-alerts", false),
+                loadBot(r));
         if (!discord.webhookUrl().isEmpty() && !discord.enabled()) {
-            r.warn("discord.webhook must be a https:// Discord webhook URL; Discord messages are off.");
+            r.warn("discord.webhook must be a https:// Discord webhook URL; the webhook is off.");
         }
+
+        long keepClosed = r.duration("tickets.keep-closed", 30L * 24 * 3600 * 1000);
+        Settings.Tickets tickets = new Settings.Tickets(
+                r.bool("tickets.enabled", true),
+                r.bool("tickets.reports", true),
+                keepClosed);
 
         Settings.Moderation moderation = loadModeration(r);
 
@@ -444,7 +477,7 @@ public final class ConfigLoader {
         }
 
         return new Settings(general, lag, alerts, violations, autoBan, antiXray, antiEsp, clientCheck, discord,
-                moderation, checks, messages, r.warnings);
+                moderation, tickets, checks, messages, r.warnings);
     }
 
     /** Maps every check to its configuration path, accepting (with a warning) the 1.x check names. */
@@ -472,6 +505,50 @@ public final class ConfigLoader {
             }
         }
         return sections;
+    }
+
+    private static final String BOT = "discord.bot.";
+
+    /** {@code discord.bot}: IDs are checked so a pasted name or link is reported instead of failing silently. */
+    private static Settings.Bot loadBot(Reader r) {
+        boolean enabled = r.bool(BOT + "enabled", false);
+        String token = r.string(BOT + "token", "").trim();
+        if (token.regionMatches(true, 0, "Bot ", 0, 4)) {
+            token = token.substring(4).trim();
+        }
+        String serverId = r.snowflake(BOT + "server-id");
+        List<String> roles = new ArrayList<>();
+        for (String role : r.stringList(BOT + "staff-roles", List.of())) {
+            String id = role.trim();
+            if (id.startsWith("<@&") && id.endsWith(">")) {
+                id = id.substring(3, id.length() - 1);
+            }
+            if (isSnowflake(id)) {
+                roles.add(id);
+            } else {
+                r.warn(BOT + "staff-roles: '" + role + "' is not a role ID (right-click the role > Copy Role ID); "
+                        + "it is ignored.");
+            }
+        }
+        Settings.Bot bot = new Settings.Bot(enabled, token, serverId, roles,
+                r.snowflake(BOT + "punishments-channel"),
+                r.snowflake(BOT + "alerts-channel"),
+                r.snowflake(BOT + "tickets-category"),
+                r.snowflake(BOT + "ticket-log-channel"),
+                r.snowflake(BOT + "chat-channel"),
+                r.bool(BOT + "read-messages", true),
+                r.bool(BOT + "ping-staff", true),
+                r.string(BOT + "status", "Watching {online} players"));
+        if (enabled && token.isEmpty()) {
+            r.warn(BOT + "enabled is true but there is no token; the Discord bot is off.");
+        } else if (enabled && serverId.isEmpty()) {
+            r.warn(BOT + "enabled is true but server-id is not set; the Discord bot is off.");
+        }
+        return bot;
+    }
+
+    static boolean isSnowflake(String text) {
+        return text.length() >= 15 && text.length() <= 21 && text.chars().allMatch(c -> c >= '0' && c <= '9');
     }
 
     private static Settings.Moderation loadModeration(Reader r) {
@@ -745,6 +822,24 @@ public final class ConfigLoader {
                 return String.join("\n", parts);
             }
             return string(path, def).replace("\\n", "\n");
+        }
+
+        /** A Discord ID (digits); empty when not set or invalid (invalid values are reported). */
+        String snowflake(String path) {
+            Object value = root.get(path);
+            if (value == null) {
+                return "";
+            }
+            String text = value instanceof Number number ? Long.toString(number.longValue()) : value.toString().trim();
+            if (text.isEmpty() || text.equals("0")) {
+                return "";
+            }
+            if (!isSnowflake(text)) {
+                warn(path + " must be a Discord ID (turn on Developer Mode in Discord, then right-click > Copy ID); "
+                        + "got '" + text + "'. It is not used.");
+                return "";
+            }
+            return text;
         }
 
         long duration(String path, long def) {

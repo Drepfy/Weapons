@@ -149,14 +149,51 @@ moderation:
     unmute: [Appeal_Accepted, False_Mute, Served_Time, Staff_Decision]
     unwarn: [Appeal_Accepted, False_Warning, Staff_Decision]
 
-# Post bans, mutes, warnings and kicks to a Discord channel.
-# Discord: channel settings > Integrations > Webhooks > New Webhook > Copy Webhook URL.
+# Discord: ban alerts, tickets, staff commands and chat. Setup steps are in the README.
 discord:
+  # Option 1, the simplest: a webhook posts bans, mutes, warnings and kicks to one channel.
+  # Channel settings > Integrations > Webhooks > New Webhook > Copy Webhook URL.
   webhook: ""
   send-punishments: true
   send-auto-bans: true
-  # Every anti-cheat alert too (can be a lot).
+  # Every anti-cheat alert through the webhook too (can be a lot).
   send-alerts: false
+  # Option 2: a bot. Posts punishments and alerts, runs tickets, and gives staff /ban, /mute,
+  # /lookup ... in Discord. When a bot channel below is set, the bot posts there instead of the webhook.
+  bot:
+    enabled: false
+    # Discord developer portal > your application > Bot > Reset Token. Keep it secret.
+    token: ""
+    # Turn on Developer Mode (Discord settings > Advanced), then right-click your server > Copy Server ID.
+    server-id: ""
+    # Roles that may use the staff commands and see tickets (right-click a role > Copy Role ID).
+    # Server admins always can.
+    staff-roles: []
+    # Channel IDs (right-click a channel > Copy Channel ID). Leave empty to turn one off.
+    punishments-channel: ""
+    # Every anti-cheat alert is posted here.
+    alerts-channel: ""
+    # Ticket channels are created in this category (right-click the category > Copy Category ID).
+    tickets-category: ""
+    # Closed tickets are logged here with the whole conversation.
+    ticket-log-channel: ""
+    # Two-way chat between Minecraft and this channel.
+    chat-channel: ""
+    # Read normal messages in ticket and chat channels. Needs "Message Content Intent" switched on
+    # in the developer portal (Bot page). Without it, staff answer tickets with /reply.
+    read-messages: true
+    # Mention the staff roles when a ticket is opened.
+    ping-staff: true
+    # Shown under the bot's name. {online} = players online.
+    status: "Watching {online} players"
+
+# Support tickets: /ticket <message> in game, /report <player> <reason>, and the Discord ticket
+# panel (/ticketpanel in Discord). Staff use /tickets in game, or the ticket channels in Discord.
+tickets:
+  enabled: true
+  reports: true
+  # Closed tickets are deleted after this long ("perm" keeps them).
+  keep-closed: 30d
 
 # Placeholders: {player} {staff} {reason} {duration} {expires} {expires-date} {date} {id} {offence} {appeal} {count} {vl} {brand}
 messages:
@@ -279,5 +316,31 @@ messages:
   never: "Never"
   presets-header: "&7Preset reasons &8(time for the 1st, 2nd, 3rd offence...)&7:"
   warn-escalation-reason: "Too many warnings ({count})"
+  # Tickets. Placeholders: {id} {player} {author} {message} {category} {staff} {reason} {count}
+  ticket-usage: "&7Need help? Open a ticket with staff: &f/ticket <message>"
+  ticket-opened: "&aYour ticket &f#{id} &ahas been opened. Staff will reply as soon as possible."
+  ticket-added: "&7Your message was added to ticket &f#{id}&7."
+  ticket-reply: "&8[&bTicket #{id}&8] &f{author}&7: &f{message}"
+  ticket-staff-new: "&8[&bTicket #{id}&8] &f{player} &7opened a ticket &8({category})&7: &f{message}"
+  ticket-staff-message: "&8[&bTicket #{id}&8] &f{author}&7: &f{message}"
+  ticket-claimed: "&7Ticket &f#{id} &7is now handled by &f{staff}&7."
+  ticket-closed: "&7Ticket &f#{id} &7has been closed."
+  ticket-closed-notify: "&7Your ticket &f#{id} &7was closed by &f{staff}&7. &8({reason})"
+  ticket-none: "&7You have no open tickets."
+  ticket-not-found: "&cTicket not found: &f{id}"
+  ticket-choose: "&7You have more than one open ticket. Add its number, for example: &f/ticket reply {id} <message>"
+  ticket-unread: "&7You have a new reply on ticket &f#{id}&7. Use &f/ticket view {id} &7to read it."
+  ticket-cooldown: "&cPlease wait a moment before sending another message."
+  ticket-full: "&cThis ticket is full. Please open a new one."
+  ticket-too-many: "&cYou already have {count} open tickets. Please wait for staff to answer them."
+  tickets-header: "&7Open tickets &8({count})&7:"
+  tickets-empty: "&7There are no open tickets."
+  tickets-open-join: "&7Open tickets waiting for staff: &f{count}&7. Use &f/tickets &7to see them."
+  tickets-disabled: "&cTickets are turned off on this server."
+  report-usage: "&7Report a player to staff: &f/report <player> <reason>"
+  report-sent: "&aThank you. Your report about &f{player} &ahas been sent to staff as ticket &f#{id}&a."
+  report-self: "&cYou cannot report yourself."
+  # Discord chat shown in game (discord.bot.chat-channel). Placeholders: {name} {message}
+  discord-chat: "&9Discord &8| &f{name}&7: {message}"
 
 # Fine-tuning (lag protection, per-check thresholds...) is optional and described in the README.

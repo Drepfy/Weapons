@@ -23,6 +23,7 @@ public record Settings(General general,
                        ClientCheck clientCheck,
                        Discord discord,
                        Moderation moderation,
+                       Tickets tickets,
                        Map<CheckType, CheckSettings> checks,
                        Messages messages,
                        List<String> warnings) {
@@ -206,14 +207,68 @@ public record Settings(General general,
     }
 
     /**
-     * Posts punishments (and optionally anti-cheat alerts) to a Discord channel.
+     * Discord: punishments and alerts through a webhook, or a bot that also runs tickets,
+     * staff commands and a chat bridge.
      *
-     * @param webhookUrl Discord webhook URL, empty = off
+     * @param webhookUrl  Discord webhook URL, empty = no webhook
+     * @param punishments post bans, mutes, warnings and kicks given by staff
+     * @param autoBans    post automatic anti-cheat bans
+     * @param alerts      post every anti-cheat alert through the webhook (the bot uses its alerts channel)
      */
-    public record Discord(String webhookUrl, boolean punishments, boolean autoBans, boolean alerts) {
+    public record Discord(String webhookUrl, boolean punishments, boolean autoBans, boolean alerts, Bot bot) {
+        /** Whether the webhook is set. */
         public boolean enabled() {
             return webhookUrl != null && webhookUrl.startsWith("https://");
         }
+    }
+
+    /**
+     * The Discord bot. Channel and role settings are Discord IDs; empty = not used.
+     *
+     * @param staffRoles   roles that may use the staff commands and see tickets (admins always can)
+     * @param readMessages read normal messages in ticket and chat channels (needs the Message Content intent)
+     * @param pingStaff    mention the staff roles when a ticket is opened
+     * @param status       text under the bot's name; {online} is the number of players online
+     */
+    public record Bot(boolean enabled,
+                      String token,
+                      String serverId,
+                      List<String> staffRoles,
+                      String punishmentsChannel,
+                      String alertsChannel,
+                      String ticketsCategory,
+                      String ticketLogChannel,
+                      String chatChannel,
+                      boolean readMessages,
+                      boolean pingStaff,
+                      String status) {
+        public Bot {
+            staffRoles = List.copyOf(staffRoles);
+        }
+
+        /** Switched on with a token and a server. */
+        public boolean active() {
+            return enabled && !token.isEmpty() && !serverId.isEmpty();
+        }
+
+        /** Never prints the token (settings can end up in logs). */
+        @Override
+        public String toString() {
+            return "Bot[enabled=" + enabled + ", token=" + (token.isEmpty() ? "" : "<hidden>") + ", serverId=" + serverId
+                    + ", staffRoles=" + staffRoles + ", punishmentsChannel=" + punishmentsChannel + ", alertsChannel="
+                    + alertsChannel + ", ticketsCategory=" + ticketsCategory + ", ticketLogChannel=" + ticketLogChannel
+                    + ", chatChannel=" + chatChannel + ", readMessages=" + readMessages + ", pingStaff=" + pingStaff
+                    + ", status=" + status + "]";
+        }
+    }
+
+    /**
+     * Support tickets (/ticket, /report, and the Discord ticket panel).
+     *
+     * @param reports      players may use /report
+     * @param keepClosedMs closed tickets are deleted after this long ({@code -1} = kept forever)
+     */
+    public record Tickets(boolean enabled, boolean reports, long keepClosedMs) {
     }
 
     public record Messages(Map<String, String> values) {

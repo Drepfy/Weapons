@@ -39,10 +39,16 @@ Anti-cheat and moderation for a Spigot/Paper SMP (built for **ᴠᴀɴɪʟʟᴀ 
   `/unwarn` removes one.
 - **Hotbar notices**: being muted, unmuted, warned or having a warning removed is
   shown in bold above the hotbar as well as in chat.
-- **Discord log** (optional): bans, mutes, warnings and kicks posted to a
-  Discord channel through a webhook.
+- **Discord** (optional): bans (also automatic ones), mutes, warnings and kicks
+  posted to a channel through a webhook, or a **bot** that also posts anti-cheat
+  alerts, runs tickets, gives staff `/ban`, `/mute`, `/warn`, `/lookup`... in
+  Discord and bridges chat (see "Discord").
+- **Tickets**: players open a ticket with `/ticket <message>` or report a player
+  with `/report`; staff answer with `/tickets`. With the bot, every ticket also
+  gets a private Discord channel, and people on Discord can open tickets (support,
+  reports, ban appeals) with buttons.
 - **Few commands, no menus**: `/ac` for the anti-cheat, plus `/ban /unban /mute
-  /unmute /warn /unwarn /kick` with preset reasons.
+  /unmute /warn /unwarn /kick` with preset reasons, and `/ticket /report /tickets`.
 - **LuckPerms ready**: every command has its own permission node, plus
   `vigil.staff` and `vigil.admin` sets (see "Permissions").
 - **Low false positives**: every check allows for lag, ping, knockback, pistons,
@@ -58,7 +64,8 @@ Anti-cheat and moderation for a Spigot/Paper SMP (built for **ᴠᴀɴɪʟʟᴀ 
    single permissions below.
 3. Optional: edit `plugins/Vigil/config.yml`, then run `/ac reload`.
 
-**Updating from 2.x:** just replace the jar. (2.4.0 removed `/punish`,
+**Updating from 2.x:** just replace the jar. (2.6.0 adds tickets and the Discord
+bot; both work without any setup in game, the bot stays off until you add a token.) (2.4.0 removed `/punish`,
 `/ac reset` and `/ac debug`; `/unban`, `/unmute` and `/ac reload` now have their
 own permissions, which ops and `vigil.*` already include.) On start, Vigil adds the new
 options to your `config.yml` and saves the old file as
@@ -88,8 +95,11 @@ Requirements: Paper (recommended) or Spigot 1.20–1.21.x, Java 17+ (Java 21 on
 | `/warn <player> <time> [reason]` | `vigil.warn` | The time is required, 1h to 10d: `/warn Steve 1d Spam`. Enough active warnings mute or ban |
 | `/unwarn <player> [reason]` | `vigil.unwarn` | Remove the player's newest active warning |
 | `/kick <player> [reason]` | `vigil.kick` | Kicked with the kick screen |
+| `/ticket <message>` | `vigil.ticket` (everyone) | Open a ticket, or add to your open ticket. Also `/ticket view`, `/ticket close`, `/ticket list`, `/ticket reply <id> <message>` |
+| `/report <player> <reason>` | `vigil.report` (everyone) | Report a player; staff see where you were |
+| `/tickets` | `vigil.tickets` | Open tickets. Also `/tickets view <id>`, `reply <id> <message>`, `claim <id>`, `close <id> [reason]`, `tp <id>` |
 
-`/ac` also works as `/anticheat` and `/vigil`. Durations: `30m`, `12h`, `7d`,
+`/ac` also works as `/anticheat` and `/vigil`, `/ticket` as `/support`. Durations: `30m`, `12h`, `7d`,
 `2w`, `1mo`, `1y`, `perm`. Tab completion shows the preset reasons. If another
 plugin also has `/ban`, use `/vigil:ban`.
 
@@ -210,9 +220,43 @@ the player's hotbar for about 5 seconds (`mute-actionbar`, `unmute-actionbar`,
 `warn-actionbar`, `unwarn-actionbar` in `messages`; set one to `""` to turn it
 off).
 
-### Discord
+## Tickets
 
-Create a webhook (channel settings → Integrations → Webhooks), then:
+- A player types `/ticket My house was griefed`. Staff online get
+  `[Ticket #1] Steve opened a ticket (Support): My house was griefed` (click it
+  to read the ticket).
+- Staff answer with `/tickets reply 1 On my way` (or click **[Reply]** under
+  `/tickets view 1`). The player sees the answer in chat; if they are offline,
+  they are told when they next join.
+- The player answers with `/ticket <message>` (or `/ticket reply <id> <message>`
+  when they have more than one ticket).
+- `/tickets claim 1` shows the player who is handling it, `/tickets tp 1` takes
+  you to where the ticket was opened, `/tickets close 1 Fixed` closes it (the
+  player can also `/ticket close`).
+- `/report Cheater flying over my base` opens a report ticket about that player,
+  with the reporter's location. One report a minute, at most 3 open tickets per
+  player.
+- Staff are told how many tickets are open when they join. Tickets are kept in
+  `data/tickets.yml`; closed ones are deleted after 30 days (`tickets.keep-closed`).
+
+With the Discord bot set up, every ticket also gets a private channel (see below),
+and replies go both ways: staff can answer from Discord or in game.
+
+```yaml
+tickets:
+  enabled: true
+  reports: true        # /report
+  keep-closed: 30d     # "perm" keeps closed tickets forever
+```
+
+## Discord
+
+There are two ways, and you can use either or both.
+
+### Option 1: webhook (ban log only, 1 minute)
+
+Create a webhook (channel settings → Integrations → Webhooks → New Webhook →
+Copy Webhook URL), then:
 
 ```yaml
 discord:
@@ -222,8 +266,82 @@ discord:
   send-alerts: false       # every anti-cheat alert (a lot)
 ```
 
-Messages are sent in the background; if Discord is down nothing on the server
-is affected. Mentions like `@everyone` in reasons never ping.
+### Option 2: the Vigil bot (ban log, alerts, tickets, staff commands, chat)
+
+The bot runs inside the plugin; nothing else needs to be installed or hosted.
+
+1. **Create the bot.** Open <https://discord.com/developers/applications> →
+   **New Application** (name it e.g. "Vigil") → **Bot** → **Reset Token** → copy
+   the token. On the same page, switch on **Message Content Intent** (needed to
+   read messages typed in ticket and chat channels).
+2. **Invite it.** **OAuth2 → URL Generator**: tick `bot` and
+   `applications.commands`, then the permissions *View Channels, Send Messages,
+   Embed Links, Attach Files, Read Message History, Manage Channels, Mention
+   Everyone*. Open the link and pick your server. (If you skip this step, the
+   console prints a ready-made invite link once the token is set.)
+3. **Copy the IDs.** In Discord: Settings → Advanced → **Developer Mode** on.
+   Then right-click → **Copy ID** on: your server, your staff role(s), and the
+   channels you want to use. Make a category for tickets (right-click it → Copy
+   Category ID). Keep the punishments, alerts and ticket-log channels visible to
+   staff only.
+4. **Fill in `config.yml`:**
+
+   ```yaml
+   discord:
+     bot:
+       enabled: true
+       token: "paste the token here"
+       server-id: "123456789012345678"
+       staff-roles: ["234567890123456789"]      # admins always count as staff
+       punishments-channel: "345678901234567890" # bans, mutes, warnings, kicks
+       alerts-channel: "456789012345678901"      # every anti-cheat alert
+       tickets-category: "567890123456789012"    # ticket channels are made here
+       ticket-log-channel: "678901234567890123"  # closed tickets with the conversation
+       chat-channel: ""                           # two-way Minecraft <-> Discord chat
+       read-messages: true
+       ping-staff: true                           # mention staff roles on new tickets
+       status: "Watching {online} players"
+   ```
+
+   Leave a channel empty to switch that feature off. Then `/ac reload` (or
+   restart). The console says `Discord: the bot is online as Vigil.`
+5. **Post the ticket buttons:** in the channel where people should open tickets,
+   type `/ticketpanel`.
+
+Keep the token secret: anyone who has it controls the bot. If it ever leaks, press
+**Reset Token** again and paste the new one.
+
+**What the bot does**
+
+| | |
+|---|---|
+| Ban log | Every ban (also automatic ones), mute, warning, kick and unban in `punishments-channel` |
+| Alerts | Anti-cheat alerts in `alerts-channel` (grouped, up to 10 per message) |
+| Tickets | Each ticket gets a private channel (`ticket-12-steve`) only staff roles, the bot and the person who opened it can see. Staff roles are mentioned. Messages go both ways between the channel and the game. **Claim** and **Close** buttons; a closed ticket's channel is deleted after 10 seconds and the whole conversation is posted to `ticket-log-channel` as a file |
+| Ticket panel | `/ticketpanel` posts **Support**, **Report a player** and **Ban appeal** buttons. Each opens a short form; ban appeals show the player's active ban to staff |
+| Staff commands | `/ban`, `/unban`, `/mute`, `/unmute`, `/warn`, `/unwarn`, `/kick` work exactly like in game (same presets and times, same ban screens), shown as "Bob (Discord)". `/lookup <player>` shows bans, mutes, warnings and recent punishments. `/tickets` lists open tickets. Player names, times and reasons are suggested while typing |
+| In ticket channels | `/reply <message>`, `/claim`, `/close [reason]` (the person who opened a ticket may `/reply` and `/close` too) |
+| For everyone | `/online` and `/status` (players, TPS, open tickets) |
+| Chat bridge | With `chat-channel` set: game chat, joins and leaves appear in Discord; Discord messages appear in game as `Discord \| Bob: hi` |
+
+Only members with a staff role (or Administrator) can use the staff commands and
+buttons; the bot checks this itself. To also hide the commands from other members,
+use Server Settings → Integrations → Vigil.
+
+**If something does not work**, the console says why (at most every few minutes):
+
+- *the bot token is wrong*: reset the token and paste the new one.
+- *"Message Content Intent" is switched off*: switch it on (step 1), or set
+  `read-messages: false`; staff then answer tickets with `/reply`.
+- *Missing Permissions* / *Missing Access*: give the bot the permissions from
+  step 2 in that channel or category.
+- *the bot is not in the server*: use the invite link printed in the console.
+- Slash commands don't appear: re-invite with `applications.commands` and
+  restart Discord (Ctrl+R).
+
+Everything is sent in the background: if Discord is slow or down, nothing on the
+server waits or breaks. Mentions like `@everyone` in reasons, chat or tickets never
+ping anyone.
 
 ## Permissions
 
@@ -233,7 +351,7 @@ completion and the web editor).
 | Permission | Default | |
 |---|---|---|
 | `vigil.*` | op | `vigil.staff` + `vigil.admin` (not `vigil.protect` or `vigil.bypass`) |
-| `vigil.staff` | op | Moderator set: all of the nodes from `vigil.alerts` to `vigil.kick` below |
+| `vigil.staff` | op | Moderator set: all of the nodes from `vigil.alerts` to `vigil.tickets` below |
 | `vigil.admin` | op | Admin set: `vigil.reload` and `vigil.preview` |
 | `vigil.alerts` | op | See detections, auto-bans and staff punishments; `/ac alerts` |
 | `vigil.check` | op | `/ac check` |
@@ -244,8 +362,11 @@ completion and the web editor).
 | `vigil.warn` | op | `/warn` |
 | `vigil.unwarn` | op | `/unwarn` |
 | `vigil.kick` | op | `/kick` |
+| `vigil.tickets` | op | `/tickets`: see, answer, claim and close tickets, and hear about new ones |
 | `vigil.reload` | op | `/ac reload` |
 | `vigil.preview` | op | `/ac preview` |
+| `vigil.ticket` | true | `/ticket` (open tickets) |
+| `vigil.report` | true | `/report` |
 | `vigil.protect` | false | Cannot be punished by staff commands and is never auto-banned (still flagged) |
 | `vigil.bypass` | false | Not checked at all (and sees hidden storage), **only** if `anticheat.bypass-permission: true` (off so `*` permissions can't switch the anti-cheat off) |
 | `vigil.bypass.<check>` | false | Skip one check, e.g. `vigil.bypass.flight` (same condition) |
@@ -261,6 +382,7 @@ lp group helper permission set vigil.check true
 lp group helper permission set vigil.warn true
 lp group helper permission set vigil.mute true
 lp group helper permission set vigil.kick true
+lp group helper permission set vigil.tickets true
 
 lp creategroup mod
 lp group mod parent add helper
@@ -416,7 +538,8 @@ anticheat:
     speed: {enabled: true, ban-at: 15}
     # ... one line per check; ban-at: 0 = alerts only
 moderation: ...   # appeal, date format, warnings, preset reasons and their times
-discord: ...      # optional webhook
+discord: ...      # optional webhook and bot (ban log, alerts, tickets, staff commands, chat)
+tickets: ...      # /ticket, /report, how long closed tickets are kept
 messages: ...     # every text players and staff see, including the ban screens
 ```
 
@@ -488,6 +611,7 @@ All options and their allowed ranges are defined in
 plugins/Vigil/
 ├── config.yml
 ├── data/punishments.yml      # bans, mutes, warnings, kicks (manual and automatic)
+├── data/tickets.yml          # tickets and their conversations
 ├── data/players/<uuid>.yml   # lifetime flag counts and recent flags
 ├── data/staff.yml            # who turned alerts off
 └── logs/flags-YYYY-MM-DD.log # every flag and automatic ban
@@ -521,7 +645,7 @@ Maven tab → **Lifecycle → package**. GitHub Actions builds every push.
 
 ## Testing
 
-`mvn test` runs 131 tests. 51 of them are end-to-end scenarios on a simulated
+`mvn test` runs 179 tests. 75 of them are end-to-end scenarios on a simulated
 server (MockBukkit). Moves are handled exactly like on a real Paper server: when
 Vigil sets a player back, the server teleports them and fires a teleport event.
 Hacked clients are modelled like Meteor/Wurst: Flight (fast, hovering, gliding,
@@ -544,7 +668,14 @@ from 1 hour to 10 days, that mute/warn notices appear above the hotbar, that
 shortening a longer mute) and that a banned player sees the ban screen when
 joining. The Paper anti-xray setup is tested on sample Paper config files
 (backups, other settings untouched, runs only once), and the config upgrade on
-the real 2.2.0 config (new options added, edited values kept). Physics
+the real 2.2.0 config (new options added, edited values kept). Tickets are tested
+in game (opening, answering both ways, offline replies shown on join, reports with
+location and cooldown, other players' tickets out of reach) and the Discord bot
+against a local fake of Discord's API: slash commands registered, `/ban` from
+Discord (staff only, protected players refused), `/lookup`, ticket channels with
+the right permissions, messages both ways, the ticket form, close and transcript,
+the chat bridge and the connection itself (login, heartbeats, resuming after a
+drop, a wrong token, a missing Message Content intent). Physics
 simulations with random network jitter, lag spikes and frozen clients guard the
 speed, timer and flight limits.
 
@@ -567,6 +698,10 @@ On a test server, before going live:
       and appear normally when you walk in.
 - [ ] `/ac preview` shows the ban animation and the chat banner.
 - [ ] With Item Scroller, mass moving items (scroll or shift-drag) stops working.
+- [ ] `/ticket test` on the alt: staff see it in game and, with the bot, a new
+      ticket channel appears. Answer it from Discord and from the game.
+- [ ] With the bot: `/ban <alt> Cheating` in Discord bans the alt and is posted in
+      the punishments channel. `/ticketpanel`, then press the buttons on another account.
 
 ## Limitations
 
