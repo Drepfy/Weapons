@@ -550,7 +550,12 @@ class LegendaryTest {
         server.getPluginManager().registerEvents(new Listener() {
             @EventHandler(priority = EventPriority.HIGHEST)
             public void onDeath(PlayerDeathEvent event) {
-                grave.addAll(event.getDrops()); // A grave plugin taking the drops.
+                grave.addAll(event.getDrops()); // A grave plugin taking the drops...
+                for (ItemStack item : event.getEntity().getInventory().getContents()) {
+                    if (item != null) {
+                        grave.add(item); // ...or reading the inventory itself.
+                    }
+                }
             }
         }, plugin);
         List<ItemStack> drops = new ArrayList<>();
@@ -602,6 +607,23 @@ class LegendaryTest {
         alex.getInventory().addItem(old);
         plugin.tracker().scan();
         assertEquals(0, count(alex, WeaponType.SUGARCRASH));
+    }
+
+    @Test
+    void aDeathThatIsCancelledGivesTheWeaponBack() {
+        PlayerMock steve = player("Steve", 0, 0);
+        ItemStack axe = give(steve, WeaponType.GRAVEBREAKER);
+        server.getPluginManager().registerEvents(new Listener() {
+            @EventHandler(priority = EventPriority.HIGH)
+            public void onDeath(PlayerDeathEvent event) {
+                event.setCancelled(true); // A plugin saving the player.
+            }
+        }, plugin);
+        PlayerDeathEvent death = new PlayerDeathEvent(steve, DamageSource.builder(DamageType.GENERIC).build(),
+                new ArrayList<>(List.of(axe)), 0, "Steve died");
+        server.getPluginManager().callEvent(death);
+        assertEquals(1, count(steve, WeaponType.GRAVEBREAKER));
+        assertEquals(WeaponRecord.State.HELD, record(axe).state());
     }
 
     @Test
@@ -693,6 +715,23 @@ class LegendaryTest {
         tick(18 * 20);
         rightClick(steve);
         assertTrue(steve.hasPotionEffect(PotionEffectType.SPEED), "18s later it works again");
+    }
+
+    @Test
+    void eatingFromTheOffhandDoesNotWasteTheAbility() {
+        PlayerMock steve = player("Steve", 0, 0);
+        give(steve, WeaponType.SUGARCRASH);
+        steve.getInventory().setItemInOffHand(new ItemStack(Material.GOLDEN_APPLE));
+        rightClick(steve);
+        assertFalse(steve.hasPotionEffect(PotionEffectType.SPEED), "the golden apple is eaten instead");
+        steve.getInventory().setItemInOffHand(new ItemStack(Material.SHIELD));
+        tick(5);
+        rightClick(steve);
+        assertTrue(steve.hasPotionEffect(PotionEffectType.SPEED), "with a shield the ability still works");
+        bars(steve);
+        tick(5);
+        rightClick(steve); // Blocking while it recharges.
+        assertFalse(has(bars(steve), "recharging"), "no nagging while blocking");
     }
 
     @Test

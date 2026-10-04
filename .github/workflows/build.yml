@@ -20,6 +20,8 @@ jobs:
         run: mvn -B -f lifesteal/pom.xml package
       - name: Build and test Combat
         run: mvn -B -f combat/pom.xml package
+      - name: Build and test Legendary
+        run: mvn -B -f legendary/pom.xml package
       - uses: actions/upload-artifact@v4
         with:
           name: Vigil
@@ -32,3 +34,7 @@ jobs:
         with:
           name: Combat
           path: combat/target/Combat-*.jar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Legendary
+          path: legendary/target/Legendary-*.jar

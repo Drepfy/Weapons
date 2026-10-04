@@ -6,6 +6,7 @@ import io.github.drepfy.legendary.WeaponType;
 import io.github.drepfy.legendary.item.WeaponItems;
 import io.github.drepfy.legendary.util.Text;
 import org.bukkit.GameMode;
+import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -77,12 +78,15 @@ public final class Abilities implements Listener {
         if (tag == null || player.getGameMode() == GameMode.SPECTATOR) {
             return;
         }
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (usesOffhand(offhand)) {
+            return; // Eating a golden apple, drinking, throwing a pearl... comes first.
+        }
         if (action == Action.RIGHT_CLICK_BLOCK) {
             Block block = event.getClickedBlock();
             if (block != null && !player.isSneaking() && block.getType().isInteractable()) {
                 return; // Doors, chests, buttons... work as usual.
             }
-            ItemStack offhand = player.getInventory().getItemInOffHand();
             if (offhand.getType().isBlock() && !offhand.getType().isAir()) {
                 return; // Placing a block from the offhand.
             }
@@ -99,15 +103,34 @@ public final class Abilities implements Listener {
             return;
         }
         Ability ability = player.isSneaking() ? tag.type().secondary() : tag.type().primary();
-        use(player, tag, ability);
+        // With a shield, right-click also blocks: no complaint while the ability recharges.
+        use(player, tag, ability, offhand.getType() != Material.SHIELD);
+    }
+
+    /** Offhand items that right-click uses instead of the weapon. */
+    static boolean usesOffhand(ItemStack offhand) {
+        Material type = offhand.getType();
+        String name = type.name();
+        return type.isEdible() || name.endsWith("POTION") || name.endsWith("BUCKET") || name.equals("BOW")
+                || name.equals("CROSSBOW") || name.equals("TRIDENT") || name.equals("ENDER_PEARL")
+                || name.equals("SNOWBALL") || name.equals("EGG") || name.equals("WIND_CHARGE")
+                || name.equals("FISHING_ROD") || name.equals("FIREWORK_ROCKET") || name.equals("EXPERIENCE_BOTTLE")
+                || name.equals("ENDER_EYE") || name.equals("GOAT_HORN");
     }
 
     /** Uses an ability now, if it is ready. */
     public void use(Player player, WeaponItems.Tag tag, Ability ability) {
+        use(player, tag, ability, true);
+    }
+
+    private void use(Player player, WeaponItems.Tag tag, Ability ability, boolean complain) {
         long now = plugin.tick();
         String name = plugin.settings().ability(ability).name();
         long left = cooldowns.remaining(tag.id(), ability, now);
         if (left > 0) {
+            if (!complain) {
+                return;
+            }
             plugin.hud().flash(player, Text.format(plugin.settings().message("on-cooldown"), "ability", name,
                     "time", Text.countdown(left)));
             plugin.fx().soundTo(player, "cooldown");

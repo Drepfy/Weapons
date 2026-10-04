@@ -134,7 +134,10 @@ Every message can be changed (or set to `""` to turn it off). Wrong values fall 
 default and the console says what to fix.
 
 Other plugins: `Bukkit.getServicesManager().load(CombatPlugin.class).isInCombat(player)`,
-`combatRemaining(player)`, `pearlCooldown(player)`.
+`combatRemaining(player)`, `pearlCooldown(player)`. While a player holds a legendary weapon
+(the Legendary plugin), its cooldown bar shows the combat time in front and Combat leaves the
+bar to it, so the two never flicker. Any plugin can do the same by setting the player metadata
+`vanillasmp:actionbar` to an expiry time in epoch milliseconds.
 
 ## Building and testing
 
@@ -143,7 +146,7 @@ cd combat
 mvn -B package   # runs the tests, writes target/Combat-<version>.jar
 ```
 
-`mvn test` runs 29 tests on a simulated server: the action bar counting down and
+`mvn test` runs 30 tests on a simulated server: the action bar counting down and
 disappearing, every hit restarting the timer, arrows, TNT, end crystals, wolves and potions
 counting (and mobs, own arrows, healing potions and cancelled hits not), commands, menus,
 item swapping, teleports and world changes not ending combat, logging out pausing the timer,
@@ -153,4 +156,4 @@ other hotbar slots, launch blocking, reconnecting, cleared item cooldowns), a pe
 60 seconds again, elytra and riptide blocked within 15 blocks of an opponent (and allowed further
 away, or for the whole combat with `radius: 0`), safe zones (walking, teleporting and riding in
 refused, players inside able to stay and leave, zones made between two corners and kept),
-staff commands, restarts and config checking.
+sharing the action bar with other plugins, staff commands, restarts and config checking.
