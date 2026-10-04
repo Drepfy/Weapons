@@ -223,7 +223,8 @@ class ModerationTest {
         service.ban(alex, "Alex", "Speed", ModerationListener.ANTI_CHEAT_STAFF, 30 * DAY);
         Punishment auto = service.ban(alex, "Alex", "Flight", ModerationListener.ANTI_CHEAT_STAFF, Durations.PERMANENT);
         String antiCheat = ChatColor.stripColor(listener.banScreen(auto));
-        assertTrue(antiCheat.contains("You have been banned by Vigil Anti-Cheat."), antiCheat);
+        assertTrue(antiCheat.contains("You have been banned by V\u026a\u0262\u026a\u029f."), antiCheat);
+        assertTrue(listener.banScreen(auto).contains("\u00a7x"), "the name has its gradient colours");
         assertTrue(antiCheat.contains("Detected: Flight"), antiCheat);
         assertTrue(antiCheat.contains("Length: Permanent (2nd offence)"), "any earlier auto-ban counts: " + antiCheat);
         assertTrue(antiCheat.contains("Expires: Never"), antiCheat);

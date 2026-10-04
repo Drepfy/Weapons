@@ -33,6 +33,10 @@ public final class FlightCheck {
     private static final double MIN_NORMAL_GRAVITY = 0.075;
     /** Blocks can change around a player who does not move; rescan at least this often. */
     private static final long SURROUNDINGS_MAX_AGE_MS = 1000;
+    /** After a confirmed flag, further verdicts within this time are flagged at once. */
+    private static final long REPEAT_WINDOW_MS = 10_000;
+    /** How much a repeat flag counts (in units of vl-per-flag). */
+    private static final double REPEAT_WEIGHT = 2.0;
 
     private final CheckContext ctx;
 
@@ -129,16 +133,20 @@ public final class FlightCheck {
                         + Text.num(data.flight.lastAllowed()) + ")";
         ctx.debug(player, TYPE, () -> verdict + ": " + detail + " confirm=" + Text.num(data.flightConfirmActiveMs));
 
-        if (data.flightSuspectSinceMs < 0) {
-            // First verdict: remove any ghost blocks and wait for confirmation.
-            data.flightSuspectSinceMs = now;
-            data.flightConfirmActiveMs = 0;
-            data.flightSuspectDetail = detail;
-            ctx.probe().resyncAround(player, world, location.getX(), y, location.getZ());
-            return false;
-        }
-        if (data.flightConfirmActiveMs < settings.num("confirm-ms")) {
-            return false;
+        // Already confirmed a few seconds ago: this is the same flyer again, flag right away.
+        boolean repeat = now < data.flightConfirmedUntilMs;
+        if (!repeat) {
+            if (data.flightSuspectSinceMs < 0) {
+                // First verdict: remove any ghost blocks and wait for confirmation.
+                data.flightSuspectSinceMs = now;
+                data.flightConfirmActiveMs = 0;
+                data.flightSuspectDetail = detail;
+                ctx.probe().resyncAround(player, world, location.getX(), y, location.getZ());
+                return false;
+            }
+            if (data.flightConfirmActiveMs < settings.num("confirm-ms")) {
+                return false;
+            }
         }
 
         clearSuspicion(data);
@@ -152,7 +160,9 @@ public final class FlightCheck {
             return false;
         }
         data.buffer(TYPE).reset();
-        ctx.flag(player, data, TYPE, detail);
+        data.flightConfirmedUntilMs = now + REPEAT_WINDOW_MS;
+        // A repeat means flying again right after being caught: that is never lag or a ghost block.
+        ctx.flag(player, data, TYPE, repeat ? detail + " (again)" : detail, repeat ? REPEAT_WEIGHT : 1.0);
         return ctx.mitigationAllowed(settings);
     }
 

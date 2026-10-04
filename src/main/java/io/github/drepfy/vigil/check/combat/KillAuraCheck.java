@@ -33,6 +33,8 @@ public final class KillAuraCheck {
     private static final CheckType TYPE = CheckType.KILLAURA;
     private static final int MAX_PENDING = 512;
     private static final long CLIENT_TICK_FRESHNESS_MS = 1000;
+    /** Each this many degrees of miss adds 1 to a flag's weight. */
+    private static final double DEGREES_PER_EXTRA_WEIGHT = 30.0;
 
     private record Pending(UUID attacker, AttackSnapshot hit) {
     }
@@ -50,7 +52,7 @@ public final class KillAuraCheck {
         }
         if (ctx.settings().general().useClientTickEvents() && now - data.lastClientTickMs < CLIENT_TICK_FRESHNESS_MS) {
             if (data.lastAttackClientTick == data.clientTick && data.lastAttackTargetId != targetId) {
-                violation(attacker, data, now, 1.5, "attacked two different entities within one tick");
+                violation(attacker, data, now, 1.5, "attacked two different entities within one tick", 1.0);
             }
             data.lastAttackClientTick = data.clientTick;
             data.lastAttackTargetId = targetId;
@@ -108,11 +110,17 @@ public final class KillAuraCheck {
         }
         double missed = angle;
         ctx.debug(attacker, TYPE, () -> "look ray missed the target by " + Text.num(missed) + " degrees");
+        // Missing the target by a wide angle (hitting someone behind you) is never aim or lag.
         violation(attacker, data, now, 1.0, "hit a target it was not looking at (off by " + Text.num(missed)
-                + " degrees, " + Text.num(hit.distance()) + " blocks away)");
+                + " degrees, " + Text.num(hit.distance()) + " blocks away)", 1.0 + missed / DEGREES_PER_EXTRA_WEIGHT);
     }
 
-    private void violation(Player attacker, PlayerData data, long now, double weight, String detail) {
+    /**
+     * @param weight   how much this adds to the suspicion buffer
+     * @param severity how much the flag counts towards a ban (1-3)
+     */
+    private void violation(Player attacker, PlayerData data, long now, double weight, String detail,
+                           double severity) {
         if (!ctx.canFlag(attacker, data, now)) {
             return;
         }
@@ -122,7 +130,7 @@ public final class KillAuraCheck {
             return;
         }
         data.buffer(TYPE).reset();
-        ctx.flag(attacker, data, TYPE, detail);
+        ctx.flag(attacker, data, TYPE, detail, severity);
     }
 
     public void clear() {

@@ -19,6 +19,8 @@ Anti-cheat and moderation for a Spigot/Paper SMP (built for **ᴠᴀɴɪʟʟᴀ 
 - **Ban animation**: lightning, an explosion, thunder and a large red "Banned"
   title on the cheater's screen, then a "Vigil Anti-Cheat" notice in chat for
   everyone.
+- **Fast bans for blatant cheats**: fly hacks are banned in about 3 seconds,
+  speed hacks in about 5 (see "How a ban happens").
 - **Automatic bans**: when a check's violation level reaches its `ban-at`, the
   player is banned ("Cheating (Flying)"): 30 days the first time, permanent the
   second time. They are kicked with the anti-cheat ban screen and everyone is
@@ -162,13 +164,27 @@ A banned player sees one of three screens (all in `messages`, all editable):
 
 - `ban-screen`: temporary bans (with the countdown and the unban date).
 - `ban-screen-permanent`: permanent bans.
-- `ban-screen-anticheat`: automatic bans ("You have been banned by Vigil
-  Anti-Cheat", what was detected).
+- `ban-screen-anticheat`: automatic bans ("You have been banned by Vɪɢɪʟ", what
+  was detected).
 - `kick-screen`: kicks.
 
 Set your Discord invite or website in `moderation.appeal`, and the date style in
 `moderation.date-format`. Placeholders: `{player} {staff} {reason} {duration}
-{expires} {expires-date} {date} {id} {offence} {appeal}`.
+{expires} {expires-date} {date} {id} {offence} {appeal} {brand}`.
+
+### The Vɪɢɪʟ name and colours
+
+Ban messages show the plugin's name in small capitals with a colour gradient. It
+is one setting, used everywhere as `{brand}`:
+
+```yaml
+messages:
+  brand: "<gradient:#FF3C3C:#FFA53C>&lVɪɢɪʟ</gradient>"
+```
+
+Every message accepts the normal `&` codes, hex colours (`&#FF8800`) and gradients
+with two or more colours (`<gradient:#FF0000:#FFFF00:#00FF00>text</gradient>`).
+Bold/italic codes inside a gradient are kept.
 
 ### Warnings
 
@@ -290,11 +306,34 @@ every punishment; an admin can also reload and cannot be punished.
 events, a ghost-block resync for flight/NoFall, a second look one tick later for
 kill aura. Only then does it *flag*. Each flag adds 1 to the player's violation
 level (VL) for that check, and 1 decays every minute. When the VL reaches
-`ban-at`, the player is banned. So a cheater is banned within seconds to a
-minute, while the rare false flag decays away. Players with `vigil.protect` are
-reported to staff instead. Nothing is banned in `advanced.passive-mode`.
+`ban-at`, the player is banned. Players with `vigil.protect` are reported to staff
+instead. Nothing is banned in `advanced.passive-mode`.
 
-Speed, flight and step also pull the player back (setback). Reach, block reach,
+Blatant cheating counts more, so it is banned in seconds while a rare false flag
+decays away:
+- **Speed**: a flag counts as many times as the player was over the limit (twice
+  the allowed speed = 2, at most 3).
+- **Flight**: once a flyer is confirmed, flying again within 10 seconds is flagged
+  at once and counts 2.
+- **Reach**: every half block beyond the (lag compensated) range adds 1.
+- **Kill aura**: every 30 degrees the look direction missed the target adds 1.
+
+Measured on the simulated server (with setbacks, like a real Paper server):
+
+| Cheat | Banned after |
+|---|---|
+| Flying up | 2.5 s |
+| Flying 20 m/s, hovering, gliding, or claiming to be on the ground | 2.5-3.5 s |
+| Speed 16 m/s on the ground | 5 s |
+| Kill aura hitting from 4.5 blocks (sword speed) | 7 s |
+| Kill aura hitting without looking at the target | 10 s |
+
+Subtle cheats (a little over the speed limit, 3.4 block reach) take longer, on
+purpose: that is where lag lives.
+
+Speed, flight and step also pull the player back (setback) to the last spot
+they reached legitimately (the spot stops moving while they are speeding or
+flying, so a setback really undoes the cheat). Reach, block reach,
 scaffold, nuker, chest aura and mace cancel the action once the pattern is clear.
 
 ## X-ray, ESP and freecam
@@ -482,8 +521,13 @@ Maven tab → **Lifecycle → package**. GitHub Actions builds every push.
 
 ## Testing
 
-`mvn test` runs 118 tests. 39 of them are end-to-end scenarios on a simulated
-server (MockBukkit). They check that legit sprint-jumping, wall jumps, stairs,
+`mvn test` runs 131 tests. 51 of them are end-to-end scenarios on a simulated
+server (MockBukkit). Moves are handled exactly like on a real Paper server: when
+Vigil sets a player back, the server teleports them and fires a teleport event.
+Hacked clients are modelled like Meteor/Wurst: Flight (fast, hovering, gliding,
+climbing, with anti-kick dips, claiming to be on the ground, taking off after
+walking), ground Speed and KillAura (4.5 block reach, no rotations). Each must be
+**banned within a time limit** (see "How a ban happens"). They also check that legit sprint-jumping, wall jumps, stairs,
 bridging, knockback, falls with damage, normal fights, fights against a strafing
 target, real mace smashes and normal branch mining are **never** flagged, and that
 chests in plain view are never hidden. They also check that flying, speed, walking

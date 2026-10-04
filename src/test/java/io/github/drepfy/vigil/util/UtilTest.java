@@ -12,6 +12,25 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class UtilTest {
 
     @Test
+    void hexColoursAndGradients() {
+        assertEquals("\u00a7x\u00a7f\u00a7f\u00a78\u00a78\u00a70\u00a70x", Text.color("&#FF8800x"));
+        // Two letters: the first gets the first colour, the last the last colour.
+        assertEquals("\u00a7x\u00a7f\u00a7f\u00a70\u00a70\u00a70\u00a70a\u00a7x\u00a70\u00a70\u00a70\u00a70\u00a7f\u00a7fb",
+                Text.color("<gradient:#FF0000:#0000FF>ab</gradient>"));
+        // Bold inside a gradient is re-applied after every colour (a colour resets formatting).
+        assertEquals("\u00a7x\u00a7f\u00a7f\u00a70\u00a70\u00a70\u00a70\u00a7la\u00a7x\u00a70\u00a70\u00a70\u00a70\u00a7f\u00a7f\u00a7lb",
+                Text.color("<gradient:#FF0000:#0000FF>&lab</gradient>"));
+        // Three colours: the middle letter gets the middle colour.
+        String three = Text.color("<gradient:#FF0000:#00FF00:#0000FF>abc</gradient>");
+        assertTrue(three.contains("\u00a7x\u00a70\u00a70\u00a7f\u00a7f\u00a70\u00a70b"), three);
+        // Text around the gradient and normal codes still work.
+        String brand = "<gradient:#FF3C3C:#FFA53C>&lV\u026a\u0262\u026a\u029f</gradient>";
+        assertEquals("V\u026a\u0262\u026a\u029f | x", org.bukkit.ChatColor.stripColor(Text.color(brand + " &8| &7x")));
+        assertEquals("V\u026a\u0262\u026a\u029f x y", Text.strip(brand + " &#123456x &cy"));
+        assertEquals("", Text.color(null));
+    }
+
+    @Test
     void droppedIoWorkIsReported() throws Exception {
         java.util.logging.Logger logger = java.util.logging.Logger.getLogger("test");
         io.github.drepfy.vigil.storage.IoExecutor io = new io.github.drepfy.vigil.storage.IoExecutor(logger);

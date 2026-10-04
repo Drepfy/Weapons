@@ -160,6 +160,8 @@ public final class TickTask implements Runnable {
         Location current = player.getLocation();
         target.setYaw(current.getYaw());
         target.setPitch(current.getPitch());
+        data.pendingSetback = target.clone();
+        data.pendingSetbackMs = now;
         player.teleport(target);
     }
 }

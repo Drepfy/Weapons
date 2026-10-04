@@ -73,7 +73,9 @@ class ConfigLoaderTest {
             assertEquals(ConfigLoader.DEFAULT_REASONS.get(type), settings.moderation().reasons(type), type.key());
         }
         for (java.util.Map.Entry<String, String> entry : ConfigLoader.DEFAULT_MESSAGES.entrySet()) {
-            assertEquals(entry.getValue(), settings.messages().get(entry.getKey()), "messages." + entry.getKey());
+            String expected = entry.getKey().equals("brand") ? entry.getValue()
+                    : entry.getValue().replace("{brand}", ConfigLoader.DEFAULT_BRAND);
+            assertEquals(expected, settings.messages().get(entry.getKey()), "messages." + entry.getKey());
         }
         assertEquals(ConfigLoader.DEFAULT_MESSAGES.get("flagged"), settings.alerts().format());
         assertEquals(io.github.drepfy.vigil.moderation.Durations.PERMANENT, settings.moderation().defaultBanMs());

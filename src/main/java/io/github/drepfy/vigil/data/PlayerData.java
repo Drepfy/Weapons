@@ -33,7 +33,7 @@ import java.util.UUID;
  */
 public final class PlayerData {
 
-    private static final long NEVER = Long.MIN_VALUE / 4;
+    public static final long NEVER = Long.MIN_VALUE / 4;
 
     private final UUID uuid;
     private volatile String name;
@@ -86,8 +86,23 @@ public final class PlayerData {
     public long flightSuspectSinceMs = -1;
     public double flightConfirmActiveMs;
     public String flightSuspectDetail = "";
+    /** Consecutive-flag fast path: a confirmed flyer is flagged again without a new confirmation. */
+    public long flightConfirmedUntilMs = NEVER;
     public Location lastSafeLocation;
     public long lastSafeUpdateMs = NEVER;
+    /**
+     * A setback Vigil itself just made: the server answers it with a teleport event, which
+     * must not be mistaken for a real teleport (that would grant grace and wipe suspicion).
+     */
+    public Location pendingSetback;
+    public long pendingSetbackMs = NEVER;
+    /** Last flag of a movement check; the setback position is not advanced while this is recent. */
+    public long lastMovementFlagMs = NEVER;
+    /** Distance and time measured by the speed check since its last flag or restart (severity). */
+    public double speedWindowDistance;
+    public long speedWindowStartMs = NEVER;
+    /** Whether the speed budget is comfortably positive (the player moves legitimately right now). */
+    public boolean speedHealthy = true;
     /** Last time the no-fall check re-sent nearby blocks to this player. */
     public long lastGroundSpoofResyncMs = NEVER;
 
@@ -306,6 +321,9 @@ public final class PlayerData {
         surroundingsValid = false;
         flightSuspectSinceMs = -1;
         flightConfirmActiveMs = 0;
+        speedWindowDistance = 0;
+        speedWindowStartMs = NEVER;
+        speedHealthy = true;
         moveEventsSinceSample = 0;
         clientTicksSinceSample = 0;
         velocityRequiredRise = 0;

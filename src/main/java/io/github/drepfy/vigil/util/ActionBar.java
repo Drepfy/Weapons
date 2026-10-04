@@ -53,9 +53,13 @@ public final class ActionBar {
 
     /** Only loaded on servers with Adventure, so Spigot never has to resolve these classes. */
     private static final class Paper {
+        /** Reads {@code §} codes including hex colours ({@code §x§r§r§g§g§b§b}, used by gradients). */
+        private static final net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer SERIALIZER =
+                net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.builder().character('§')
+                        .hexColors().useUnusualXRepeatedCharacterHexFormat().build();
+
         static void send(Player player, String text) {
-            player.sendActionBar(
-                    net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection().deserialize(text));
+            player.sendActionBar(SERIALIZER.deserialize(text));
         }
     }
 }

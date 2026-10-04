@@ -384,7 +384,8 @@ public class VigilPlugin extends JavaPlugin {
             return; // An unreadable file is reported by readSettings and never rewritten.
         }
         List<YamlConfiguration> older = new ArrayList<>();
-        for (String name : List.of("upgrade/config-2.2.yml", "upgrade/config-2.3.yml")) {
+        for (String name : List.of("upgrade/config-2.2.yml", "upgrade/config-2.3.yml",
+                "upgrade/config-2.4.yml")) {
             java.io.InputStream stream = getResource(name);
             if (stream == null) {
                 continue;

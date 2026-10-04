@@ -198,6 +198,33 @@ Every source file was read again. Fixed:
 - /ac check labels bans replaced by a newer ban as "[replaced]" instead of "[lifted]".
 - Tests: 118 (each fix has a test that fails without it).
 
+## 2.5.0: real-server fly fix, fast bans, Vɪɢɪʟ branding
+
+A user test on a real server: flying at 20 m/s only produced Speed flags, slowly,
+and Flight never flagged. Cause, found by making the tests behave like Paper:
+- When a plugin changes the destination of a move (`setTo`, Vigil's setback), Paper
+  teleports the player and fires `PlayerTeleportEvent`. MockBukkit does not, so the
+  tests never saw it. Vigil treated its own setback as a real teleport: 1 s of
+  teleport grace (all movement checks off), flight tracking reset, and the setback
+  point wiped. Speed flagged, pulled back, went blind; flight never got 1 s of
+  airtime. Now every setback is marked and its teleport event is recognised
+  (`LifecycleListener.isOwnSetback`): no grace, no reset.
+- The setback point followed a speeder (updated every 250 ms on the ground). It now
+  only advances while the speed budget is healthy, no movement flag is recent and
+  no flight suspicion is open.
+- After a speed flag the full 1.5 s burst budget was given back; now a quarter.
+- Severity weights (`ViolationService.flag(..., weight)`, 1-3): speed by how many
+  times over the limit, flight repeats within 10 s count 2 (and skip the confirm
+  step), reach by the excess distance, kill aura by the missed angle.
+- Test harness: `paperMove` reproduces CraftBukkit's move handling. New time-bounded
+  hacked-client scenarios (fly fast/hover/up/glide/ground-spoof/after walking, ground
+  speed, 4.5-block aura, no-rotation aura) with measured ban times of 2.3-9.6 s.
+  Tests that spawned players floating in mid-air were made realistic.
+- Branding: `messages.brand` ("Vɪɢɪʟ", gradient), `{brand}` in any message, hex
+  colours (`&#RRGGBB`) and `<gradient:#a:#b...>` everywhere (legacy `§x` form, Paper
+  action bars parse it). 2.4 configs are upgraded (bundled `upgrade/config-2.4.yml`).
+- Tests: 131.
+
 ## Remaining / next steps
 
 - Validate on a live server with a hacked client on an alt (see the README
@@ -205,5 +232,7 @@ Every source file was read again. Fixed:
 - Prediction-based movement (Grim style) would catch subtle speed and strafe
   cheats, but it is a large project.
 - Moderation ideas: IP bans and alt detection.
+- Without Paper's client tick events (Spigot, Paper before 1.21.2) a flyer who hovers
+  completely still sends no move events, so its airtime is not counted.
 - When `auto-ban.command` hands bans to another plugin, Vigil doesn't store them,
   so the auto-ban ladder always uses its first step.

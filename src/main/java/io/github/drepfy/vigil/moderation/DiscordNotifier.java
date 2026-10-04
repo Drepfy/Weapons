@@ -128,7 +128,7 @@ public final class DiscordNotifier {
 
     /** JSON string literal; colour codes are removed, text is cut to Discord's field limit. */
     static String quote(String text) {
-        String clean = text.replaceAll("[&§][0-9a-fk-orA-FK-OR]", "");
+        String clean = io.github.drepfy.vigil.util.Text.strip(text);
         if (clean.length() > 1000) {
             clean = clean.substring(0, 1000) + "...";
         }

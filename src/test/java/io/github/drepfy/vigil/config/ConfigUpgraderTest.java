@@ -26,7 +26,8 @@ class ConfigUpgraderTest {
     }
 
     private static List<YamlConfiguration> older() throws Exception {
-        return List.of(resource("/upgrade/config-2.2.yml"), resource("/upgrade/config-2.3.yml"));
+        return List.of(resource("/upgrade/config-2.2.yml"), resource("/upgrade/config-2.3.yml"),
+                resource("/upgrade/config-2.4.yml"));
     }
 
     /** Saves and reloads, like the plugin does, so the result must also survive YAML. */
@@ -93,6 +94,20 @@ class ConfigUpgraderTest {
         assertFalse(upgraded.messages().get("auto-banned").contains("\u26a0"), "the emoji banner is replaced");
         assertEquals("&cBye {player}", upgraded.messages().get("kick-screen"), "edited messages are kept");
         assertEquals(ConfigLoader.DEFAULT_WARN_MAX_MS, upgraded.moderation().warnMaxMs());
+    }
+
+    @Test
+    void config24GetsTheBrandedBanMessages() throws Exception {
+        YamlConfiguration old = resource("/upgrade/config-2.4.yml");
+        List<String> changes = ConfigUpgrader.upgrade(old, resource("/config.yml"), older());
+        assertTrue(changes.contains("messages.brand"), changes.toString());
+        assertTrue(changes.contains("messages.auto-banned"), changes.toString());
+        assertTrue(changes.contains("messages.ban-screen-anticheat"), changes.toString());
+        Settings upgraded = ConfigLoader.load(roundTrip(old));
+        assertEquals(List.of(), upgraded.warnings());
+        assertTrue(upgraded.messages().get("auto-banned").contains("V\u026a\u0262\u026a\u029f"),
+                "the banner shows the small-caps name");
+        assertFalse(upgraded.messages().get("auto-banned").contains("{brand}"), "{brand} is filled in");
     }
 
     @Test

@@ -31,6 +31,9 @@ public final class ViolationService {
     private final TpsMonitor tps;
     private final ServerCompat compat;
 
+    /** Most a single flag can count for, however blatant (in units of {@code vl-per-flag}). */
+    public static final double MAX_WEIGHT = 3.0;
+
     public ViolationService(Supplier<Settings> settings, AlertService alerts, AutoBanService autoBan,
                             FlagLogWriter log, TpsMonitor tps, ServerCompat compat) {
         this.settings = settings;
@@ -47,18 +50,33 @@ public final class ViolationService {
      * @return the new VL, or -1 if another plugin cancelled the flag
      */
     public double flag(Player player, PlayerData data, CheckType type, String detail) {
+        return flag(player, data, type, detail, 1.0);
+    }
+
+    /**
+     * Records a violation that counts {@code weight} times {@code vl-per-flag}: blatant cheating
+     * (e.g. twice the allowed speed) reaches the ban limit sooner than borderline cases.
+     *
+     * @param weight 1 for an ordinary flag, capped at {@link #MAX_WEIGHT}
+     * @return the new VL, or -1 if another plugin cancelled the flag
+     */
+    public double flag(Player player, PlayerData data, CheckType type, String detail, double weight) {
         Settings config = settings.get();
         CheckSettings check = config.check(type);
         long now = Clock.now();
         double current = data.violation(type).get(now, check.decayPerMinute());
+        double added = check.vlPerFlag() * (Double.isFinite(weight) ? Math.max(1.0, Math.min(MAX_WEIGHT, weight)) : 1.0);
 
-        VigilFlagEvent event = new VigilFlagEvent(player, type, check.vlPerFlag(), current, detail);
+        VigilFlagEvent event = new VigilFlagEvent(player, type, added, current, detail);
         Bukkit.getPluginManager().callEvent(event);
         if (event.isCancelled()) {
             return -1;
         }
+        if (type.category() == io.github.drepfy.vigil.api.CheckCategory.MOVEMENT) {
+            data.lastMovementFlagMs = now;
+        }
 
-        double vl = data.violation(type).add(check.vlPerFlag(), now, check.decayPerMinute());
+        double vl = data.violation(type).add(added, now, check.decayPerMinute());
         Location location = player.getLocation();
         String world = location.getWorld() != null ? location.getWorld().getName() : "?";
         int ping = Math.max(0, compat.ping(player));

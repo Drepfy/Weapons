@@ -23,6 +23,12 @@ public final class SpeedCheck {
     private static final CheckType TYPE = CheckType.SPEED;
     /** Liquids change movement completely; skip this long after touching one. */
     private static final long LIQUID_GRACE_MS = 1000;
+    /** Share of the burst budget given back after a flag (a full budget would be a free second of speed). */
+    private static final double REFILL_AFTER_FLAG = 0.25;
+    /** Above this share of the budget the player moves normally, so the setback point may follow. */
+    private static final double HEALTHY_BALANCE = 0.5;
+    /** Severity is averaged over at least this many ticks. */
+    private static final double MIN_WINDOW_TICKS = 5.0;
 
     private final CheckContext ctx;
 
@@ -35,11 +41,11 @@ public final class SpeedCheck {
      */
     public boolean onMove(Player player, PlayerData data, Location from, Location to, boolean exemptState, long now) {
         if (!ctx.isActive(player, data, TYPE, now)) {
-            data.speed.restart(now);
+            restart(data, now);
             return false;
         }
         if (exemptState || ctx.inMovementGrace(data, now) || now - data.lastLiquidMs < LIQUID_GRACE_MS) {
-            data.speed.restart(now);
+            restart(data, now);
             return false;
         }
         CheckSettings settings = ctx.settings(TYPE);
@@ -50,6 +56,11 @@ public final class SpeedCheck {
         double limit = limitPerTick(player, data, settings, now);
         double capacity = limit * settings.num("burst-ticks") + settings.num("extra-blocks");
         double deficit = data.speed.consume(now, distance, limit, capacity);
+        if (data.speedWindowStartMs == PlayerData.NEVER) {
+            data.speedWindowStartMs = now - 50L;
+        }
+        data.speedWindowDistance += distance;
+        data.speedHealthy = deficit <= 0.0 && data.speed.balance() >= capacity * HEALTHY_BALANCE;
 
         if (ctx.isDebugging(player)) {
             ctx.debug(player, TYPE, () -> "dist=" + Text.num(distance) + " limit=" + Text.num(limit)
@@ -63,11 +74,17 @@ public final class SpeedCheck {
         // The budget is exhausted: only now run the more expensive/uncertain exemptions.
         if (!ctx.canFlag(player, data, now) || ctx.isDisturbed(to, now)) {
             data.speed.refill(capacity);
+            startWindow(data, now);
             return false;
         }
 
-        double averageSpeed = data.positions.averageHorizontalSpeed(now - 1000);
-        data.speed.refill(capacity);
+        // How fast the player really went since the budget was last full: 2x the limit is not lag.
+        double ticks = Math.max(MIN_WINDOW_TICKS, (now - data.speedWindowStartMs) / 50.0);
+        double averageSpeed = data.speedWindowDistance / ticks;
+        double severity = averageSpeed / limit;
+        // Not a whole new burst: a player who keeps speeding is flagged again within a few ticks.
+        data.speed.refill(capacity * REFILL_AFTER_FLAG);
+        startWindow(data, now);
         double buffer = data.buffer(TYPE).add(1.0, now, 0.05);
         if (buffer < settings.bufferThreshold()) {
             return false;
@@ -76,8 +93,19 @@ public final class SpeedCheck {
 
         String detail = "over by " + Text.num(deficit) + " blocks, avg " + Text.num(averageSpeed * 20.0)
                 + " m/s, limit " + Text.num(limit * 20.0) + " m/s";
-        ctx.flag(player, data, TYPE, detail);
+        ctx.flag(player, data, TYPE, detail, severity);
         return ctx.mitigationAllowed(settings);
+    }
+
+    private static void restart(PlayerData data, long now) {
+        data.speed.restart(now);
+        startWindow(data, now);
+        data.speedHealthy = true;
+    }
+
+    private static void startWindow(PlayerData data, long now) {
+        data.speedWindowDistance = 0.0;
+        data.speedWindowStartMs = now;
     }
 
     /** Maximum legitimate horizontal distance per 50 ms for this player right now. */

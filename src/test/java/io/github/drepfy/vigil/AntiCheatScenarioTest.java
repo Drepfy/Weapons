@@ -127,8 +127,29 @@ class AntiCheatScenarioTest {
 
     private void move(PlayerMock player, Location to, boolean onGround) {
         player.setOnGround(onGround);
-        player.simulatePlayerMove(to);
+        paperMove(player, to);
         tick(1);
+    }
+
+    /**
+     * A move exactly as CraftBukkit/Paper handles it (MockBukkit's own simulation does not):
+     * a cancelled move puts the player back where they were, and a destination changed by a
+     * plugin ({@code setTo}, e.g. a setback) makes the server teleport the player there,
+     * which fires a {@link org.bukkit.event.player.PlayerTeleportEvent} with cause PLUGIN.
+     */
+    private org.bukkit.event.player.PlayerMoveEvent paperMove(PlayerMock player, Location to) {
+        Location from = player.getLocation();
+        Location requested = to.clone();
+        var event = new org.bukkit.event.player.PlayerMoveEvent(player, from.clone(), to.clone());
+        player.setLocation(to.clone());
+        server.getPluginManager().callEvent(event);
+        if (event.isCancelled()) {
+            player.setLocation(from);
+        } else if (!requested.equals(event.getTo())) {
+            player.setLocation(from);
+            player.teleport(event.getTo(), org.bukkit.event.player.PlayerTeleportEvent.TeleportCause.PLUGIN);
+        }
+        return event;
     }
 
     private void swing(PlayerMock player) {
@@ -323,6 +344,160 @@ class AntiCheatScenarioTest {
 
     // ---- cheats -------------------------------------------------------------------------------
 
+    // ---- hacked clients, as they behave against a real server -----------------------------------
+
+    /**
+     * A hacked client's Flight module (Meteor, Wurst...): it rises {@code climbPerTick} per tick
+     * until {@code altitude} blocks above the ground, then moves {@code speed} blocks per tick
+     * horizontally while sinking {@code sinkPerTick}, and dips 0.04 blocks every 40 ticks (Meteor's
+     * anti-kick). {@code altitude} below 0 means it keeps climbing. After a setback it simply
+     * carries on from wherever the server put it, like a real client.
+     *
+     * @return ticks until the player was auto-banned, or -1 if it never was
+     */
+    private int hackedFlight(PlayerMock player, double speed, double altitude, double climbPerTick,
+                             double sinkPerTick, int maxTicks) {
+        return hackedFlight(player, speed, altitude, climbPerTick, sinkPerTick, maxTicks, false);
+    }
+
+    /** @param claimGround the client lies that it stands on the ground (dodges vanilla's fly kick) */
+    private int hackedFlight(PlayerMock player, double speed, double altitude, double climbPerTick,
+                             double sinkPerTick, int maxTicks, boolean claimGround) {
+        PlayerData data = data(player);
+        for (int tick = 0; tick < maxTicks; tick++) {
+            if (data.autoBanned) {
+                return tick;
+            }
+            Location at = player.getLocation().clone();
+            double target = groundY + altitude;
+            if (altitude < 0 || at.getY() < target - 1.0E-6) {
+                at.setY(altitude < 0 ? at.getY() + climbPerTick : Math.min(target, at.getY() + climbPerTick));
+            } else {
+                at.setY(Math.max(groundY, at.getY() - sinkPerTick));
+                if (tick % 40 == 0) {
+                    at.setY(at.getY() - 0.04);
+                } else if (tick % 40 == 1) {
+                    at.setY(at.getY() + 0.04);
+                }
+            }
+            at.setX(at.getX() + speed);
+            move(player, at, claimGround);
+        }
+        return data.autoBanned ? maxTicks : -1;
+    }
+
+    private void assertBannedWithin(PlayerMock player, int ticks, int limit, String what) {
+        PlayerData data = data(player);
+        assertTrue(ticks >= 0 && ticks <= limit, what + " should be auto-banned within " + limit / 20.0
+                + " s, took " + (ticks < 0 ? "forever" : ticks / 20.0 + " s") + ". Flags:" + describe(data));
+        tick(80);
+        assertFalse(player.isOnline(), "kicked after the ban animation");
+        assertNotNull(plugin.moderation().activeBan(player.getUniqueId()));
+    }
+
+    @Test
+    void fastFlyHackIsBannedWithinSeconds() {
+        // The user's test: Flight at ~20 m/s from the ground.
+        PlayerMock flyer = join("FastFlyer", 0.5, groundY, 0.5);
+        assertBannedWithin(flyer, hackedFlight(flyer, 1.0, 2.0, 0.4, 0.0, 400), 100, "a 20 m/s flyer");
+    }
+
+    @Test
+    void flyHackFromTheGroundIsPulledDownAndBanned() {
+        // Exactly the user's test: walk around first (so there is a safe spot), then fly off fast.
+        PlayerMock flyer = join("GroundFlyer", 0.5, groundY, 0.5);
+        PlayerData data = data(flyer);
+        Location at = flyer.getLocation();
+        for (int i = 0; i < 30; i++) {
+            at = at.clone().add(0.2, 0, 0);
+            move(flyer, at, true);
+        }
+        assertNotNull(data.lastSafeLocation, "walking on the ground gives a safe spot");
+        long teleportBefore = data.lastTeleportMs;
+        int ticks = hackedFlight(flyer, 1.0, 2.0, 0.4, 0.0, 400);
+        assertEquals(teleportBefore, data.lastTeleportMs, "Vigil's own setbacks are not treated as teleports");
+        assertTrue(flyer.getLocation().getY() < groundY + 1.0 || ticks >= 0, "pulled back down");
+        assertBannedWithin(flyer, ticks, 100, "a flyer who took off from the ground");
+    }
+
+    @Test
+    void flyHackThatClaimsToBeOnTheGroundIsBanned() {
+        PlayerMock flyer = join("GroundLiar", 0.5, groundY, 0.5);
+        assertBannedWithin(flyer, hackedFlight(flyer, 0.3, 3.0, 0.4, 0.0, 400, true), 100,
+                "a flyer spoofing on-ground");
+    }
+
+    @Test
+    void slowFlyHackFromTheGroundIsBanned() {
+        PlayerMock flyer = join("SlowGroundFlyer", 0.5, groundY, 0.5);
+        Location at = flyer.getLocation();
+        for (int i = 0; i < 30; i++) {
+            at = at.clone().add(0.2, 0, 0);
+            move(flyer, at, true);
+        }
+        assertBannedWithin(flyer, hackedFlight(flyer, 0.2, 3.0, 0.4, 0.0, 400), 100,
+                "a slow flyer who took off from the ground");
+    }
+
+    @Test
+    void setbacksPullTheFlyerBackToTheGround() {
+        PlayerMock flyer = join("PulledDown", 0.5, groundY, 0.5);
+        PlayerData data = data(flyer);
+        Location at = flyer.getLocation();
+        for (int i = 0; i < 30; i++) {
+            at = at.clone().add(0.1, 0, 0);
+            move(flyer, at, true);
+        }
+        double safeX = data.lastSafeLocation.getX();
+        // Fly away and watch where the server puts the player after the first flight flag.
+        double lowest = Double.MAX_VALUE;
+        for (int tick = 0; tick < 60 && !data.autoBanned; tick++) {
+            hackedFlight(flyer, 0.2, 3.0, 0.4, 0.0, 1);
+            if (flags(data, CheckType.FLIGHT) > 0) {
+                lowest = Math.min(lowest, flyer.getLocation().getY());
+            }
+        }
+        assertTrue(flags(data, CheckType.FLIGHT) > 0, describe(data));
+        assertTrue(lowest <= groundY + 0.5, "the flyer was put back on the ground, lowest y " + lowest);
+        assertTrue(Math.abs(data.lastSafeLocation.getX() - safeX) < 1.0, "the safe spot did not follow the flyer");
+    }
+
+    @Test
+    void hoveringFlyHackIsBannedWithinSeconds() {
+        PlayerMock flyer = join("Hoverer", 0.5, groundY, 0.5);
+        assertBannedWithin(flyer, hackedFlight(flyer, 0.2, 3.0, 0.4, 0.0, 400), 100, "a slow flyer");
+        assertEquals("Cheating (Flying)", plugin.moderation().activeBan(flyer.getUniqueId()).reason());
+    }
+
+    @Test
+    void flyingStraightUpIsBannedWithinSeconds() {
+        PlayerMock flyer = join("Climber", 0.5, groundY, 0.5);
+        assertBannedWithin(flyer, hackedFlight(flyer, 0.0, -1, 0.3, 0.0, 400), 100, "a player flying up");
+    }
+
+    @Test
+    void slowGlideIsBannedWithinSeconds() {
+        PlayerMock flyer = join("Glider", 0.5, groundY, 0.5);
+        assertBannedWithin(flyer, hackedFlight(flyer, 0.25, 6.0, 0.4, 0.03, 400), 100, "a glider");
+    }
+
+    @Test
+    void groundSpeedHackIsBannedWithinSeconds() {
+        PlayerMock speeder = join("GroundSpeeder", 0.5, groundY, 0.5);
+        PlayerData data = data(speeder);
+        int ticks = -1;
+        for (int tick = 0; tick < 400; tick++) {
+            if (data.autoBanned) {
+                ticks = tick;
+                break;
+            }
+            Location at = speeder.getLocation().clone();
+            at.setX(at.getX() + 0.8); // 16 m/s on the ground
+            move(speeder, at, true);
+        }
+        assertBannedWithin(speeder, ticks, 140, "a 16 m/s speed hacker");
+    }
+
     @Test
     void flyingIsFlaggedAndAutoBanned() throws Exception {
         PlayerMock staff = join("Staff", 0.5, groundY, 20.5);
@@ -346,7 +521,11 @@ class AntiCheatScenarioTest {
         List<String> staffMessages = messages(staff);
         assertTrue(staffMessages.stream().anyMatch(m -> m.contains("Flyer has been flagged for Flying")),
                 staffMessages.toString());
-        assertTrue(staffMessages.stream().anyMatch(m -> m.contains("Flyer has been banned for cheating (Flying)")),
+        assertTrue(staffMessages.stream().anyMatch(m -> m.contains("V\u026a\u0262\u026a\u029f | Anti-Cheat")),
+                staffMessages.toString());
+        assertTrue(staffMessages.stream().anyMatch(m -> m.contains("Flyer has been banned for cheating.")),
+                staffMessages.toString());
+        assertTrue(staffMessages.stream().anyMatch(m -> m.contains("Detected: Flying")),
                 staffMessages.toString());
 
         // The ban is enforced at login.
@@ -405,6 +584,40 @@ class AntiCheatScenarioTest {
         }
         PlayerData data = data(attacker);
         assertTrue(flags(data, CheckType.REACH) >= 3, "reach flags: " + describe(data));
+    }
+
+    /** Hits {@code target} every {@code interval} ticks until the attacker is banned; returns the ticks or -1. */
+    private int fightUntilBanned(PlayerMock attacker, PlayerMock target, int interval, int maxTicks) {
+        PlayerData data = data(attacker);
+        for (int tick = 0; tick < maxTicks; tick += interval) {
+            if (data.autoBanned) {
+                return tick;
+            }
+            attack(attacker, target, true);
+            tick(interval);
+        }
+        return data.autoBanned ? maxTicks : -1;
+    }
+
+    @Test
+    void killAuraWithLongReachIsBannedWithinSeconds() {
+        // A typical hacked-client KillAura: looks at the target, hits from 4.5 blocks at sword speed.
+        PlayerMock attacker = join("AuraReach", 0.5, groundY, 0.5);
+        PlayerMock target = join("AuraVictim", 0.5, groundY, 5.0);
+        attacker.setRotation(0, 0);
+        tick(40);
+        assertBannedWithin(attacker, fightUntilBanned(attacker, target, 12, 800), 160, "a 4.5-block kill aura");
+        assertEquals("Cheating (Reach)", plugin.moderation().activeBan(attacker.getUniqueId()).reason());
+    }
+
+    @Test
+    void killAuraWithoutRotationsIsBannedWithinSeconds() {
+        PlayerMock attacker = join("AuraBlind", 0.5, groundY, 0.5);
+        PlayerMock target = join("AuraBehind", 0.5, groundY, -2.0);
+        attacker.setRotation(0, 0); // looking away from the target
+        tick(40);
+        assertBannedWithin(attacker, fightUntilBanned(attacker, target, 12, 800), 220, "a no-rotation kill aura");
+        assertEquals("Cheating (Kill Aura)", plugin.moderation().activeBan(attacker.getUniqueId()).reason());
     }
 
     @Test
@@ -493,8 +706,9 @@ class AntiCheatScenarioTest {
 
     @Test
     void fallingWithoutFallDamageIsFlagged() {
-        PlayerMock player = join("NoFall", 0.5, groundY + 30, 0.5);
+        PlayerMock player = join("NoFall", 0.5, groundY, 0.5);
         PlayerData data = data(player);
+        player.teleport(new Location(world, 0.5, groundY + 30, 0.5));
         fall(player);
         tick(40);
         assertTrue(flags(data, CheckType.NOFALL) >= 1, "no-fall flags: " + describe(data));
@@ -502,14 +716,15 @@ class AntiCheatScenarioTest {
 
     @Test
     void fallingWithFallDamageIsNotFlagged() {
-        PlayerMock player = join("Faller", 0.5, groundY + 30, 0.5);
+        PlayerMock player = join("Faller", 0.5, groundY, 0.5);
         PlayerData data = data(player);
+        player.teleport(new Location(world, 0.5, groundY + 30, 0.5));
         fall(player);
         EntityDamageEvent damage = new EntityDamageEvent(player, EntityDamageEvent.DamageCause.FALL,
                 DamageSource.builder(DamageType.FALL).build(), 20.0);
         server.getPluginManager().callEvent(damage);
         tick(40);
-        assertEquals(0, flags(data, CheckType.NOFALL), describe(data));
+        assertEquals(0, totalFlags(data), "a legit 30 block fall: " + describe(data));
     }
 
     private void fall(PlayerMock player) {
@@ -550,7 +765,7 @@ class AntiCheatScenarioTest {
         // Fake fall by jumping 10 blocks up and back down within one tick.
         Location ground = cheater.getLocation();
         move(cheater, ground.clone().add(0, 10, 0), false);
-        cheater.simulatePlayerMove(ground.clone().add(0, 0.2, 0));
+        paperMove(cheater, ground.clone().add(0, 0.2, 0));
         cheater.setFallDistance(9.8f);
         var teleported = maceHit(cheater, victim);
         assertTrue(teleported.isCancelled());
@@ -559,9 +774,11 @@ class AntiCheatScenarioTest {
 
     @Test
     void realMaceSmashIsNotFlagged() {
-        PlayerMock attacker = join("MaceUser", 0.5, groundY + 12, 0.5);
         PlayerMock victim = join("MaceTarget", 0.5, groundY, 1.0);
+        PlayerMock attacker = join("MaceUser", 0.5, groundY, 0.5);
         PlayerData data = data(attacker);
+        // Up on a tower (teleported there), then straight off: a real client starts falling at once.
+        attacker.teleport(new Location(world, 0.5, groundY + 12, 0.5));
         Location at = attacker.getLocation();
         double velocity = 0.0;
         double y = at.getY();
@@ -574,7 +791,7 @@ class AntiCheatScenarioTest {
         }
         attacker.setFallDistance(fall);
         var hit = maceHit(attacker, victim);
-        assertFalse(hit.isCancelled());
+        assertFalse(hit.isCancelled(), describe(data));
         assertEquals(0, flags(data, CheckType.MACE), describe(data));
     }
 
@@ -789,7 +1006,7 @@ class AntiCheatScenarioTest {
             move(flyer, at, false);
         }
         assertTrue(flyer.isOnline(), "kicked only after the animation");
-        var escape = flyer.simulatePlayerMove(at.clone().add(5, 0, 0));
+        var escape = paperMove(flyer, at.clone().add(5, 0, 0));
         assertTrue(escape.isCancelled(), "cannot move away during the animation");
         tick(70);
         assertFalse(flyer.isOnline());

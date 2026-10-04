@@ -221,7 +221,13 @@ public record Settings(General general,
             values = Map.copyOf(values);
         }
 
+        /** The message; {@code {brand}} inside it becomes the {@code brand} message (the plugin's name). */
         public String get(String key) {
+            String value = raw(key);
+            return value.contains("{brand}") && !key.equals("brand") ? value.replace("{brand}", raw("brand")) : value;
+        }
+
+        private String raw(String key) {
             String value = values.get(key);
             return value != null ? value : ConfigLoader.DEFAULT_MESSAGES.getOrDefault(key, key);
         }

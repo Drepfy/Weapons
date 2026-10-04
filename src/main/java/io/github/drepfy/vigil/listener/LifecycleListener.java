@@ -78,8 +78,36 @@ public final class LifecycleListener implements Listener {
     public void onTeleport(PlayerTeleportEvent event) {
         long now = Clock.now();
         PlayerData data = ctx.players().get(event.getPlayer());
+        if (isOwnSetback(data, event, now)) {
+            // Vigil pulled a cheater back: not a real teleport. No grace period and no reset, or
+            // every setback would switch the movement checks off for a second and hide the cheat.
+            Location to = event.getTo();
+            data.fallPeakY = to.getY();
+            data.fallPeakMs = now;
+            data.pendingFallDistance = 0.0;
+            return;
+        }
         data.lastTeleportMs = now;
         resetMovement(data, event.getTo());
+    }
+
+    /**
+     * Whether this teleport is the server carrying out a setback Vigil just made (moving the
+     * player back with {@code setTo}, cancelling a move, or teleporting after a flight flag).
+     */
+    static boolean isOwnSetback(PlayerData data, PlayerTeleportEvent event, long now) {
+        Location expected = data.pendingSetback;
+        data.pendingSetback = null;
+        Location to = event.getTo();
+        if (expected == null || to == null || now - data.pendingSetbackMs > 1000
+                || expected.getWorld() == null || !expected.getWorld().equals(to.getWorld())) {
+            return false;
+        }
+        PlayerTeleportEvent.TeleportCause cause = event.getCause();
+        if (cause != PlayerTeleportEvent.TeleportCause.PLUGIN && cause != PlayerTeleportEvent.TeleportCause.UNKNOWN) {
+            return false;
+        }
+        return expected.distanceSquared(to) < 0.01;
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

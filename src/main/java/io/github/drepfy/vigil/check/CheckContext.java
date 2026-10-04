@@ -242,6 +242,11 @@ public final class CheckContext {
         return violations.flag(player, data, type, detail);
     }
 
+    /** A flag that counts {@code weight} times (1-3) because the cheat is blatant. */
+    public double flag(Player player, PlayerData data, CheckType type, String detail, double weight) {
+        return violations.flag(player, data, type, detail, weight);
+    }
+
     public void debug(Player player, CheckType type, Supplier<String> message) {
         debug.debug(player, type, message);
     }

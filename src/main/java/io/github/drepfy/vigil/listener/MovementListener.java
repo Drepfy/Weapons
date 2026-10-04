@@ -33,6 +33,8 @@ public final class MovementListener implements Listener {
     private static final long SAFE_LOCATION_INTERVAL_MS = 250;
     /** Setbacks never teleport further than this. */
     private static final double MAX_SETBACK_DISTANCE = 64.0;
+    /** After a movement flag the setback point is kept for this long. */
+    private static final long SAFE_AFTER_FLAG_MS = 2000;
 
     private final CheckContext ctx;
     private final Logger logger;
@@ -166,6 +168,13 @@ public final class MovementListener implements Listener {
         if (exemptState || now - data.lastSafeUpdateMs < SAFE_LOCATION_INTERVAL_MS) {
             return;
         }
+        // Only positions reached legitimately count: while the player is speeding (budget running
+        // low), just flagged, or suspected of flying, the setback point stays where they were
+        // still moving normally. Otherwise it would follow a speeder and a setback would not hurt.
+        if (!data.speedHealthy || now - data.lastMovementFlagMs < SAFE_AFTER_FLAG_MS
+                || data.flightSuspectSinceMs >= 0) {
+            return;
+        }
         data.lastSafeUpdateMs = now;
         int flags = ctx.probe().scan(to.getWorld(), to.getX(), to.getY(), to.getZ(), player.getWidth(),
                 player.getHeight(), 0.0, 0.1);
@@ -183,8 +192,14 @@ public final class MovementListener implements Listener {
             Location target = safe.clone();
             target.setYaw(event.getTo().getYaw());
             target.setPitch(event.getTo().getPitch());
+            // The server answers setTo with a teleport event: remember it is ours.
+            data.pendingSetback = target.clone();
+            data.pendingSetbackMs = now;
             event.setTo(target);
         } else {
+            // Cancelling can also make the server teleport the player back to "from".
+            data.pendingSetback = from.clone();
+            data.pendingSetbackMs = now;
             event.setCancelled(true);
         }
     }

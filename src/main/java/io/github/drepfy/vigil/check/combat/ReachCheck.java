@@ -20,6 +20,8 @@ import org.bukkit.event.Cancellable;
 public final class ReachCheck {
 
     private static final CheckType TYPE = CheckType.REACH;
+    /** Each this much reach beyond range + leniency adds 1 to a flag's weight. */
+    private static final double BLOCKS_PER_EXTRA_WEIGHT = 0.5;
 
     private final CheckContext ctx;
 
@@ -52,7 +54,9 @@ public final class ReachCheck {
             return;
         }
         data.buffer(TYPE).reset();
+        // The distance is already lag compensated: every extra half block is plainly impossible.
+        double weight = 1.0 + (distance - range - settings.num("leniency")) / BLOCKS_PER_EXTRA_WEIGHT;
         ctx.flag(attacker, data, TYPE, "hit from " + Text.num(distance) + " blocks (range " + Text.num(range)
-                + ", " + (hit.playerTarget() ? "player" : "mob") + ", lag window " + hit.windowMs() + "ms)");
+                + ", " + (hit.playerTarget() ? "player" : "mob") + ", lag window " + hit.windowMs() + "ms)", weight);
     }
 }

@@ -158,19 +158,14 @@ discord:
   # Every anti-cheat alert too (can be a lot).
   send-alerts: false
 
-# Placeholders: {player} {staff} {reason} {duration} {expires} {expires-date} {date} {id} {offence} {appeal} {count} {vl} {brand}
+# Placeholders: {player} {staff} {reason} {duration} {expires} {expires-date} {date} {id} {offence} {appeal} {count} {vl}
 messages:
-  # The plugin's name on ban messages. Use it anywhere as {brand}.
-  # Colours: &c, &#FF8800 (hex) or <gradient:#FF3C3C:#FFA53C>text</gradient> (two or more colours).
-  brand: "<gradient:#FF3C3C:#FFA53C>&lVɪɢɪʟ</gradient>"
   flagged: "&f{player} &7has been flagged for &c{reason} &8(VL {vl})"
   # Shown to everyone when the anti-cheat bans someone.
   auto-banned:
     - "&8&m                                                  "
-    - "  {brand} &8&l| &7Anti-Cheat"
-    - ""
-    - "  &f{player} &7has been banned for cheating."
-    - "  &7Detected: &c{reason}"
+    - "&c&lVigil &7Anti-Cheat"
+    - "&f{player} &7has been banned for cheating &8(&c{reason}&8)&7."
     - "&8&m                                                  "
   # Big text on the cheater's screen during the ban animation.
   ban-title: "&c&lBanned"
@@ -239,7 +234,7 @@ messages:
   ban-screen-anticheat:
     - "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ"
     - "&8&m                                    "
-    - "&cYou have been banned by {brand}&c."
+    - "&cYou have been banned by Vigil Anti-Cheat."
     - ""
     - "&7Detected: &f{reason}"
     - "&7Length: &f{duration} &8({offence} offence)"

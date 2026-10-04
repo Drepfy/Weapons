@@ -28,6 +28,8 @@ public final class ConfigLoader {
     public static final int SUPPORTED_CONFIG_VERSION = 2;
 
     public static final String DEFAULT_PREFIX = "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ » &r";
+    /** "Vigil" in small capitals with a red-orange gradient. */
+    public static final String DEFAULT_BRAND = "<gradient:#FF3C3C:#FFA53C>&lV\u026a\u0262\u026a\u029f</gradient>";
 
     private static final String OLD_BAN_SCREEN = "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ\n\n&cYou are banned from this server.\n\n"
                 + "&7Reason: &f{reason}\n&7Duration: &f{duration}\n&7Expires in: &f{expires}\n&7Banned by: &f{staff}";
@@ -52,12 +54,16 @@ public final class ConfigLoader {
     static {
         Map<String, String> messages = new LinkedHashMap<>();
         messages.put("prefix", DEFAULT_PREFIX);
+        // The plugin's name as shown on ban messages; {brand} in any message is replaced by it.
+        messages.put("brand", DEFAULT_BRAND);
         // Anti-cheat. Placeholders: {player} {reason} {check} {vl} {detail}
         messages.put("flagged", "&f{player} &7has been flagged for &c{reason} &8(VL {vl})");
         messages.put("auto-banned", String.join("\n",
                 "&8&m                                                  ",
-                "&c&lVigil &7Anti-Cheat",
-                "&f{player} &7has been banned for cheating &8(&c{reason}&8)&7.",
+                "  {brand} &8&l| &7Anti-Cheat",
+                "",
+                "  &f{player} &7has been banned for cheating.",
+                "  &7Detected: &c{reason}",
                 "&8&m                                                  "));
         messages.put("ban-title", "&c&lBanned");
         messages.put("ban-subtitle", "&7Detected: &c{reason}");
@@ -122,7 +128,7 @@ public final class ConfigLoader {
         messages.put("ban-screen-anticheat", String.join("\n",
                 "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ",
                 "&8&m                                    ",
-                "&cYou have been banned by Vigil Anti-Cheat.",
+                "&cYou have been banned by {brand}&c.",
                 "",
                 "&7Detected: &f{reason}",
                 "&7Length: &f{duration} &8({offence} offence)",
