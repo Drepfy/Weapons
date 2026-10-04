@@ -1,0 +1,9 @@
+{
+  "pack": {
+    "pack_format": 34,
+    "supported_formats": { "min_inclusive": 15, "max_inclusive": 99 },
+    "min_format": 15,
+    "max_format": 99,
+    "description": "Lifesteal: the Heart item"
+  }
+}

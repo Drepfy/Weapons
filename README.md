@@ -2,6 +2,9 @@
 
 Anti-cheat and moderation for a Spigot/Paper SMP (built for **ᴠᴀɴɪʟʟᴀ sᴍᴘ**).
 
+> This repository also has the server's **[Lifesteal plugin](lifesteal/README.md)**
+> (`lifesteal/`, released as `release/Lifesteal.jar`).
+
 - **20 server-side checks**: speed, flight (incl. spider and walking on water),
   step, NoFall, timer, NoSlow, anti-knockback, reach, kill aura, no-swing,
   hitting through walls, auto clicker, mace exploits, block reach, scaffold, fast

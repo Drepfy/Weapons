@@ -1,0 +1,125 @@
+# Lifesteal. After editing, run /lifesteal reload.
+prefix: "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ » &r"
+
+hearts:
+  # Hearts of a new player.
+  start: 10
+  # Nobody goes below this. A player at the minimum has no heart to steal.
+  min: 3
+  # Nobody goes above this. A heart stolen by a player at the maximum drops as a Heart item.
+  max: 20
+  # Hearts the killer takes from the victim per kill.
+  per-kill: 1
+  # Also lose a heart when dying without a player killer (falling, lava, mobs...).
+  lose-on-natural-death: false
+  # Fill the hearts you gain (otherwise they start empty and regenerate).
+  heal-gained-hearts: true
+  # Worlds where kills never move hearts (event arenas...).
+  disabled-worlds: []
+
+# After stealing a heart from someone, you cannot steal from them again for this long.
+# The kill still counts as a normal kill. Times: 30m, 1h, 2h30m...
+cooldown:
+  time: 30m
+  # true: the victim also cannot take the heart straight back from their killer.
+  both-directions: false
+
+withdraw:
+  enabled: true
+  # Most hearts one /withdraw can take.
+  max-per-command: 17
+
+# The Heart item. Only the plugin's own Heart counts; red dye renamed in an anvil does not.
+heart-item:
+  material: RED_DYE
+  name: "&c&l❤ Heart"
+  lore:
+    - "&7A stolen heart."
+    - ""
+    - "&eRight-click to consume"
+    - "&8Sneak + right-click to use the whole stack"
+  # Model number used by the resource pack (Lifesteal-ResourcePack.zip). 0 = none.
+  custom-model-data: 1001
+  # Shine like an enchanted item.
+  glow: true
+
+# Crafting a Heart. Each letter in the shape is an ingredient below; a space is an empty slot.
+recipe:
+  enabled: true
+  shape:
+    - "DND"
+    - "DSD"
+    - "DND"
+  ingredients:
+    D: DIAMOND_BLOCK
+    N: NETHERITE_INGOT
+    S: NETHER_STAR
+
+# The heart texture. Lifesteal-ResourcePack.zip is in this folder: upload it somewhere that gives a
+# direct download link (for example mc-packs.net) and paste the link here, or put it in
+# server.properties (resource-pack=...) yourself. Without it, Hearts look like glowing red dye.
+resource-pack:
+  url: ""
+  # Leave empty: the plugin works it out from the zip in this folder.
+  sha1: ""
+  # Kick players who decline the pack.
+  required: false
+  prompt: "&7This server uses a small pack for the Heart item."
+
+# Stops players farming hearts with their own alternate accounts. A kill between accounts
+# that look like the same person does not move any hearts (both keep theirs).
+alt-protection:
+  enabled: true
+  shared-ip:
+    # Accounts that joined from the same IP address count as the same person.
+    # Staff can make exceptions (siblings...) with /lifesteal alts allow <player> <player>.
+    enabled: true
+    # How long an IP address is remembered. Addresses are stored only as a scrambled code.
+    remember: 30d
+    # An address used by more accounts than this is a shared network (school, public Wi-Fi)
+    # and is ignored.
+    max-accounts-per-ip: 5
+  # Accounts that have played less than this neither gain nor lose hearts (fresh alts). 0 = off.
+  min-playtime: 30m
+  # Tell staff (lifesteal.notify) when a kill is not counted.
+  notify-staff: true
+
+# Every heart change in logs/lifesteal.log.
+log-to-file: true
+
+# Placeholders: {killer} {victim} {player} {hearts} {min} {max} {time} {count} {s} {available} {input} {reason}
+messages:
+  steal-killer: "&7You stole a heart from &c{victim}&7. You now have &c{hearts} &7hearts."
+  steal-victim: "&c{killer} &7stole one of your hearts. You now have &c{hearts} &7hearts."
+  steal-killer-at-max: "&7You already have the maximum of &c{max} &7hearts, so the heart from &c{victim} &7dropped as an item."
+  victim-at-min-killer: "&c{victim} &7only has &c{min} &7hearts left, so there was no heart to steal."
+  victim-at-min-victim: "&7You are at the minimum of &c{min} &7hearts and did not lose one."
+  cooldown-killer: "&7You took a heart from &c{victim} &7recently. You can take another in &c{time}&7."
+  cooldown-victim: "&7You did not lose a heart: &c{killer} &7took one from you recently."
+  alt-killer: "&7No heart was stolen: this kill was not counted by the alt account protection."
+  alt-victim: "&7You did not lose a heart: this kill was not counted by the alt account protection."
+  alt-staff: "&8[&cLifesteal&8] &7{killer} killed {victim}, not counted: &f{reason}"
+  natural-death: "&7You lost a heart. You now have &c{hearts} &7hearts."
+  consume: "&7You used &c{count} &7Heart{s}. You now have &c{hearts} &7hearts."
+  consume-at-max: "&cYou already have the maximum of {max} hearts."
+  withdraw-success: "&7You withdrew &c{count} &7heart{s}. You now have &c{hearts} &7hearts."
+  withdraw-usage: "&cUsage: /withdraw <amount>"
+  withdraw-invalid: "&c'{input}' is not a valid amount. Use a whole number from 1 to {max}."
+  withdraw-too-many: "&cYou can withdraw at most {max} hearts at once."
+  withdraw-too-low: "&cYou must keep at least {min} hearts. You can withdraw up to {available} right now."
+  withdraw-none: "&cYou only have {min} hearts, so you cannot withdraw any."
+  withdraw-disabled: "&cWithdrawing hearts is turned off."
+  inventory-full: "&7Your inventory is full, so {count} Heart{s} dropped at your feet."
+  hearts-self: "&7You have &c{hearts} &7hearts."
+  hearts-other: "&f{player} &7has &c{hearts} &7hearts."
+  top-header: "&7Most hearts:"
+  top-entry: "&8{rank}. &f{player} &8- &c{hearts} &7hearts"
+  no-permission: "&cYou do not have permission to do that."
+  player-not-found: "&cPlayer not found: &f{player}"
+  players-only: "&cOnly players can do that."
+  reloaded: "&aLifesteal reloaded. &7({warnings} warning(s), see console)"
+  reload-failed: "&cReload failed, the previous settings are kept: &f{error}"
+  hearts-set: "&7{player} now has &c{hearts} &7hearts."
+  hearts-changed-notify: "&7Your hearts were changed by staff. You now have &c{hearts} &7hearts."
+  given: "&7Gave &c{count} &7Heart{s} to &f{player}&7."
+  invalid-number: "&c'{input}' is not a valid number."

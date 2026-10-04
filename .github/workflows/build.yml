@@ -16,7 +16,13 @@ jobs:
           cache: maven
       - name: Build and test
         run: mvn -B package
+      - name: Build and test Lifesteal
+        run: mvn -B -f lifesteal/pom.xml package
       - uses: actions/upload-artifact@v4
         with:
           name: Vigil
           path: target/Vigil-*.jar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lifesteal
+          path: lifesteal/target/Lifesteal-*.jar

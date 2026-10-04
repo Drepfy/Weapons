@@ -1,0 +1,60 @@
+name: Lifesteal
+version: '${project.version}'
+main: io.github.drepfy.lifesteal.LifestealPlugin
+api-version: '1.20'
+description: Steal hearts from the players you kill. Heart items, /withdraw, cooldowns and alt account protection.
+authors: [Drepfy]
+
+commands:
+  withdraw:
+    description: Turn some of your hearts into Heart items.
+    usage: /<command> <amount>
+    permission: lifesteal.withdraw
+  hearts:
+    description: Show your hearts, another player's, or the players with the most.
+    usage: /<command> [player|top]
+    permission: lifesteal.hearts
+  lifesteal:
+    description: Lifesteal staff commands.
+    usage: /<command> [reload|sethearts|addhearts|removehearts|giveheart|resetcooldowns|info|alts]
+    aliases: [ls]
+
+# Every node shows up in LuckPerms.
+permissions:
+  lifesteal.withdraw:
+    description: Use /withdraw.
+    default: true
+  lifesteal.hearts:
+    description: Use /hearts and /hearts top.
+    default: true
+  lifesteal.hearts.others:
+    description: See other players' hearts with /hearts <player>.
+    default: true
+  lifesteal.notify:
+    description: Be told when a kill is not counted by the alt account protection.
+    default: op
+  lifesteal.admin:
+    description: Every staff command.
+    default: op
+    children:
+      lifesteal.admin.reload: true
+      lifesteal.admin.hearts: true
+      lifesteal.admin.give: true
+      lifesteal.admin.cooldowns: true
+      lifesteal.admin.alts: true
+      lifesteal.notify: true
+  lifesteal.admin.reload:
+    description: /lifesteal reload
+    default: op
+  lifesteal.admin.hearts:
+    description: /lifesteal sethearts, addhearts, removehearts
+    default: op
+  lifesteal.admin.give:
+    description: /lifesteal giveheart
+    default: op
+  lifesteal.admin.cooldowns:
+    description: /lifesteal resetcooldowns
+    default: op
+  lifesteal.admin.alts:
+    description: /lifesteal info and /lifesteal alts (link, unlink, allow, disallow)
+    default: op
