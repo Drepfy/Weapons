@@ -6,7 +6,37 @@ cut out, flat light per face, drawn larger and scaled down for smooth edges.
 """
 import math
 
-from mesh import corners, rotate
+def corners(direction, a, b):
+    """Top-left, top-right and bottom-left corners of a box face, as Minecraft maps a texture onto
+    it (u runs top-left to top-right, v top-left to bottom-left, seen from outside)."""
+    (x0, y0, z0), (x1, y1, z1) = a, b
+    return {
+        'south': ((x0, y1, z1), (x1, y1, z1), (x0, y0, z1)),
+        'north': ((x1, y1, z0), (x0, y1, z0), (x1, y0, z0)),
+        'east': ((x1, y1, z1), (x1, y1, z0), (x1, y0, z1)),
+        'west': ((x0, y1, z0), (x0, y1, z1), (x0, y0, z0)),
+        'up': ((x0, y1, z0), (x1, y1, z0), (x0, y1, z1)),
+        'down': ((x0, y0, z1), (x1, y0, z1), (x0, y0, z0)),
+    }[direction]
+
+
+def rotate(p, rot):
+    """Turns a point by an element rotation (axis, angle in degrees, origin), right-handed like
+    Minecraft."""
+    if not rot:
+        return p
+    axis, angle, (ox, oy, oz) = rot
+    c, s = math.cos(math.radians(angle)), math.sin(math.radians(angle))
+    x, y, z = p[0] - ox, p[1] - oy, p[2] - oz
+    if axis == 'x':
+        y, z = y * c - z * s, y * s + z * c
+    elif axis == 'y':
+        z, x = z * c - x * s, z * s + x * c
+    else:
+        x, y = x * c - y * s, x * s + y * c
+    return x + ox, y + oy, z + oz
+
+
 
 
 def _euler(rx, ry, rz):
@@ -28,12 +58,32 @@ def _normalize(v):
     return tuple(c / n for c in v)
 
 
+DEFAULT_UV = {
+    'north': lambda a, b: [16 - b[0], 16 - b[1], 16 - a[0], 16 - a[1]],
+    'south': lambda a, b: [a[0], 16 - b[1], b[0], 16 - a[1]],
+    'east': lambda a, b: [16 - b[2], 16 - b[1], 16 - a[2], 16 - a[1]],
+    'west': lambda a, b: [a[2], 16 - b[1], b[2], 16 - a[1]],
+    'up': lambda a, b: [a[0], a[2], b[0], b[2]],
+    'down': lambda a, b: [a[0], 16 - b[2], b[0], 16 - a[2]],
+}
+
+
+def _face_uv(face, direction, a, b):
+    """The texture coordinates at a face's top-left, top-right and bottom-left corners, with the
+    face's texture rotation (0, 90, 180, 270) applied the way Minecraft does."""
+    u0, v0, u1, v1 = face.get('uv') or DEFAULT_UV[direction](a, b)
+    quad = [(u0, v0), (u0, v1), (u1, v1), (u1, v0)]          # vertex order: TL, BL, BR, TR
+    k = (face.get('rotation', 0) // 90) % 4
+    return quad[k % 4], quad[(3 + k) % 4], quad[(1 + k) % 4]
+
+
 def render(model, texture, size=400, rotation=(0, 0, 0), zoom=1.0, ss=3, light=(-0.5, 0.6, 0.65),
-           ambient=0.52, frame=23.0):
-    """Returns rows of (r, g, b, a) or None. rotation: display rotation [x, y, z]. frame: how many
-    model units fit across the picture (at zoom 1)."""
+           ambient=0.52, frame=23.0, scale=1.0, translate=(0, 0, 0)):
+    """Returns rows of (r, g, b, a) or None. texture: rows, or {'#key': rows} for models with
+    several textures. rotation: display rotation [x, y, z]. frame: how many model units fit across
+    the picture (at zoom 1). scale and translate: a display transform's (translate after turning)."""
     view = _euler(*rotation)
-    tex_h, tex_w = len(texture), len(texture[0])
+    textures = texture if isinstance(texture, dict) else {'#0': texture}
     big = size * ss
     k = big / frame * zoom
     lx, ly, lz = _normalize(light)
@@ -41,12 +91,13 @@ def render(model, texture, size=400, rotation=(0, 0, 0), zoom=1.0, ss=3, light=(
     zbuf = [[-1e9] * big for _ in range(big)]
 
     def screen(p):
-        x, y, z = view((p[0] - 8, p[1] - 8, p[2] - 8))
+        x, y, z = view(((p[0] - 8) * scale, (p[1] - 8) * scale, (p[2] - 8) * scale))
+        x, y, z = x + translate[0], y + translate[1], z + translate[2]
         return big / 2 + x * k, big / 2 - y * k, z
 
     for e in model['elements']:
         r = e.get('rotation')
-        rot = (r['axis'], r['angle'], tuple(r['origin'])) if r else None
+        rot = (r['axis'], r.get('angle', 0), tuple(r.get('origin', (8, 8, 8)))) if r and r.get('axis') else None
         a, b = tuple(e['from']), tuple(e['to'])
         for direction, face in e['faces'].items():
             tl, tr, bl = (rotate(c, rot) for c in corners(direction, a, b))
@@ -64,7 +115,12 @@ def render(model, texture, size=400, rotation=(0, 0, 0), zoom=1.0, ss=3, light=(
             det = ex * fy - ey * fx
             if abs(det) < 1e-9:
                 continue
-            u0, v0, u1, v1 = face['uv']
+            tex = textures.get(face.get('texture', '#0'))
+            if tex is None:
+                continue
+            tex_h, tex_w = len(tex), len(tex[0])
+            (ua, va), (ub, vb), (uc, vc) = _face_uv(face, direction, a, b)
+            du_s, dv_s, du_t, dv_t = ub - ua, vb - va, uc - ua, vc - va
             xs = (p0[0], p1[0], p2[0], p1[0] + fx)
             ys = (p0[1], p1[1], p2[1], p1[1] + fy)
             for py in range(max(0, int(min(ys))), min(big, int(max(ys)) + 1)):
@@ -81,9 +137,9 @@ def render(model, texture, size=400, rotation=(0, 0, 0), zoom=1.0, ss=3, light=(
                     depth = p0[2] + s * ez + t * fz
                     if depth <= zrow[px]:
                         continue
-                    tx = min(tex_w - 1, max(0, int((u0 + s * (u1 - u0)) / 16 * tex_w)))
-                    ty = min(tex_h - 1, max(0, int((v0 + t * (v1 - v0)) / 16 * tex_h)))
-                    c = texture[ty][tx]
+                    tx = min(tex_w - 1, max(0, int((ua + s * du_s + t * du_t) / 16 * tex_w)))
+                    ty = min(tex_h - 1, max(0, int((va + s * dv_s + t * dv_t) / 16 * tex_h)))
+                    c = tex[ty][tx]
                     if c is None or c[3] < 128:
                         continue
                     zrow[px] = depth

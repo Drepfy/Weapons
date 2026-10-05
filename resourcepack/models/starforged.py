@@ -1,84 +1,92 @@
-"""Starforged: a double-bladed axe of deep navy metal. Thin glowing cyan edges, a lightning
-inlay and a few stars in each blade, an ice crystal standing out of a gold setting between them,
-gold rings on the haft, an ice shard on top and an ice crystal under the pommel.
+"""Starforged: a double-bladed battle axe of deep navy steel. Each crescent blade has a crackling
+cyan edge, a lightning bolt and a few stars set in it; a pulsing ice crystal sits in a gold
+setting between them. A navy haft with gold rings, a wrapped grip, an ice shard on top and a
+gold pommel with an ice crystal.
 """
 import math
 
-from mesh import Model
-from paint import bevel, crystal, fbm, gold, hexrgb, leather, metal, mix, ramp, smooth
-from shape import bezier, inside, line_dist, mirror_x, worst_fit
+from pixel import Art, bezier, dome, inside, line_dist, noise, ramp
 
-NAVY_LIGHT, NAVY, NAVY_DARK = hexrgb('#4a6bb0'), hexrgb('#24386b'), hexrgb('#111a38')
-FROST = hexrgb('#b9d4f5')
-CYAN, CYAN_HOT = hexrgb('#4fe9ff'), hexrgb('#e2fdff')
+NAVY = ramp('#070b1a', '#0f1834', '#18244d', '#233569', '#30488a', '#4562ac', '#6a88cc', '#a3bce8')
+CYAN = ramp('#06304a', '#0b5f86', '#1aa3cf', '#4fe9ff', '#a8f6ff', '#effeff')
+GOLD = ramp('#3b2204', '#6b410c', '#9e6719', '#d29a33', '#f3cb63', '#fff0b0')
+ICE = ramp('#0b2a63', '#14509e', '#2a86d6', '#56c5f5', '#a6ecff', '#effdff')
+WRAP = ramp('#090d1c', '#131a33', '#1f2a4f', '#2f3e70')
 
-# the right blade (the left one is its mirror image): a fan from the core out to a curved edge
-EDGE = bezier((12.9, 13.9), (14.6, 12.6), (14.6, 9.4), (12.9, 8.1), 24)
-RIGHT = [(8.9, 10.4), (10.6, 9.6)] + [(12.9, 8.1)] + EDGE[::-1][1:-1] + [(12.9, 13.9), (10.6, 12.4), (8.9, 11.6)]
-LEFT = mirror_x(RIGHT)
-BOLT = [(9.3, 11.0), (10.4, 11.5), (10.9, 10.7), (12.2, 11.4), (13.4, 10.9)]
-STARS = [(11.3, 12.7), (12.4, 9.4), (10.2, 10.1), (13.1, 12.1)]
-
-
-def blade_colour(x, y):
-    xr = x if x >= 8 else 16 - x                           # paint both blades from the right one
-    yr = y if x >= 8 else y + 0.25                         # (the left one a little different)
-    d = line_dist(EDGE, xr, yr)
-    n = (fbm(x * 2, y * 2, 81) - 0.5) * 14
-    if d < 0.22:
-        c = mix(CYAN_HOT, CYAN, d / 0.22)                  # the glowing edge
-    elif d < 0.6:
-        c = mix(FROST, NAVY_LIGHT, smooth((d - 0.22) / 0.38))
-    else:
-        c = ramp([(0, NAVY_LIGHT), (0.35, NAVY), (1, NAVY_DARK)], (d - 0.6) / 4.0)
-    c = tuple(v + n for v in c)
-    k = line_dist(BOLT, xr, yr)
-    if k < 0.16:
-        c = mix(CYAN_HOT, CYAN, k / 0.16)                  # the lightning inlay
-    elif k < 0.4:
-        c = mix(c, CYAN, (0.4 - k) / 0.24 * 0.45)
-    for sx, sy in STARS:
-        r = math.hypot(xr - sx, yr - sy)
-        if r < 0.22:
-            c = mix(c, CYAN_HOT, 1 - r / 0.22)
-    return c
+Y_HEAD = 11.8
+EDGE_R = bezier((12.35, 15.0), (14.25, 13.6), (14.25, 10.0), (12.35, 8.6), 32)
+TOP_R = bezier((8.9, 12.55), (10.3, 13.1), (11.4, 14.0), (12.35, 15.0), 16)
+BOTTOM_R = bezier((12.35, 8.6), (11.4, 9.6), (10.3, 10.5), (8.9, 11.05), 16)
+RIGHT = TOP_R + EDGE_R[1:] + BOTTOM_R[1:]
+LEFT = [(16 - x, y) for x, y in RIGHT]
+BOLT_R = [(9.15, 11.85), (10.35, 12.35), (10.85, 11.45), (12.3, 12.05), (13.45, 11.55)]
+STARS = [(11.3, 13.4), (12.6, 10.0), (10.4, 10.75), (13.05, 13.2)]
 
 
-def blade(face, s, t, p):
-    x, y, z = p
-    if not (inside(RIGHT, x, y) or inside(LEFT, x, y)):
-        return None
-    return blade_colour(x, y)
-
-
-def plate(face, s, t, p):
-    x, y, z = p
-    if face.dir in ('south', 'north'):
-        return blade_colour(x, y)
-    return bevel(face, s, t, NAVY_LIGHT if face.dir in ('up', 'west') else NAVY_DARK)
+def mirror(pts):
+    return [(16 - x, y) for x, y in pts]
 
 
 def build():
-    assert max(worst_fit(RIGHT), worst_fit(LEFT)) <= 11.3
-    m = Model()
-    navy = metal(NAVY_DARK, NAVY, NAVY_LIGHT, seed=14)
-    gilt = gold()
-    ice = crystal(hexrgb('#123d8a'), hexrgb('#4fd8ff'), hexrgb('#f2feff'))
-    # the two blades: thin cards for their shape, thicker plates towards the core
-    m.card(1.3, 8.0, 14.7, 14.0, 0.24, blade, tag='blades')
-    m.box((8.9, 10.1, 7.72), (10.4, 11.9, 8.28), plate, tag='blades')
-    m.box((5.6, 10.1, 7.72), (7.1, 11.9, 8.28), plate, tag='blades')
-    # gold setting and the ice crystal standing out of it
-    m.box((6.95, 9.95, 7.1), (9.05, 12.05, 8.9), gilt, tag='core')
-    m.box((7.15, 10.15, 6.85), (8.85, 11.85, 9.15), ice, rot=('z', 45.0, (8, 11.0, 8)), tag='core')
-    # haft with gold rings, the ice shard on top
-    m.rod(3.4, 15.9, 0.46, navy, tag='haft')
-    for y in (3.4, 7.7, 13.9):
-        m.rod(y, y + 0.4, 0.6, gilt, tag='ring')
-    m.box((7.7, 15.9, 7.7), (8.3, 16.9, 8.3), ice, tag='shard')
-    m.box((7.58, 16.4, 7.58), (8.42, 17.24, 8.42), ice, rot=('z', 45.0, (8, 16.82, 8)), tag='shard')
-    # grip, pommel, crystal
-    m.rod(-2.0, 3.4, 0.58, leather(hexrgb('#151c35'), hexrgb('#36426a'), hexrgb('#7d9cd3'), turns=2.4), tag='grip')
-    m.rod(-2.6, -2.0, 0.68, gilt, tag='pommel')
-    m.box((7.6, -3.1, 7.6), (8.4, -2.3, 8.4), ice, rot=('z', 45.0, (8, -2.7, 8)), tag='pommel')
-    return m
+    art = Art()
+    # haft, rings, grip, pommel
+    art.add('haft', lambda x, y: abs(x - 8) <= 0.42 and 4.2 <= y <= 15.0,
+            lambda x, y: math.sqrt(max(0.0, 1 - ((x - 8) / 0.46) ** 2)), NAVY, depth=4, relief=2.2, shine=0.5)
+    art.add('grip', lambda x, y: abs(x - 8) <= 0.52 and 1.0 <= y <= 4.2,
+            lambda x, y: math.sqrt(max(0.0, 1 - ((x - 8) / 0.56) ** 2)) * (0.7 + 0.3 * ((y * 2.4 - (x - 8) * 1.2) % 1.0)),
+            WRAP, depth=5, relief=2.6)
+    for yb in (4.15, 8.3, 14.55):
+        art.add('ring', lambda x, y, yb=yb: abs(x - 8) <= 0.58 and yb <= y <= yb + 0.32,
+                lambda x, y: math.sqrt(max(0.0, 1 - ((x - 8) / 0.62) ** 2)), GOLD, depth=5, relief=2.2, shine=0.8)
+    art.add('pommel', lambda x, y: abs(x - 8) <= 0.62 and 0.6 <= y <= 1.02,
+            lambda x, y: math.sqrt(max(0.0, 1 - ((x - 8) / 0.65) ** 2)), GOLD, depth=6, relief=2.2, shine=0.8)
+    art.add('pommel crystal', lambda x, y: abs(x - 8) + abs(y - 0.3) * 0.9 < 0.42 and y < 0.62,
+            dome(7.9, 0.4, 0.45), ICE, depth=5, relief=3.0, shine=1.0)
+    # the two blades
+    def blade_tone(x, y):
+        xr = x if x >= 8 else 16 - x
+        d = line_dist(EDGE_R, xr, y)
+        if d < 0.75:
+            return 0.92 - d * 0.4                        # frosted bevel next to the glowing edge
+        lit = 0.08 if x < 8 else -0.08                   # the left blade faces the light
+        return 0.5 + lit - min(d - 0.75, 3.0) * 0.08 + 0.04 * math.sin(y * 2 + xr)
+
+    in_blades = lambda x, y: inside(RIGHT, x, y) or inside(LEFT, x, y)
+    art.add('blades', in_blades, lambda x, y: 0.5, NAVY, depth=3, tone=blade_tone,
+            detail=lambda x, y: (noise(x * 3, y * 3, 41) - 0.5) * 0.6)
+
+    def edge_glow(x, y, t):
+        xr = x if x >= 8 else 16 - x
+        flicker = noise(y * 2.5, t * 10 + (x < 8) * 5, 43)
+        return 0.55 + 0.45 * flicker
+
+    art.add('edge', lambda x, y: in_blades(x, y) and line_dist(EDGE_R, x if x >= 8 else 16 - x, y) < 0.2,
+            lambda x, y: 0.5, CYAN, depth=2, outline=True, shadow=False, glow=edge_glow)
+
+    def bolt_glow(x, y, t):
+        xr = x if x >= 8 else 16 - x
+        run = (xr - 9.0) / 4.5                           # the bolt flashes outwards from the core
+        return 0.35 + 0.65 * max(0.0, math.sin(2 * math.pi * (t * 1.5 - run * 0.8))) ** 3
+
+    bolt_l = mirror(BOLT_R)
+    art.add('lightning', lambda x, y: line_dist(BOLT_R, x, y) < 0.1 or line_dist(bolt_l, x, y) < 0.1,
+            lambda x, y: 0.5, CYAN, depth=3, outline=False, shadow=False, glow=bolt_glow)
+    stars = STARS + mirror(STARS[:3])
+    art.add('stars', lambda x, y: any(math.hypot(x - sx, y - sy) < 0.12 for sx, sy in stars),
+            lambda x, y: 0.5, CYAN, depth=3, outline=False, shadow=False,
+            glow=lambda x, y, t: 0.5 + 0.5 * math.sin(2 * math.pi * (t + x * 0.37 + y * 0.21)))
+    # the core: a gold setting and a glowing ice crystal
+    art.add('setting', lambda x, y: abs(x - 8) <= 0.95 and abs(y - Y_HEAD) <= 0.95 and abs(x - 8) + abs(y - Y_HEAD) < 1.6,
+            dome(7.9, Y_HEAD + 0.1, 1.2), GOLD, depth=6, relief=2.6, shine=0.8)
+
+    def ice_glow(x, y, t):
+        d = (abs(x - 8) + abs(y - Y_HEAD)) / 0.75
+        pulse = 0.5 + 0.5 * math.sin(2 * math.pi * t)
+        light = max(0.0, 1 - math.hypot(x - 7.8, y - Y_HEAD - 0.2) / 0.5)
+        return (1 - d) * 0.6 + 0.25 * pulse + light * 0.5
+
+    art.add('ice', lambda x, y: abs(x - 8) + abs(y - Y_HEAD) < 0.72, lambda x, y: 0.5, ICE, depth=8,
+            outline=True, glow=ice_glow)
+    art.add('top shard', lambda x, y: 14.85 <= y <= 16.0 and abs(x - 8) <= 0.42 * (16.0 - y) / 1.15,
+            lambda x, y: 1 - abs(x - 8) / 0.42, ICE, depth=4, relief=3.0, shine=1.0)
+    return art, 2.6

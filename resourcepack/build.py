@@ -54,6 +54,9 @@ def files():
     for item, weapons in (('netherite_sword', SWORDS), ('netherite_axe', AXES)):
         for _, name in weapons:
             out[f'assets/legendary/textures/item/{name}.png'] = textures.texture(name)
+            meta = textures.animation(name)
+            if meta:
+                out[f'assets/legendary/textures/item/{name}.png.mcmeta'] = meta
             # a 3D model: no item/generated parent, or Minecraft would flatten it again
             out[f'assets/legendary/models/item/{name}.json'] = (
                 json.dumps(textures.model(name), separators=(',', ':'), ensure_ascii=False) + '\n').encode('utf-8')

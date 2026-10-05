@@ -1,89 +1,79 @@
-"""Gravebreaker: a bearded battle axe. A broad head that goes from a thin polished edge to a
-thick forged-iron centre with rivets and a glowing crack, a back spike and a top spike, on a dark
-wooden haft with iron bands, a leather grip and a heavy spiked pommel.
+"""Gravebreaker: a bearded battle axe. A broad head with a polished cutting edge, a forged-iron
+centre held by rivets and split by a smouldering crack, a back spike and a top spike, on a long
+dark-wood haft with iron bands, a leather grip and a spiked iron pommel.
 """
 import math
 
-from mesh import Model
-from paint import bevel, fbm, hexrgb, leather, metal, mix, ramp, scale, smooth, wood
-from shape import bezier, inside, line_dist, worst_fit
+from pixel import Art, bezier, dome, inside, line_dist, noise, ramp
 
-EDGE_LIGHT, EDGE_MID = hexrgb('#f4f7fa'), hexrgb('#cdd5df')
-STEEL, STEEL_DARK = hexrgb('#a3adba'), hexrgb('#6c7684')
-IRON, IRON_DARK = hexrgb('#4c515c'), hexrgb('#262931')
-EMBER, EMBER_HOT, EMBER_DARK = hexrgb('#ff7a1f'), hexrgb('#ffd27a'), hexrgb('#8f2a08')
+STEEL = ramp('#1b1e24', '#353a44', '#535a66', '#78808d', '#a0a8b4', '#c8cfd8', '#eef2f6', '#ffffff')
+IRON = ramp('#0d0e11', '#1b1d22', '#2b2e35', '#3e424b', '#565b66', '#737985')
+EMBER = ramp('#3a0a02', '#7a1d04', '#c43d08', '#f2701a', '#ffad42', '#ffe39a', '#fffbe8')
+WOOD = ramp('#1f1209', '#341f10', '#4c2f18', '#6a4424', '#8a5c33', '#a8774a')
+LEATHER = ramp('#120d0a', '#231a14', '#3a2c22', '#554234', '#735c4a')
+RIVET = ramp('#2b2e35', '#565b66', '#9aa1ad', '#e6eaef')
 
-# the head, seen from the front: the cutting edge bulges out to the left, the beard hangs down
-EDGE = bezier((3.0, 14.0), (0.5, 12.4), (0.6, 7.6), (2.4, 5.5), 24)
-BEARD = bezier((2.4, 5.5), (4.4, 7.4), (6.0, 8.6), (7.3, 10.2), 12)
-HEAD = EDGE + BEARD[1:] + [(7.3, 14.9), (5.4, 14.1)]
-CRACK = [(4.6, 9.9), (5.1, 10.6), (4.9, 11.2), (5.5, 11.9), (5.4, 12.5), (6.0, 13.1)]
-
-
-def head_colour(x, y):
-    d = line_dist(EDGE, x, y)
-    n = (fbm(x * 2.2, y * 2.2, 71) - 0.5)
-    if d < 0.35:
-        c = mix(EDGE_LIGHT, EDGE_MID, d / 0.35)
-    elif d < 1.2:
-        c = mix(EDGE_MID, STEEL, smooth((d - 0.35) / 0.85))
-        c = mix(c, EDGE_LIGHT, max(0.0, 1 - abs(d - 1.15) / 0.06) * 0.5)   # the bevel line
-    elif d < 2.9:
-        c = mix(STEEL, STEEL_DARK, smooth((d - 1.2) / 1.7))
-    else:
-        c = scale(mix(IRON, IRON_DARK, smooth((d - 2.9) / 2.5)), 0.85 + 0.35 * fbm(x * 3.5, y * 3.5, 73))
-    c = tuple(v + n * 18 for v in c)
-    k = line_dist(CRACK, x, y)
-    if k < 0.22:                                        # a glowing crack in the forged iron
-        q = k / 0.22
-        c = ramp([(0, EMBER_HOT), (0.45, EMBER), (1, EMBER_DARK)], q)
-    elif k < 0.5:
-        c = mix(c, EMBER_DARK, (0.5 - k) / 0.28 * 0.6)
-    return c
-
-
-def head(face, s, t, p):
-    x, y, z = p
-    if not inside(HEAD, x, y):
-        return None
-    return head_colour(x, y)
-
-
-def cheek(face, s, t, p):
-    x, y, z = p
-    if face.dir in ('south', 'north'):
-        return head_colour(x, y)
-    return bevel(face, s, t, STEEL if face.dir in ('up', 'west') else IRON)
-
-
-def rivet(face, s, t, p):
-    r = math.hypot(s - 0.35, t - 0.35)
-    return mix(hexrgb('#f2f4f8'), hexrgb('#5b616d'), min(1.0, r * 1.6))
+EDGE = bezier((3.25, 15.35), (1.55, 13.9), (1.45, 10.2), (3.0, 8.55), 32)
+BEARD = bezier((3.0, 8.55), (4.4, 9.0), (6.0, 9.6), (7.35, 10.75), 16)
+TOP = bezier((7.35, 14.35), (6.0, 14.35), (4.6, 14.6), (3.25, 15.35), 16)
+HEAD = EDGE + BEARD[1:] + TOP[:-1]
+CRACK = [(4.6, 10.6), (5.15, 11.2), (4.85, 11.9), (5.45, 12.5), (5.3, 13.1), (5.85, 13.6)]
+SPIKE = [(8.65, 13.35), (11.1, 12.25), (8.65, 11.55)]
+TOP_SPIKE = [(7.55, 14.55), (8.0, 16.0), (8.45, 14.55)]
 
 
 def build():
-    assert worst_fit(HEAD) <= 11.3
-    m = Model()
-    iron = metal(IRON_DARK, IRON, hexrgb('#a9b1bd'), seed=10)
-    steel = metal(hexrgb('#606a78'), hexrgb('#b2bcc8'), hexrgb('#f2f5f9'), seed=12)
-    # head: a thin card for the whole shape, thicker plates towards the haft
-    m.card(0.4, 5.4, 7.4, 15.0, 0.24, head, tag='head')
-    m.box((3.9, 8.6, 7.7), (7.3, 13.7, 8.3), cheek, tag='head')
-    m.box((5.5, 9.5, 7.55), (7.3, 13.5, 8.45), cheek, tag='head')
-    for (x, y) in ((6.3, 12.6), (6.3, 10.3)):
-        for z0, z1 in ((8.45, 8.62), (7.38, 7.55)):
-            m.box((x - 0.22, y - 0.22, z0), (x + 0.22, y + 0.22, z1), rivet, tag='rivet')
-    # socket round the haft, back spike, top spike
-    m.box((7.2, 10.1, 7.25), (8.8, 15.2, 8.75), iron, tag='socket')
-    m.box((8.8, 12.05, 7.62), (10.4, 13.15, 8.38), steel, tag='spike')
-    m.box((10.15, 12.22, 7.7), (10.91, 12.98, 8.3), steel, rot=('z', 45.0, (10.53, 12.6, 8)), tag='spike')
-    m.box((7.6, 15.2, 7.6), (8.4, 16.4, 8.4), steel, tag='spike')
-    m.box((7.68, 16.12, 7.68), (8.32, 16.76, 8.32), steel, rot=('z', 45.0, (8, 16.44, 8)), tag='spike')
+    art = Art()
     # haft, bands, grip, pommel
-    m.rod(3.6, 10.1, 0.48, wood(hexrgb('#2a180c'), hexrgb('#5a3820'), hexrgb('#8a5c35')), tag='haft')
-    m.rod(4.1, 4.55, 0.56, iron, tag='band')
-    m.rod(8.6, 9.05, 0.56, iron, tag='band')
-    m.rod(-2.05, 3.6, 0.6, leather(hexrgb('#1d1714'), hexrgb('#4a3c34'), hexrgb('#8a7564'), turns=2.6), tag='grip')
-    m.rod(-2.75, -2.05, 0.74, iron, tag='pommel')
-    m.box((7.62, -3.18, 7.62), (8.38, -2.42, 8.38), steel, rot=('z', 45.0, (8, -2.8, 8)), tag='pommel')
-    return m
+    art.add('haft', lambda x, y: abs(x - 8) <= 0.45 and 4.3 <= y <= 14.6,
+            lambda x, y: math.sqrt(max(0.0, 1 - ((x - 8) / 0.5) ** 2)), WOOD, depth=4, relief=2.2,
+            detail=lambda x, y: (noise(x * 10, y * 0.7, 21) - 0.5) * 1.6)
+    for yb in (4.35, 8.7):
+        art.add('band', lambda x, y, yb=yb: abs(x - 8) <= 0.56 and yb <= y <= yb + 0.35,
+                lambda x, y: math.sqrt(max(0.0, 1 - ((x - 8) / 0.6) ** 2)), IRON, depth=5, relief=2.2, shine=0.6)
+    art.add('grip', lambda x, y: abs(x - 8) <= 0.53 and 0.95 <= y <= 4.35,
+            lambda x, y: math.sqrt(max(0.0, 1 - ((x - 8) / 0.58) ** 2)) * (0.75 + 0.25 * ((y * 2.4 + (x - 8) * 1.2) % 1.0)),
+            LEATHER, depth=5, relief=2.6)
+    art.add('pommel', lambda x, y: abs(x - 8) <= 0.62 and 0.45 <= y <= 0.98,
+            lambda x, y: math.sqrt(max(0.0, 1 - ((x - 8) / 0.65) ** 2)), IRON, depth=6, relief=2.2, shine=0.6)
+    art.add('pommel spike', lambda x, y: 0.0 <= y < 0.45 and abs(x - 8) <= 0.45 * y / 0.45,
+            lambda x, y: math.sqrt(max(0.0, 1 - ((x - 8) / 0.5) ** 2)), STEEL, depth=4, relief=2.0, shine=0.6)
+    # head: the blade, then the forged centre over it
+    def head_tone(x, y):
+        d = line_dist(EDGE, x, y)
+        if d < 0.16:
+            return 1.0                                  # the honed edge
+        if d < 0.62:
+            return 0.86 - (d - 0.16) * 0.25
+        if d < 0.72:
+            return 0.95                                 # the bevel line
+        if d < 2.0:
+            return 0.58 - (d - 0.72) * 0.14 + 0.05 * math.sin(y * 1.3 + x)
+        return 0.38
+
+    art.add('head', lambda x, y: inside(HEAD, x, y), lambda x, y: 0.5, STEEL, depth=3, tone=head_tone,
+            detail=lambda x, y: (noise(x * 3, y * 3, 23) - 0.5) * 0.7)
+    forge = [(4.2, 10.4), (5.6, 10.25), (7.35, 10.75), (7.35, 14.35), (6.0, 14.3), (4.6, 14.5), (4.05, 12.4)]
+    art.add('forged iron', lambda x, y: inside(forge, x, y),
+            lambda x, y: 0.5 + 0.5 * noise(x * 1.6, y * 1.6, 29), IRON, depth=5, relief=2.2,
+            detail=lambda x, y: (noise(x * 4, y * 4, 31) - 0.5) * 0.6)
+    art.add('crack', lambda x, y: line_dist(CRACK, x, y) < 0.11, lambda x, y: 0.5, EMBER, depth=4,
+            outline=False, shadow=False,
+            glow=lambda x, y, t: 0.5 + 0.3 * math.sin(2 * math.pi * (t + y * 0.3))
+            + 0.25 * (noise(y * 3, t * 8, 37) - 0.5))
+    art.add('crack glow', lambda x, y: 0.11 <= line_dist(CRACK, x, y) < 0.2, lambda x, y: 0.5, EMBER, depth=5,
+            outline=False, shadow=False,
+            glow=lambda x, y, t: 0.15 + 0.12 * math.sin(2 * math.pi * (t + y * 0.3)))
+    for rx, ry in ((6.55, 13.6), (6.55, 11.35), (4.85, 13.95)):
+        art.add('rivet', lambda x, y, rx=rx, ry=ry: math.hypot(x - rx, y - ry) < 0.24, dome(rx - 0.04, ry + 0.04, 0.26),
+                RIVET, depth=7, relief=3.0, shine=1.0)
+    # socket round the haft, spikes
+    art.add('socket', lambda x, y: abs(x - 8) <= 0.68 and 10.55 <= y <= 14.6,
+            lambda x, y: math.sqrt(max(0.0, 1 - ((x - 8) / 0.72) ** 2)), IRON, depth=7, relief=2.2, shine=0.5)
+    art.add('socket bands', lambda x, y: abs(x - 8) <= 0.74 and (10.55 <= y <= 10.85 or 14.3 <= y <= 14.6),
+            lambda x, y: math.sqrt(max(0.0, 1 - ((x - 8) / 0.78) ** 2)), STEEL, depth=8, relief=2.2, shine=0.8)
+    art.add('back spike', lambda x, y: inside(SPIKE, x, y),
+            lambda x, y: 1 - abs(y - (12.45 - (x - 8.65) * 0.08)) / 0.9, STEEL, depth=4, relief=2.6, shine=0.7)
+    art.add('top spike', lambda x, y: inside(TOP_SPIKE, x, y),
+            lambda x, y: 1 - abs(x - 8) / 0.45, STEEL, depth=4, relief=2.6, shine=0.7)
+    return art, 2.6
