@@ -30,11 +30,10 @@ def _held(vanilla, grip_y, scale):
     return [0, -90, round(turn, 3)], [round(tx, 3), round(ty + dy, 3), round(tz + dx, 3)]
 
 
-def gui_fit(depth, size=128, slot=15.4, most=1.5):
-    """Scale and move the weapon so it fills the slot (turned 45 degrees) without spilling out."""
-    k = 16.0 / size
-    pts = [((i + dx) * k - 8, 8 - (j + dy) * k) for j in range(size) for i in range(size) if depth[j][i]
-           for dx, dy in ((0, 0), (1, 1))]
+def gui_fit(points, slot=15.4, most=1.5):
+    """Scale and move the weapon so it fills the slot (turned 45 degrees) without spilling out.
+    points: (x, y) model units of its outline seen from the front."""
+    pts = [(x - 8, y - 8) for x, y in points]
     gx = [(x + y) * math.sqrt(0.5) for x, y in pts]
     gy = [(y - x) * math.sqrt(0.5) for x, y in pts]
     s = min(most, slot / (max(gx) - min(gx)), slot / (max(gy) - min(gy)))
@@ -42,8 +41,8 @@ def gui_fit(depth, size=128, slot=15.4, most=1.5):
     return round(s, 3), [round(-cx * s, 3), round(-cy * s, 3), 0]
 
 
-def display(grip_y, depth, hand_scale=1.3, first_scale=1.0):
-    gs, gt = gui_fit(depth)
+def display(grip_y, points, hand_scale=1.3, first_scale=1.0):
+    gs, gt = gui_fit(points)
     r3, t3 = _held(THIRD_PERSON, grip_y, hand_scale)
     r1, t1 = _held(FIRST_PERSON, grip_y, first_scale)
     s3, s1 = [hand_scale] * 3, [first_scale] * 3

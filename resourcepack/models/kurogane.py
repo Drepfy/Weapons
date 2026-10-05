@@ -1,46 +1,53 @@
-"""Kurogane: a crimson-steel katana. A long curved blade of polished steel with a glowing crimson
-temper line that shimmers along it, a dark groove and a blackened spine; a gold collar, a black
-iron guard capped in gold, a handle bound in crimson cord over pale ray skin, and a black and
-gold pommel.
+"""Kurogane: a crimson-steel katana. A long curved blade of mirror-polished steel: a frosted
+cutting edge bounded by a wavy temper line that glows crimson and pulses up the blade, a crisp
+ridge line, a darker burnished back with a red-lacquered groove. A gold collar, a round black
+iron guard rimmed in gold, a round handle bound in crimson silk cord over white ray skin, and a
+black and gold pommel cap.
 """
 import math
 
-from pixel import Art, column, noise, ramp
+from forge import Weapon
+from paint import clamp, fbm, hexrgb, mix, noise, ramp, smooth
 
-STEEL = ramp('#161a23', '#2e3542', '#4b5466', '#6f7a8e', '#98a3b5', '#c3ccd8', '#e6ecf3', '#ffffff')
-SPINE = ramp('#0e0f13', '#1d1f26', '#30333d', '#474b58', '#636878')
-GROOVE = ramp('#230209', '#45060f', '#6c0b1a', '#981328', '#c41d36')
-CRIMSON_GLOW = ramp('#5e0715', '#9c0f25', '#d01a35', '#ff3d58', '#ff8c9c', '#ffd2d8')
-GOLD = ramp('#3b2204', '#6b410c', '#9e6719', '#d29a33', '#f3cb63', '#fff0b0')
-IRON = ramp('#0a0a0e', '#17181e', '#272932', '#3b3e4a', '#555968', '#747a8b')
-CORD = ramp('#2b030a', '#560815', '#8a0f22', '#c01a33', '#e9425a', '#ff8796')
-SKIN = ramp('#5b5560', '#8c8592', '#b8b1bd', '#dcd6df', '#f4f0f5')
-
-Y_BLADE, Y_KISSAKI, Y_TIP = 6.1, 14.4, 15.85
+Y_BLADE, Y_KISSAKI, Y_TIP = 6.25, 14.3, 15.9
+STEEL = hexrgb('#c4ccd7')
+FROST = hexrgb('#eef2f7')
+BACK = hexrgb('#8a93a3')
+SPINE = hexrgb('#4d535f')
+LACQUER = hexrgb('#5c0a14')
+GOLD = ramp('#6e4210', '#c08a2c', '#f0c860', '#fff2c0')
+IRON = hexrgb('#24262c')
+CORD = ramp('#3d0109', '#8c0c1e', '#d3233a', '#ff6878')
+SKIN = hexrgb('#e9e4dc')
+GLOW = ramp('#2a0006', '#8a0a1a', '#ff2038', '#ff7a8a', '#fff0f2')
 
 
 def bow(y):
-    """How far the blade curves towards its spine (right) at height y."""
-    return 0.42 * max(0.0, (y - Y_BLADE) / (Y_TIP - Y_BLADE)) ** 2
+    """How far the blade curves towards its back (right) at height y."""
+    return 0.45 * max(0.0, (y - Y_BLADE) / (Y_TIP - Y_BLADE)) ** 2
+
+
+def half(y):
+    return 0.52 - 0.07 * clamp((y - Y_BLADE) / (Y_KISSAKI - Y_BLADE))
 
 
 def edge(y):
-    x = 8 - 0.68 + bow(y)
+    x = 8 + bow(y) - half(y)
     if y > Y_KISSAKI:
         q = (y - Y_KISSAKI) / (Y_TIP - Y_KISSAKI)
-        x += (spine(y) - x) * q ** 1.5
+        x += (spine(y) - x) * (1 - math.sqrt(max(0.0, 1 - q ** 1.25)))   # the edge sweeps up to the point
     return x
 
 
 def spine(y):
-    x = 8 + 0.68 + bow(y)
+    x = 8 + bow(y) + half(y)
     if y > Y_KISSAKI:
-        x -= 0.25 * ((y - Y_KISSAKI) / (Y_TIP - Y_KISSAKI)) ** 2.2
+        x -= 0.22 * ((y - Y_KISSAKI) / (Y_TIP - Y_KISSAKI)) ** 2.4
     return x
 
 
 def across(x, y):
-    """0 at the cutting edge, 1 at the spine."""
+    """0 at the cutting edge, 1 at the back."""
     return (x - edge(y)) / max(spine(y) - edge(y), 1e-6)
 
 
@@ -49,64 +56,161 @@ def in_blade(x, y):
 
 
 def hamon(y):
-    return 0.27 + 0.05 * math.sin(y * 2.6)
+    """Where the temper line runs (fraction of the way from edge to back)."""
+    return 0.31 + 0.055 * math.sin(y * 2.3) + 0.025 * math.sin(y * 5.9 + 1.0)
+
+
+RIDGE = 0.68
+
+
+def in_groove(x, y):
+    u = across(x, y)
+    top = 12.4 + 0.12 * math.cos((u - 0.79) * 20)
+    return 0.725 <= u <= 0.855 and Y_BLADE + 0.3 <= y <= top
+
+
+def ridge(y):
+    if y <= Y_KISSAKI:
+        return RIDGE
+    return RIDGE + 0.3 * (y - Y_KISSAKI) / (Y_TIP - Y_KISSAKI)
+
+
+def blade_height(s):
+    u = across(s.x, s.y)
+    RIDGE = ridge(s.y)
+    if u < RIDGE:
+        h = 0.03 + 0.17 * u / RIDGE
+    else:
+        h = 0.2 - 0.07 * (u - RIDGE) / (1 - RIDGE)
+    h -= 0.02 * smooth(0.0, 0.05, 0.05 - s.d)          # rounded off at the very outline
+    if in_groove(s.x, s.y):
+        g = (across(s.x, s.y) - 0.79) / 0.065
+        h -= 0.05 * math.sqrt(max(0.0, 1 - g * g))
+    if s.y > Y_KISSAKI - 0.02:
+        h += 0.02 * smooth(0.04, 0.0, abs(s.y - Y_KISSAKI))   # the crisp line across the point
+    return h
+
+
+def blade_colour(s):
+    x, y = s.x, s.y
+    u = across(x, y)
+    brushed = 0.95 + 0.05 * noise(x * 46, y * 1.4, 3)
+    if u < RIDGE:
+        hm = hamon(y)
+        # frosted hardened edge, misty where it meets the polished steel
+        c = mix(FROST, STEEL, smooth(hm - 0.05, hm + 0.03, u))
+        mist = math.exp(-abs(u - hm) / 0.06)
+        c = mix(c, hexrgb('#ff8c9a'), 0.22 * mist)
+        if u < 0.06:
+            c = mix(c, (1.0, 1.0, 1.0), 0.6)
+    elif y > Y_KISSAKI:
+        c = mix(STEEL, BACK, 0.5)                         # the back of the point, polished
+    else:
+        c = mix(BACK, SPINE, smooth(0.86, 0.95, u))
+        if in_groove(x, y):
+            c = LACQUER
+    c = tuple(v * brushed for v in c)
+    if y > Y_KISSAKI:
+        c = mix(c, FROST, 0.5 * smooth(0.6, 0.1, u))
+    return c
+
+
+def blade_sheen(s):
+    u = across(s.x, s.y)
+    y = s.y
+    v = 0.9 * math.exp(-((y - 11.6 + 1.6 * u) / 0.75) ** 2) + 0.45 * math.exp(-((y - 8.0 + 1.2 * u) / 0.45) ** 2)
+    v += 0.5 * math.exp(-((y - 15.0 + 0.8 * u) / 0.35) ** 2)
+    if u > ridge(y):
+        v *= 0.4
+    return v - 0.12
+
+
+def temper_glow(s, t):
+    pulse = max(0.0, math.sin(2 * math.pi * (t - s.y * 0.11))) ** 3
+    return 0.42 + 0.5 * pulse + 0.08 * noise(s.y * 6, t * 8, 5)
+
+
+def in_temper(x, y):
+    if not (Y_BLADE + 0.3 <= y <= Y_KISSAKI - 0.06) or not in_blade(x, y):
+        return False
+    hx = edge(y) + hamon(y) * (spine(y) - edge(y))
+    return abs(x - hx) < 0.07
+
+
+def cord_pattern(s):
+    """The silk cord wound in diamonds round the handle: (on a cord, which cord is on top, how far
+    across the cord: 0 middle .. 1 its edge)."""
+    k = 1.05
+    turn = s.a / (2 * math.pi)
+    p1 = (s.y * k + turn) % 1.0
+    p2 = (s.y * k - turn) % 1.0
+    w = 0.29
+    d1, d2 = abs(p1 - 0.5) / w, abs(p2 - 0.5) / w
+    on1, on2 = d1 < 1, d2 < 1
+    if on1 and on2:
+        top = 1 if (math.floor(s.y * k + turn) + math.floor(s.y * k - turn)) % 2 == 0 else 2
+        return True, (d1 if top == 1 else d2)
+    if on1:
+        return True, d1
+    if on2:
+        return True, d2
+    return False, min(d1, d2)
+
+
+def handle_colour(s):
+    on, d = cord_pattern(s)
+    if on:
+        weave = 0.85 + 0.15 * math.sin((s.y * 1.05 + s.a / 6.28) * 120)
+        return tuple(v * weave for v in CORD(0.55 + 0.3 * (1 - d)))
+    nod = noise(s.u * 26, s.y * 26, 9)
+    return mix(SKIN, hexrgb('#b8b0a6'), 0.35 * nod + 0.3 * smooth(1.0, 1.6, d))
+
+
+def handle_height(s):
+    on, d = cord_pattern(s)
+    if on:
+        return 0.05 * math.sqrt(max(0.0, 1 - d * d))
+    return 0.012 * noise(s.u * 26, s.y * 26, 9)
+
+
+def tsuba_colour(s):
+    if s.cap == 0:
+        return GOLD(0.62 + 0.25 * noise(s.a * 3, s.y * 12, 4))
+    rho = 1.55 - s.d
+    if s.d < 0.14:
+        return GOLD(0.6 + 0.3 * smooth(0.14, 0.0, s.d))
+    if rho < 0.82:
+        return GOLD(0.5) if rho > 0.72 else IRON
+    hammered = 0.8 + 0.4 * fbm(s.x * 5, s.z * 5, 21)
+    return tuple(v * hammered for v in mix(IRON, hexrgb('#3a2c2a'), 0.4 * fbm(s.x * 2, s.z * 2, 22)))
+
+
+def tsuba_height(s):
+    if s.cap == 0:
+        return 0.0
+    rho = 1.55 - s.d
+    h = 0.03 * smooth(0.18, 0.1, s.d)
+    h += 0.015 * fbm(s.x * 5, s.z * 5, 21)
+    h += 0.02 * smooth(0.86, 0.8, rho)
+    return h
 
 
 def build():
-    art = Art()
-
-    def blade_tone(x, y):
-        u = across(x, y)
-        sheen = 0.08 if (y * 0.8 + u * 1.5) % 3.2 < 0.5 else 0.0          # soft reflections
-        if y > Y_KISSAKI:
-            return 1.0 if u < 0.2 or abs(y - Y_KISSAKI) < 0.07 else 0.78 + sheen
-        if u < 0.12:
-            return 1.0                                                     # the cutting edge
-        if u < hamon(y):
-            return 0.84 + sheen                                            # polished, hardened steel
-        if u < 0.6:
-            return 0.52 + sheen + 0.1 * (y - Y_BLADE) / (Y_TIP - Y_BLADE)
-        if u < 0.66:
-            return 0.86                                                    # the ridge line
-        return 0.4
-
-    art.add('blade', in_blade, lambda x, y: 0.5, STEEL, depth=2, tone=blade_tone)
-    art.add('spine', lambda x, y: in_blade(x, y) and across(x, y) > 0.82 and y < Y_KISSAKI,
-            lambda x, y: 0.5, SPINE, depth=3, outline=False, shadow=False, tone=lambda x, y: 0.55)
-    art.add('groove', lambda x, y: in_blade(x, y) and 0.66 <= across(x, y) <= 0.82 and Y_BLADE + 0.6 < y < 12.9,
-            lambda x, y: 0.5, GROOVE, depth=2, outline=False, shadow=False,
-            tone=lambda x, y: 0.25 if across(x, y) < 0.74 else 0.6)
-    art.add('temper line', lambda x, y: in_blade(x, y) and Y_BLADE + 0.2 < y < Y_KISSAKI
-            and column(x) == column(edge(y) + hamon(y) * (spine(y) - edge(y))),
-            lambda x, y: 0.5, CRIMSON_GLOW, depth=2, outline=False, shadow=False,
-            glow=lambda x, y, t: 0.5 + 0.5 * max(0.0, math.sin(2 * math.pi * (t - y * 0.11))) ** 2)
-    # gold collar (habaki)
-    art.add('collar', lambda x, y: 7.33 <= x <= 8.67 + bow(y) and 5.55 <= y <= 6.25,
-            lambda x, y: math.sqrt(max(0.0, 1 - ((x - 8) / 0.7) ** 2)), GOLD, depth=5, relief=2.0, shine=0.8)
-    # guard (tsuba): black iron, gold caps at the ends
-    art.add('guard', lambda x, y: 6.35 <= x <= 9.65 and 4.95 <= y <= 5.6 and not (abs(x - 8) > 1.5 and abs(y - 5.27) > 0.22),
-            lambda x, y: math.sqrt(max(0.0, 1 - ((y - 5.27) / 0.36) ** 2)), IRON, depth=7, relief=2.0, shine=0.4)
-    art.add('guard caps', lambda x, y: (6.35 <= x <= 6.8 or 9.2 <= x <= 9.65) and 4.95 <= y <= 5.6
-            and not (abs(x - 8) > 1.5 and abs(y - 5.27) > 0.22),
-            lambda x, y: math.sqrt(max(0.0, 1 - ((y - 5.27) / 0.36) ** 2)), GOLD, depth=7, relief=2.0, shine=0.8,
-            shadow=False)
-    # handle: pale ray skin under a crimson cord wound in diamonds
-    art.add('handle', lambda x, y: 7.44 <= x <= 8.56 and 0.95 <= y <= 4.95,
-            lambda x, y: math.sqrt(max(0.0, 1 - ((x - 8) / 0.6) ** 2)) * 0.6, SKIN, depth=4, relief=2.0)
-
-    def cord(x, y):
-        a = (y * 1.05 + (x - 8) * 1.05) % 1.0
-        b = (y * 1.05 - (x - 8) * 1.05) % 1.0
-        return min(a, b)
-
-    art.add('cord', lambda x, y: 7.44 <= x <= 8.56 and 1.0 <= y <= 4.85 and cord(x, y) < 0.26,
-            lambda x, y: math.sqrt(max(0.0, 1 - ((x - 8) / 0.6) ** 2)), CORD, depth=5, relief=2.2, outline=True)
-    art.add('collar 2', lambda x, y: 7.38 <= x <= 8.62 and 4.7 <= y <= 4.98,
-            lambda x, y: math.sqrt(max(0.0, 1 - ((x - 8) / 0.66) ** 2)), GOLD, depth=5, relief=2.0, shine=0.8)
-    # pommel (kashira)
-    art.add('pommel', lambda x, y: 7.36 <= x <= 8.64 and 0.3 <= y <= 1.0 and not (abs(x - 8) > 0.5 and y < 0.42),
-            lambda x, y: math.sqrt(max(0.0, 1 - ((x - 8) / 0.68) ** 2)), IRON, depth=6, relief=2.0, shine=0.5)
-    art.add('pommel band', lambda x, y: 7.36 <= x <= 8.64 and 0.88 <= y <= 1.0,
-            lambda x, y: math.sqrt(max(0.0, 1 - ((x - 8) / 0.68) ** 2)), GOLD, depth=6, relief=2.0, shine=0.8,
-            shadow=False)
-    return art, 3.0          # the art, and the height of the middle of the grip
+    w = Weapon('kurogane', grip=2.9)
+    w.sheet('blade', in_blade, lambda s: 0.19 if across(s.x, s.y) < 0.3 else 0.31, blade_colour,
+            box=(7.2, Y_BLADE, 9.3, Y_TIP), height=blade_height, relief=3.0, metal=0.85, gloss=0.75,
+            spec=0.9, sheen=blade_sheen)
+    w.sheet('temper line', in_temper, None, '#4a0810', box=(7.3, Y_BLADE, 9.0, Y_KISSAKI),
+            metal=0.3, gloss=0.6, glow=temper_glow, glow_colours=GLOW, glow_strength=1.3)
+    # gold collar, guard, collar of the handle
+    w.rod('collar', 8.0, 5.55, 6.3, 0.74, lambda s: GOLD(0.55 + 0.25 * math.sin(s.y * 40 + s.a * 3) ** 2),
+          caps=(False, True), metal=1.0, gloss=0.6, spec=0.8)
+    w.rod('guard', 8.0, 5.13, 5.55, 1.55, tsuba_colour, sides=16, caps=(True, True), height=tsuba_height,
+          relief=2.0, metal=0.75, gloss=0.55, spec=0.7)
+    w.rod('handle collar', 8.0, 4.83, 5.13, 0.64, lambda s: GOLD(0.55), metal=1.0, gloss=0.6, spec=0.8)
+    w.rod('handle', 8.0, 0.98, 4.83, 0.57, handle_colour, height=handle_height, relief=2.5,
+          gloss=0.45, spec=0.5)
+    w.rod('pommel', 8.0, 0.32, 0.98, 0.62,
+          lambda s: GOLD(0.55) if (s.cap == 0 and (s.y > 0.86 or s.y < 0.42)) or (s.cap and s.d < 0.1) else IRON,
+          caps=(True, False), metal=0.8, gloss=0.6, spec=0.7)
+    return w
