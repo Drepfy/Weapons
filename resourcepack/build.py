@@ -54,8 +54,9 @@ def files():
     for item, weapons in (('netherite_sword', SWORDS), ('netherite_axe', AXES)):
         for _, name in weapons:
             out[f'assets/legendary/textures/item/{name}.png'] = textures.png(name)
-            out[f'assets/legendary/models/item/{name}.json'] = as_json(
-                {'parent': 'minecraft:item/handheld', 'textures': {'layer0': f'legendary:item/{name}'}})
+            # a 3D model: no item/generated parent, or Minecraft would flatten it again
+            out[f'assets/legendary/models/item/{name}.json'] = (
+                json.dumps(textures.model(name), separators=(',', ':'), ensure_ascii=False) + '\n').encode('utf-8')
         # 1.20 - 1.21.3: model overrides
         out[f'assets/minecraft/models/item/{item}.json'] = as_json({
             'parent': 'minecraft:item/handheld',

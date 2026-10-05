@@ -8,17 +8,34 @@ def hexrgb(h):
     return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
 
 class Sprite:
-    def __init__(self, palette, outline_of):
+    def __init__(self, palette, outline_of, depth_of=None):
         self.pal = {k: hexrgb(v) for k, v in palette.items()}
         self.outline_of = outline_of   # material key -> outline key
+        self.depth_of = depth_of or {}  # material key -> thickness in voxels (3D model)
         self.px = {}
+        self.dp = {}                    # (x, y) -> thickness, when set by hand
+        self.thin_outline = True        # 3D: outlines are a thin rim, so the sides show the material
 
-    def set(self, x, y, k):
+    def set(self, x, y, k, depth=None):
         if 0 <= x < N and 0 <= y < N:
             if k is None:
                 self.px.pop((x, y), None)
+                self.dp.pop((x, y), None)
             else:
                 self.px[(x, y)] = k
+                if depth is None:
+                    self.dp.pop((x, y), None)
+                else:
+                    self.dp[(x, y)] = depth
+
+    def depth(self, x, y):
+        """Thickness of a pixel in voxels: set by hand, else by its colour key (default 2)."""
+        if (x, y) in self.dp:
+            return self.dp[(x, y)]
+        return self.depth_of.get(self.px[(x, y)], 2)
+
+    def depths(self):
+        return {p: self.depth(*p) for p in self.px}
 
     def get(self, x, y):
         return self.px.get((x, y))
@@ -38,10 +55,12 @@ class Sprite:
             for x in range(N):
                 s, o = self.so(x, y)
                 k = fn(s, o, x, y)
-                if k:
+                if isinstance(k, tuple):
+                    self.set(x, y, k[0], k[1])
+                elif k:
                     self.set(x, y, k)
 
-    def draw(self, art, ox=0, oy=0):
+    def draw(self, art, ox=0, oy=0, depth=None):
         for y, row in enumerate(art):
             for x, c in enumerate(row):
                 if c == ' ' or c == '.':
@@ -49,7 +68,7 @@ class Sprite:
                 if c == '_':
                     self.set(ox + x, oy + y, None)
                 else:
-                    self.set(ox + x, oy + y, c)
+                    self.set(ox + x, oy + y, c, depth)
 
     def center(self, dx=0, dy=0):
         """Move the drawing to the middle of the canvas (plus an optional nudge)."""
@@ -57,6 +76,7 @@ class Sprite:
         mx = (N - 1 - max(xs) - min(xs)) // 2 + dx
         my = (N - 1 - max(ys) - min(ys)) // 2 + dy
         self.px = {(x + mx, y + my): k for (x, y), k in self.px.items()}
+        self.dp = {(x + mx, y + my): d for (x, y), d in self.dp.items()}
 
     def outline(self):
         add = {}
@@ -72,7 +92,13 @@ class Sprite:
                         votes[o] = votes.get(o, 0) + 1
                 if votes:
                     add[(x, y)] = max(votes, key=lambda o: (votes[o], o))
+        thin = {}
+        for (x, y) in add:
+            near = [self.depth(x + dx, y + dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))
+                    if (x + dx, y + dy) in self.px]
+            thin[(x, y)] = 1 if self.thin_outline else max(1, min(near))
         self.px.update(add)
+        self.dp.update(thin)
 
     def rows(self):
         return [[self.pal[self.px[(x, y)]] if (x, y) in self.px else None for x in range(N)] for y in range(N)]

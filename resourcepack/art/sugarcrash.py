@@ -49,62 +49,59 @@ def nearest(x, y):
     cross = tx * (y - py) - ty * (x - px)
     return t, math.sqrt(best[0]), cross
 
-# slim silver crossguard with a crimson gem; the tips turn towards the blade
-GUARD = [
-    '.H.......',   # row 17 (x 5..)
-    '.WH......',
-    '..WH.....',
-    '...WHH...',
-    '...HcRS..',
-    '....RrSD.',
-    '.....SSD.',
-    '......SDD',
-    '........D',
-]
-
 def make():
     sp = Sprite(PAL, OUT)
     for y in range(32):
         for x in range(32):
             t, dist, cross = nearest(x + 0.5, y + 0.5)
             # a crescent: swells through the middle, sharp at the point
-            half = 2.1 + 1.0 * math.sin(math.pi * min(t / 0.75, 1.0)) if t < 0.62 else \
-                3.0 * max(0.0, 1 - ((t - 0.62) / 0.36)) ** 0.8
+            half = 2.6 + 1.2 * math.sin(math.pi * min(t / 0.75, 1.0)) if t < 0.62 else \
+                3.7 * max(0.0, 1 - ((t - 0.62) / 0.36)) ** 1.35
             if half <= 0.3 or dist > half or t >= 0.98:
                 continue
             side = dist if cross > 0 else -dist       # negative = outer (spine) side
             rel = side / max(half, 0.01)              # -1 outer .. +1 inner
+            # layers from the thick ivory spine down to the thin glowing edge
             if rel < -0.45:
-                k = 'W'
+                k, d = 'W', 3
             elif rel < -0.12:
-                k = 'w' if t < 0.6 else 'u'
+                k, d = ('w' if t < 0.6 else 'u'), 3
             elif rel < 0.12:
-                k = 'x'                              # dark inlay between ivory and crimson
+                k, d = 'x', 2                        # dark inlay between ivory and crimson
             elif rel < 0.45:
-                k = 'R'
+                k, d = 'R', 2
             elif rel < 0.75:
-                k = 'r'
+                k, d = 'r', 2
             else:
-                k = 'P' if 0.2 < t < 0.85 else 'Q'
-            sp.set(x, y, k)
+                k, d = ('P' if 0.2 < t < 0.85 else 'Q'), 1
+            sp.set(x, y, k, d)
 
     def fn(s, o, x, y):
-        if 1.5 <= s <= 2.5 and abs(o) <= (2 if s == 2 else 1):   # pommel: silver cap, crimson stone
-            if (s, o) in ((2, -1), (2, 0)):
-                return 'c' if o == -1 else 'R'
-            return 'H' if o < 0 else ('S' if o <= 1 else 'D')
-        if 3 <= s <= 8.5 and -2 <= o <= 2:                      # ivory grip, crimson spiral binding
+        if 1 <= s <= 2.5 and abs(o) <= {1: 1, 1.5: 2, 2: 3, 2.5: 2}[s]:   # pommel: silver cap, crimson stone
+            if (s, o) in ((2, -1), (2, 1), (1.5, 0)):
+                return ('c' if o == -1 else ('R' if o == 0 else 'r')), 5
+            return ('H' if o < 0 else ('S' if o <= 1 else 'D')), 4
+        if 3 <= s <= 8.5 and -2 <= o <= 2:                      # ivory grip, raised crimson spiral
             band = (int(2 * s) + o) % 4
             if band in (0, 1):
-                return 'c' if o <= -1 else ('R' if o <= 1 else 'r')
-            return 'W' if o <= -1 else ('w' if o <= 1 else 'u')
+                return ('c' if o <= -1 else ('R' if o <= 1 else 'r')), 4
+            return ('W' if o <= -1 else ('w' if o <= 1 else 'u')), 3
+        a = abs(o)
+        if 9 <= s <= 11.5 and a <= 7:                           # silver crossguard, curled tips, crimson gem
+            if a <= 1 and s <= 10.5:
+                return {(-1, 9.5): 'c', (0, 10): 'c', (1, 10.5): 'R', (0, 9): 'R', (1, 9.5): 'r',
+                        (-1, 10.5): 'R'}.get((o, s), 'R'), 5
+            if a <= 5 and s <= 10:
+                return (('W' if s == 10 else 'H') if o < 0 else ('S' if s == 10 else 'D')), 3
+            if a == 6 and 9.5 <= s <= 11:
+                return (('W' if s >= 10.5 else 'H') if o < 0 else ('S' if s >= 10.5 else 'D')), 2
+            if a == 7 and 10.5 <= s <= 11.5:
+                return ('W' if o < 0 else 'S'), 2
         return None
 
     sp.paint(fn)
-    sp.draw(GUARD, 5, 17)
-    for (x, y), ch in {(10, 19): 'W', (11, 20): 'H', (12, 20): 'S', (12, 21): 'D',   # collar into the blade
-                       (27, 17): None}.items():                                        # a sharp point on the hook
-        sp.set(x, y, ch)
+    for (x, y), ch in {(10, 19): 'W', (11, 20): 'H', (12, 20): 'S', (12, 21): 'D'}.items():
+        sp.set(x, y, ch, 3)                                    # collar into the blade
     sp.center()
     sp.outline()
     return sp

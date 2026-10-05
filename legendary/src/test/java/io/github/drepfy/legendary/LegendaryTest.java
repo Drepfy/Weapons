@@ -343,7 +343,7 @@ class LegendaryTest {
             steve.getInventory().setItemInMainHand(sword);
             steve.getInventory().setItem(0, sword);
         }
-        assertTrue(has(chat(steve), "cannot be put in containers"));
+        assertTrue(has(chat(steve), "can't go in containers"));
         // The ender chest too.
         InventoryView ender = steve.openInventory(steve.getEnderChest());
         steve.setItemOnCursor(sword);
@@ -467,7 +467,7 @@ class LegendaryTest {
         plugin.tracker().scan();
         assertEquals(1, count(steve, WeaponType.KUROGANE), "the original stays");
         assertEquals(0, count(alex, WeaponType.KUROGANE), "the copy is gone");
-        assertTrue(has(chat(alex), "cannot be duplicated"));
+        assertTrue(has(chat(alex), "can't be duplicated"));
         // Two in one inventory.
         steve.getInventory().addItem(sword.clone());
         plugin.tracker().scan();
@@ -544,7 +544,7 @@ class LegendaryTest {
         EntityPickupItemEvent byAlt = new EntityPickupItemEvent(alt, dropped, 0);
         server.getPluginManager().callEvent(byAlt);
         assertTrue(byAlt.isCancelled(), "same IP: refused");
-        assertTrue(has(chat(alt), "cannot be passed between your own accounts"));
+        assertTrue(has(chat(alt), "can't move between your own accounts"));
         EntityPickupItemEvent byBob = new EntityPickupItemEvent(bob, dropped, 0);
         server.getPluginManager().callEvent(byBob);
         assertFalse(byBob.isCancelled(), "anyone else can take it");
@@ -739,7 +739,7 @@ class LegendaryTest {
         bars(steve);
         tick(5);
         rightClick(steve); // Blocking while it recharges.
-        assertFalse(has(bars(steve), "recharging"), "no nagging while blocking");
+        assertFalse(has(bars(steve), "ready in"), "no nagging while blocking");
     }
 
     @Test
@@ -848,7 +848,7 @@ class LegendaryTest {
         tick(16);
         assertFalse(has(chat(alex), "marked"), "two counted hits are not enough");
         melee(steve, alex, 5);
-        assertTrue(has(chat(alex), "marked by the Executioner"));
+        assertTrue(has(chat(alex), "You are marked"));
         alex.teleport(new Location(world, 0.5, 64, 4.5));
         rightClick(steve);
         tick(8);
@@ -896,7 +896,7 @@ class LegendaryTest {
         rightClick(steve);
         assertEquals(0, plugin.abilities().active(steve, tag, Ability.ASTRAL_IMPACT, plugin.tick()),
                 "Astral Impact is locked while the well is open");
-        assertTrue(has(bars(steve), "Astral Impact is recharging"));
+        assertTrue(has(bars(steve), "Astral Impact ready in"));
         tick(4 * 20 - 10);
         assertTrue(alex.getVelocity().getX() > 0.3, "the burst throws outwards");
     }
@@ -988,6 +988,37 @@ class LegendaryTest {
         assertEquals(8.0, plugin.settings().ability(Ability.CRESCENT_DRAW).num("cooldown"));
         assertEquals(1.25, plugin.settings().ability(Ability.ASTRAL_IMPACT).num("warning"), "never under 0.5s");
         assertEquals(List.of(), freshWarnings(), "the bundled config.yml has no mistakes");
+    }
+
+    @Test
+    void oldDefaultTextsAreUpdatedButOwnTextsAreKept() {
+        // A config.yml written by 1.0.1: the old long lore and messages.
+        org.bukkit.configuration.file.YamlConfiguration old = org.bukkit.configuration.file.YamlConfiguration
+                .loadConfiguration(new java.io.InputStreamReader(plugin.getResource("previous-text.yml"),
+                        java.nio.charset.StandardCharsets.UTF_8));
+        plugin.getConfig().set("weapons.kurogane.lore", old.getStringList("weapons.kurogane.lore"));
+        plugin.getConfig().set("messages.storage-blocked", old.getString("messages.storage-blocked"));
+        // ...but this server wrote its own Starforged lore and alt message.
+        plugin.getConfig().set("weapons.starforged.lore", List.of("&bMy own lore"));
+        plugin.getConfig().set("messages.alt-blocked", "&cNo alts!");
+        plugin.saveConfig();
+        assertTrue(old.getStringList("weapons.kurogane.lore").size() > 12, "the old lore was long");
+
+        plugin.reload();
+        List<String> lore = plugin.getConfig().getStringList("weapons.kurogane.lore");
+        assertEquals(9, lore.size(), "the new, shorter lore");
+        assertTrue(String.join("\n", lore).contains("Crescent Draw"));
+        assertEquals("&cLegendaries can't go in containers.", plugin.getConfig().getString("messages.storage-blocked"));
+        assertEquals(List.of("&bMy own lore"), plugin.getConfig().getStringList("weapons.starforged.lore"));
+        assertEquals("&cNo alts!", plugin.getConfig().getString("messages.alt-blocked"));
+        // It is saved, so it sticks after the next restart.
+        org.bukkit.configuration.file.YamlConfiguration saved = org.bukkit.configuration.file.YamlConfiguration
+                .loadConfiguration(new java.io.File(plugin.getDataFolder(), "config.yml"));
+        assertEquals(9, saved.getStringList("weapons.kurogane.lore").size());
+        // Weapons already out get the new lore too.
+        PlayerMock steve = player("Steve", 0, 0);
+        ItemStack sword = give(steve, WeaponType.KUROGANE);
+        assertEquals(9, sword.getItemMeta().getLore().size());
     }
 
     private List<String> freshWarnings() {

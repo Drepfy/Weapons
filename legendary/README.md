@@ -11,8 +11,9 @@ ability is ready again.
 
 ## The weapons
 
-All five are netherite with **Sharpness VI**, are unbreakable, and have a custom name, lore,
-tracking number (`#3F9A2C1E`) and custom model data (1001 to 1005) for resource packs.
+All five are netherite with **Sharpness VI**, are unbreakable, and have a custom name, short
+lore (what each ability does and its cooldown), a tracking number (`#3F9A2C1E`) and custom model
+data (1001 to 1005) for the server resource pack, which gives them 3D models.
 
 ### Kurogane (katana): precision and sustained combat
 
@@ -23,7 +24,7 @@ tracking number (`#3F9A2C1E`) and custom model data (1001 to 1005) for resource 
   not build it. Edge fades after 3s without a hit, and switching targets starts again.
   Crescent Draw spends the stacks for +1.5 damage each.
 
-### Sugarcrash (candy cane): mobility and burst tempo
+### Sugarcrash (candy sickle): mobility and burst tempo
 
 - **Sugar Rush** (right-click): Speed II and Haste II (faster attack recharge) for 6s, with a
   candy trail. The 18s cooldown starts when it wears off.
@@ -40,7 +41,7 @@ tracking number (`#3F9A2C1E`) and custom model data (1001 to 1005) for resource 
   cooldown starts after returning (or when the mark fades). It is a normal teleport, so the
   Combat plugin's safe zones and region plugins can refuse it, and the mark then stays.
 
-### Gravebreaker (executioner's axe): ground control and heavy hits
+### Gravebreaker (battle axe): ground control and heavy hits
 
 - **Earthsplitter** (right-click, 12s): a shockwave cracks along the ground for 9 blocks.
   Players it hits take 6 damage, are thrown upwards and get Mining Fatigue II for 3s. No block
@@ -127,6 +128,10 @@ effect levels and durations, and warning times. There are also the names, lore (
 pack sounds such as a katana slash), and every message. A wrong value falls back to its
 default and the console says what to fix.
 
+Updating from 1.0.0 or 1.0.1: the lore and player messages are now much shorter. Any of them
+still worded exactly as before is switched to the new text automatically on start (and saved in
+`config.yml`); ones you changed yourself are kept.
+
 ## Building and testing
 
 ```bash
@@ -134,7 +139,7 @@ cd legendary
 mvn -B package   # runs the tests, writes target/Legendary-<version>.jar
 ```
 
-`mvn test` runs 37 tests on a simulated server:
+`mvn test` runs 38 tests on a simulated server:
 - **Every weapon:** all five abilities, Edge stacking (including spam clicks and switching
   targets), the Executioner's Mark, cooldowns, and the Starforged lockout.
 - **Protection:** protected, creative and PvP-off players.
@@ -143,4 +148,5 @@ mvn -B package   # runs the tests, writes target/Legendary-<version>.jar
 - **Duplicates:** copies, creative middle-click, revoked and lost weapons.
 - **Ownership:** alt protection, death drops (keepInventory, grave plugins, cancelled
   deaths), and staff /invsee.
-- **Other:** the registry across restarts, the action bar, commands and config checking.
+- **Other:** the registry across restarts, the action bar, commands, config checking, and
+  updating old default texts while keeping your own.

@@ -6,6 +6,7 @@ import io.github.drepfy.legendary.ability.Hits;
 import io.github.drepfy.legendary.command.LegendaryCommand;
 import io.github.drepfy.legendary.config.Settings;
 import io.github.drepfy.legendary.config.SettingsLoader;
+import io.github.drepfy.legendary.config.TextUpdate;
 import io.github.drepfy.legendary.guard.StorageGuard;
 import io.github.drepfy.legendary.guard.Tracker;
 import io.github.drepfy.legendary.hud.Hud;
@@ -53,7 +54,8 @@ public class LegendaryPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         saveDefaultConfig();
-        defaults = bundledConfig();
+        defaults = resource("config.yml");
+        updateOldTexts();
         settings = readSettings(false);
         items = new WeaponItems(this, this::settings);
         registry = new WeaponRegistry(getLogger(), getDataFolder().toPath(), this::now);
@@ -126,6 +128,7 @@ public class LegendaryPlugin extends JavaPlugin {
      */
     public List<String> reload() {
         reloadConfig();
+        updateOldTexts();
         settings = readSettings(true);
         tracker.scan();
         return settings.warnings();
@@ -145,8 +148,21 @@ public class LegendaryPlugin extends JavaPlugin {
         return loaded;
     }
 
-    private YamlConfiguration bundledConfig() {
-        try (InputStream in = getResource("config.yml")) {
+    /**
+     * Lore and messages still worded exactly as an older version shipped them are switched to the
+     * new defaults (and saved); anything changed by hand stays as it is.
+     */
+    private void updateOldTexts() {
+        int updated = TextUpdate.apply(getConfig(), resource("previous-text.yml"), defaults);
+        if (updated > 0) {
+            saveConfig();
+            getLogger().info("Updated " + updated + " weapon text(s) in config.yml to the new, simpler wording."
+                    + " Texts you had changed yourself were kept.");
+        }
+    }
+
+    private YamlConfiguration resource(String name) {
+        try (InputStream in = getResource(name)) {
             if (in != null) {
                 return YamlConfiguration.loadConfiguration(new InputStreamReader(in, StandardCharsets.UTF_8));
             }
