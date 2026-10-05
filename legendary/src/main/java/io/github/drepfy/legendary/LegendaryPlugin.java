@@ -18,6 +18,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.PluginCommand;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
@@ -153,7 +154,14 @@ public class LegendaryPlugin extends JavaPlugin {
      * new defaults (and saved); anything changed by hand stays as it is.
      */
     private void updateOldTexts() {
-        int updated = TextUpdate.apply(getConfig(), resource("previous-text.yml"), defaults);
+        YamlConfiguration previous = resource("previous-text.yml");
+        int updated = 0;
+        for (String version : previous.getKeys(false)) {
+            ConfigurationSection texts = previous.getConfigurationSection(version);
+            if (texts != null) {
+                updated += TextUpdate.apply(getConfig(), texts, defaults);
+            }
+        }
         if (updated > 0) {
             saveConfig();
             getLogger().info("Updated " + updated + " weapon text(s) in config.yml to the new, simpler wording."

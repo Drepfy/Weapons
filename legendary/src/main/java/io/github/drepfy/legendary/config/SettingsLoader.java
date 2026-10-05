@@ -51,6 +51,7 @@ public final class SettingsLoader {
                 blocked.add(clean);
             }
         }
+        Settings.Controls controls = in.choice("controls", Settings.Controls.class);
         Settings.HitMobs hitMobs = in.choice("hit-mobs", Settings.HitMobs.class);
         boolean actionBar = in.bool("display.action-bar");
         boolean readySound = in.bool("display.ready-sound");
@@ -97,7 +98,8 @@ public final class SettingsLoader {
                 messages.put(key, in.string("messages." + key));
             }
         }
-        return new Settings(prefix, oneOfEach, dropOnDeath, alts, List.copyOf(blocked), hitMobs, actionBar, readySound,
+        return new Settings(prefix, oneOfEach, dropOnDeath, alts, List.copyOf(blocked), controls, hitMobs, actionBar,
+                readySound,
                 looks, abilities, sounds, messages, List.copyOf(warnings));
     }
 
@@ -286,7 +288,8 @@ public final class SettingsLoader {
             } catch (IllegalArgumentException e) {
                 StringBuilder options = new StringBuilder();
                 for (E option : type.getEnumConstants()) {
-                    options.append(options.length() == 0 ? "" : ", ").append(option.name().toLowerCase(Locale.ROOT));
+                    options.append(options.length() == 0 ? "" : ", ")
+                            .append(option.name().toLowerCase(Locale.ROOT).replace('_', '-'));
                 }
                 warnings.add(path + ": \"" + value + "\" should be one of " + options + " (using " + def + ")");
                 return Enum.valueOf(type, def.trim().toUpperCase(Locale.ROOT).replace('-', '_'));

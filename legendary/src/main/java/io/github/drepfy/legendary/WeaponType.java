@@ -7,7 +7,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
-/** The five legendary weapons. Right-click uses the first ability, sneak + right-click the second. */
+/** The five legendary weapons. F (or right-click) uses the first ability, Shift + F the second. */
 public enum WeaponType {
 
     KUROGANE("kurogane", Material.NETHERITE_SWORD, Ability.CRESCENT_DRAW, null, Ability.UNBROKEN_EDGE),
@@ -38,12 +38,12 @@ public enum WeaponType {
         return material;
     }
 
-    /** Right-click. */
+    /** F, or right-click. */
     public Ability primary() {
         return primary;
     }
 
-    /** Sneak + right-click; the weapons with one ability use it for both. */
+    /** Shift + F, or sneak + right-click; the weapons with one ability use it for both. */
     public Ability secondary() {
         return secondary != null ? secondary : primary;
     }
@@ -57,7 +57,7 @@ public enum WeaponType {
         return passive;
     }
 
-    /** The right-click abilities, in order. */
+    /** The abilities used with a key, in order. */
     public List<Ability> actives() {
         return secondary == null ? List.of(primary) : List.of(primary, secondary);
     }

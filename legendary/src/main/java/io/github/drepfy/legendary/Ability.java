@@ -116,7 +116,7 @@ public enum Ability {
         return defaultName;
     }
 
-    /** Used with right-click (true) or a passive (false). */
+    /** Used with a key (true) or a passive (false). */
     public boolean active() {
         return active;
     }

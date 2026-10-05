@@ -13,6 +13,7 @@ public record Settings(
         boolean dropOnDeath,
         Alts alts,
         List<String> blockedCommands,
+        Controls controls,
         HitMobs hitMobs,
         boolean actionBar,
         boolean readySound,
@@ -41,6 +42,42 @@ public record Settings(
 
     /** Alt protection: no passing weapons between accounts on the same IP. */
     public record Alts(boolean enabled, long rememberMs, int maxAccountsPerIp) {
+    }
+
+    /** Which keys use the abilities. */
+    public enum Controls {
+        /** F (the swap-offhand key) and Shift + F. */
+        OFFHAND("F", "Shift + F"),
+        /** Right-click and sneak + right-click. */
+        RIGHT_CLICK("Right-click", "Sneak + right-click"),
+        /** Both of the above. */
+        BOTH("F", "Shift + F");
+
+        private final String key;
+        private final String sneakKey;
+
+        Controls(String key, String sneakKey) {
+            this.key = key;
+            this.sneakKey = sneakKey;
+        }
+
+        public boolean offhand() {
+            return this != RIGHT_CLICK;
+        }
+
+        public boolean rightClick() {
+            return this != OFFHAND;
+        }
+
+        /** How the first ability's key reads in lore and help: {key}. */
+        public String key() {
+            return key;
+        }
+
+        /** And the second's: {sneak-key}. */
+        public String sneakKey() {
+            return sneakKey;
+        }
     }
 
     /** Which mobs the abilities hit besides players. */

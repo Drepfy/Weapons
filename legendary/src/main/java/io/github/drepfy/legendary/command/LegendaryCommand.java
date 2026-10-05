@@ -3,6 +3,7 @@ package io.github.drepfy.legendary.command;
 import io.github.drepfy.legendary.Ability;
 import io.github.drepfy.legendary.LegendaryPlugin;
 import io.github.drepfy.legendary.WeaponType;
+import io.github.drepfy.legendary.config.Settings;
 import io.github.drepfy.legendary.item.WeaponItems;
 import io.github.drepfy.legendary.registry.WeaponRecord;
 import io.github.drepfy.legendary.util.Durations;
@@ -80,8 +81,12 @@ public final class LegendaryCommand implements TabExecutor {
 
     private void help(CommandSender sender, String label) {
         line(sender, "&6&lLegendary Weapons");
-        line(sender, "&7Right-click &8» &fthe weapon's first ability");
-        line(sender, "&7Sneak + right-click &8» &fits second ability");
+        Settings.Controls controls = plugin.settings().controls();
+        line(sender, "&7" + controls.key() + " &8» &fthe weapon's first ability");
+        line(sender, "&7" + controls.sneakKey() + " &8» &fits second ability");
+        if (controls.offhand()) {
+            line(sender, "&8(F is your swap-offhand key; the weapon stays in your hand)");
+        }
         line(sender, "&7Cooldowns show above your hotbar while you hold one.");
         line(sender, "&7They cannot go in containers, bundles or item frames, and drop when you die.");
         if (sender.hasPermission("legendary.give")) {

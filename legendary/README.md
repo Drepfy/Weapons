@@ -4,7 +4,9 @@ Five legendary netherite weapons for **ᴠᴀɴɪʟʟᴀ sᴍᴘ**, each with it
 weapon is tracked one by one, so it cannot be duplicated, stored away, or passed between alt
 accounts. For Paper 1.21 and newer.
 
-**Controls:** right-click uses a weapon's first ability and sneak + right-click its second.
+**Controls:** **F** (the swap-offhand key) uses a weapon's first ability and **Shift + F** its
+second; the weapon stays in your hand. `controls: right-click` in `config.yml` switches back to
+right-click and sneak + right-click (or `both`), and the lore always shows the right keys.
 While you hold one, its cooldowns show above the hotbar (`Crescent Draw 4.2s | Edge ■■□□`),
 with the Combat plugin's timer in front when you are in combat. A soft chime plays when an
 ability is ready again.
@@ -17,7 +19,7 @@ data (1001 to 1005) for the server resource pack, which gives them 3D models.
 
 ### Kurogane (katana): precision and sustained combat
 
-- **Crescent Draw** (right-click, 8s): a crescent slash flies 7 blocks forward, hitting
+- **Crescent Draw** (F, 8s): a crescent slash flies 7 blocks forward, hitting
   everything it passes once (6 damage) and knocking it back. It stops at walls.
 - **Unbroken Edge** (passive): fully charged hits on the *same* target build Edge, up to 4
   stacks, and each stack adds +5% melee damage. Spam clicking keeps the chain alive but does
@@ -26,24 +28,24 @@ data (1001 to 1005) for the server resource pack, which gives them 3D models.
 
 ### Sugarcrash (candy sickle): mobility and burst tempo
 
-- **Sugar Rush** (right-click): Speed II and Haste II (faster attack recharge) for 6s, with a
+- **Sugar Rush** (F): Speed II and Haste II (faster attack recharge) for 6s, with a
   candy trail. The 18s cooldown starts when it wears off.
-- **Sweet Shock** (sneak + right-click, 14s): a candy shockwave hits everyone within 5 blocks
+- **Sweet Shock** (Shift + F, 14s): a candy shockwave hits everyone within 5 blocks
   for 2 damage, knocks them back and gives Slowness II for 2.5s.
 
 ### Riftblade (void sword): space and positioning
 
-- **Rift Slash** (right-click, 10s): a rift travels 10 blocks along the ground. Whoever it
+- **Rift Slash** (F, 10s): a rift travels 10 blocks along the ground. Whoever it
   passes through takes 6 damage, is thrown back and gets 3s of Nausea (the distortion). It
   moves at a visible speed, so it can be dodged.
-- **Rift Recall** (sneak + right-click): marks where you stand. Use it again within 10s to
+- **Rift Recall** (Shift + F): marks where you stand. Use it again within 10s to
   return there. Everyone can see the mark, and building over it collapses the rift. The 22s
   cooldown starts after returning (or when the mark fades). It is a normal teleport, so the
   Combat plugin's safe zones and region plugins can refuse it, and the mark then stays.
 
 ### Gravebreaker (battle axe): ground control and heavy hits
 
-- **Earthsplitter** (right-click, 12s): a shockwave cracks along the ground for 9 blocks.
+- **Earthsplitter** (F, 12s): a shockwave cracks along the ground for 9 blocks.
   Players it hits take 6 damage, are thrown upwards and get Mining Fatigue II for 3s. No block
   is ever changed: the cracks and debris are only shown. It climbs single steps and stops at
   walls and drops.
@@ -54,10 +56,10 @@ data (1001 to 1005) for the server resource pack, which gives them 3D models.
 
 ### Starforged (celestial axe): area control and gravity
 
-- **Astral Impact** (right-click, 16s): call a star down where you look (up to 24 blocks).
+- **Astral Impact** (F, 16s): call a star down where you look (up to 24 blocks).
   A gold warning circle appears and closes in for 1.25s (never less than 0.5s). Then the star
   lands: 7 damage and a launch upwards for everyone within 4 blocks who is not behind cover.
-- **Gravity Well** (sneak + right-click, 20s): a 6-block field opens where you look, with its
+- **Gravity Well** (Shift + F, 20s): a 6-block field opens where you look, with its
   edge drawn in particles. Players caught in it take 1 damage, are dragged towards the centre
   for 4s (they can still walk out slowly) and pulled down if they jump, then a burst throws
   everyone out (4 damage). While a star is falling no well can open, and the other way round,
@@ -73,8 +75,8 @@ data (1001 to 1005) for the server resource pack, which gives them 3D models.
   spectator mode, vanished staff, and everyone in a world with PvP off are never hit.
 - Each ability hits a target once per use, and cooldowns belong to the weapon, so passing it
   to a friend, dropping it or reconnecting does not reset them.
-- Right-click with food, potions, a bow, pearls and so on in the offhand uses that item and
-  not the ability. A shield still works with abilities.
+- With `controls: right-click`, right-click with food, potions, a bow, pearls and so on in the
+  offhand uses that item and not the ability. A shield still works with abilities.
 - Abilities also hit hostile mobs (`hit-mobs: hostile`, `all` or `none`).
 - They work with the Vigil anti-cheat: ability hits are not melee attacks to it, and the
   knockback and launches are expected movement.
@@ -128,9 +130,9 @@ effect levels and durations, and warning times. There are also the names, lore (
 pack sounds such as a katana slash), and every message. A wrong value falls back to its
 default and the console says what to fix.
 
-Updating from 1.0.0 or 1.0.1: the lore and player messages are now much shorter. Any of them
-still worded exactly as before is switched to the new text automatically on start (and saved in
-`config.yml`); ones you changed yourself are kept.
+Updating from 1.0.x: the lore and player messages are short and simple, and the lore shows
+F / Shift + F. Any text still worded exactly as an older version shipped it is switched to the
+new text automatically on start (and saved in `config.yml`); ones you changed yourself are kept.
 
 ## Building and testing
 
@@ -139,7 +141,7 @@ cd legendary
 mvn -B package   # runs the tests, writes target/Legendary-<version>.jar
 ```
 
-`mvn test` runs 38 tests on a simulated server:
+`mvn test` runs 40 tests on a simulated server:
 - **Every weapon:** all five abilities, Edge stacking (including spam clicks and switching
   targets), the Executioner's Mark, cooldowns, and the Starforged lockout.
 - **Protection:** protected, creative and PvP-off players.
@@ -148,5 +150,7 @@ mvn -B package   # runs the tests, writes target/Legendary-<version>.jar
 - **Duplicates:** copies, creative middle-click, revoked and lost weapons.
 - **Ownership:** alt protection, death drops (keepInventory, grave plugins, cancelled
   deaths), and staff /invsee.
+- **Controls:** F and Shift + F (the weapon stays in hand), the right-click and both settings,
+  and the keys shown in the lore.
 - **Other:** the registry across restarts, the action bar, commands, config checking, and
   updating old default texts while keeping your own.

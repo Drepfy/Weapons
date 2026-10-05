@@ -1,8 +1,15 @@
 # Legendary Weapons. After editing, run /legendary reload.
 #
-# Controls: right-click uses a weapon's first ability, sneak + right-click its second
+# Controls: F (the swap-offhand key) uses a weapon's first ability, Shift + F its second
 # (Kurogane and Gravebreaker have one ability and a passive). Times: 8s, 2.5s, 1m, 30d.
 prefix: "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ » &r"
+
+# Which keys use the abilities:
+#   offhand     - F and Shift + F. The weapon stays in your hand (it is not swapped).
+#   right-click - right-click and sneak + right-click (how 1.0 worked).
+#   both        - either.
+# The lore shows the right keys by itself ({key} and {sneak-key}).
+controls: offhand
 
 # Only one of each weapon can exist. /legendary give refuses a second Kurogane while the first
 # is still around; remove it first (/legendary remove), or give a new one if it was lost.
@@ -46,8 +53,9 @@ display:
   # A soft chime when an ability is ready again (only while holding the weapon).
   ready-sound: true
 
-# Each weapon: its name and lore ({id} = its tracking number, {<ability>.<setting>} = a value
-# below, such as {crescent-draw.cooldown}), resource pack model, enchantments and abilities. Damage is in health points
+# Each weapon: its name and lore ({id} = its tracking number, {key} / {sneak-key} = the keys that
+# use its abilities, {<ability>.<setting>} = a value below, such as {crescent-draw.cooldown}),
+# resource pack model, enchantments and abilities. Damage is in health points
 # (2 = one heart) and is reduced by armour like a sword hit.
 weapons:
   kurogane:
@@ -61,7 +69,7 @@ weapons:
     lore:
       - "&8Legendary Katana"
       - ""
-      - "&cRight-click &8» &fCrescent Draw &8({crescent-draw.cooldown})"
+      - "&c{key} &8» &fCrescent Draw &8({crescent-draw.cooldown})"
       - "&7Fires a slash that cuts and knocks back."
       - ""
       - "&cPassive &8» &fUnbroken Edge"
@@ -99,10 +107,10 @@ weapons:
     lore:
       - "&8Legendary Candy Sickle"
       - ""
-      - "&dRight-click &8» &fSugar Rush &8({sugar-rush.cooldown})"
+      - "&d{key} &8» &fSugar Rush &8({sugar-rush.cooldown})"
       - "&7Run and swing faster for {sugar-rush.duration}."
       - ""
-      - "&dSneak + right-click &8» &fSweet Shock &8({sweet-shock.cooldown})"
+      - "&d{sneak-key} &8» &fSweet Shock &8({sweet-shock.cooldown})"
       - "&7Knocks back and slows players near you."
       - ""
       - "&6&lLEGENDARY &8#{id}"
@@ -134,10 +142,10 @@ weapons:
     lore:
       - "&8Legendary Void Sword"
       - ""
-      - "&#B76BFFRight-click &8» &fRift Slash &8({rift-slash.cooldown})"
+      - "&#B76BFF{key} &8» &fRift Slash &8({rift-slash.cooldown})"
       - "&7Sends a rift forward that throws players back."
       - ""
-      - "&#B76BFFSneak + right-click &8» &fRift Recall &8({rift-recall.cooldown})"
+      - "&#B76BFF{sneak-key} &8» &fRift Recall &8({rift-recall.cooldown})"
       - "&7Mark a spot, then use it again to return."
       - ""
       - "&6&lLEGENDARY &8#{id}"
@@ -171,7 +179,7 @@ weapons:
     lore:
       - "&8Legendary Battle Axe"
       - ""
-      - "&#E5484DRight-click &8» &fEarthsplitter &8({earthsplitter.cooldown})"
+      - "&#E5484D{key} &8» &fEarthsplitter &8({earthsplitter.cooldown})"
       - "&7A shockwave that throws players into the air."
       - ""
       - "&#E5484DPassive &8» &fExecutioner's Mark"
@@ -212,10 +220,10 @@ weapons:
     lore:
       - "&8Legendary Celestial Axe"
       - ""
-      - "&bRight-click &8» &fAstral Impact &8({astral-impact.cooldown})"
+      - "&b{key} &8» &fAstral Impact &8({astral-impact.cooldown})"
       - "&7Calls down a star where you look."
       - ""
-      - "&bSneak + right-click &8» &fGravity Well &8({gravity-well.cooldown})"
+      - "&b{sneak-key} &8» &fGravity Well &8({gravity-well.cooldown})"
       - "&7Pulls players in, then blasts them away."
       - ""
       - "&6&lLEGENDARY &8#{id}"

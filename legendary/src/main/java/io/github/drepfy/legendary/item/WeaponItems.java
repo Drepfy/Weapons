@@ -151,6 +151,8 @@ public final class WeaponItems {
     private Map<String, String> placeholders(WeaponType type, UUID id) {
         Map<String, String> values = new TreeMap<>();
         values.put("id", shortId(id));
+        values.put("key", settings.get().controls().key());
+        values.put("sneak-key", settings.get().controls().sneakKey());
         for (Ability ability : type.abilities()) {
             settings.get().ability(ability).placeholders(values);
         }

@@ -21,6 +21,7 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 
@@ -31,8 +32,9 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Right-click uses a weapon's first ability, sneak + right-click its second. Also passes
- * sword and axe hits on to the passives.
+ * F (the swap-offhand key) uses a weapon's first ability and Shift + F its second; or
+ * right-click and sneak + right-click, as config.yml's controls say. Also passes sword and axe
+ * hits on to the passives.
  */
 public final class Abilities implements Listener {
 
@@ -73,6 +75,9 @@ public final class Abilities implements Listener {
                 || event.useItemInHand() == Event.Result.DENY) {
             return;
         }
+        if (!plugin.settings().controls().rightClick()) {
+            return;
+        }
         Player player = event.getPlayer();
         WeaponItems.Tag tag = plugin.items().read(player.getInventory().getItemInMainHand());
         if (tag == null || player.getGameMode() == GameMode.SPECTATOR) {
@@ -105,6 +110,27 @@ public final class Abilities implements Listener {
         Ability ability = player.isSneaking() ? tag.type().secondary() : tag.type().primary();
         // With a shield, right-click also blocks: no complaint while the ability recharges.
         use(player, tag, ability, offhand.getType() != Material.SHIELD);
+    }
+
+    /**
+     * F with a legendary in the main hand: its first ability (Shift + F the second). The weapon is
+     * not swapped into the offhand. A legendary held in the offhand swaps back as usual.
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onSwapHands(PlayerSwapHandItemsEvent event) {
+        if (!plugin.settings().controls().offhand()) {
+            return;
+        }
+        Player player = event.getPlayer();
+        WeaponItems.Tag tag = plugin.items().read(player.getInventory().getItemInMainHand());
+        if (tag == null || player.getGameMode() == GameMode.SPECTATOR) {
+            return;
+        }
+        event.setCancelled(true);
+        if (!plugin.tracker().verify(player, tag)) {
+            return;
+        }
+        use(player, tag, player.isSneaking() ? tag.type().secondary() : tag.type().primary(), true);
     }
 
     /** Offhand items that right-click uses instead of the weapon. */

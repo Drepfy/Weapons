@@ -53,7 +53,7 @@ def files():
     # ---- Legendary weapons ----
     for item, weapons in (('netherite_sword', SWORDS), ('netherite_axe', AXES)):
         for _, name in weapons:
-            out[f'assets/legendary/textures/item/{name}.png'] = textures.png(name)
+            out[f'assets/legendary/textures/item/{name}.png'] = textures.texture(name)
             # a 3D model: no item/generated parent, or Minecraft would flatten it again
             out[f'assets/legendary/models/item/{name}.json'] = (
                 json.dumps(textures.model(name), separators=(',', ':'), ensure_ascii=False) + '\n').encode('utf-8')
@@ -82,21 +82,18 @@ def dispatch(item, entries):
 
 
 def icon():
-    """64x64: Kurogane and Starforged crossed, on a dark background."""
-    size, scale = 64, 2
+    """64x64: Kurogane and Starforged crossed, as 3D models, on a dark background."""
+    size = 64
     pixels = [[(24, 22, 32)] * size for _ in range(size)]
     for name, mirror in (('starforged', True), ('kurogane', False)):
-        rows = textures.rows(name)
-        for y in range(textures.SIZE):
-            for x in range(textures.SIZE):
-                rgb = rows[y][x]
-                if rgb is None:
-                    continue
-                px = (textures.SIZE - 1 - x) if mirror else x
-                for dy in range(scale):
-                    for dx in range(scale):
-                        pixels[y * scale + dy][px * scale + dx] = rgb
-    return textures.pix.png_bytes(pixels)
+        image = textures.gui_image(name, size)
+        for y in range(size):
+            for x in range(size):
+                p = image[y][size - 1 - x if mirror else x]
+                if p is not None:
+                    a = p[3] / 255.0
+                    pixels[y][x] = tuple(int(p[i] * a + pixels[y][x][i] * (1 - a)) for i in range(3))
+    return textures.png.encode(pixels)
 
 
 def main():
