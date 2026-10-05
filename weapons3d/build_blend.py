@@ -166,6 +166,14 @@ def main():
     scene.view_settings.view_transform = "Standard"
     scene.render.filepath = os.path.join(HERE, "showcase.png")
 
+    # open with textures visible, looking through the showcase camera
+    for screen in bpy.data.screens:
+        for area in screen.areas:
+            if area.type == "VIEW_3D":
+                space = area.spaces[0]
+                space.shading.type = "MATERIAL"
+                space.region_3d.view_perspective = "CAMERA"
+
     bpy.ops.file.pack_all()
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(HERE, "weapons.blend"))
     if "--no-render" not in sys.argv:
