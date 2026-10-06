@@ -22,20 +22,23 @@ Combat plugin's timer. `display.boss-bars: false` turns them off.
 
 The swords (Kurogane, Sugarcrash, Riftblade) have **Sharpness VII, Fire Aspect II, Looting III
 and Sweeping Edge III**; the axes (Gravebreaker, Starforged) **Sharpness VII, Efficiency V and
-Fortune III**. All five are unbreakable netherite with a custom name and short lore: the
-passive, each ability with its key and cooldown, and the enchantments listed in the weapon's own
-colours.
+Fortune III**. All five are unbreakable netherite with the enchantment shimmer, a custom name and
+short lore: the passive, and each ability with its key and cooldown. The enchantments are listed
+under the name like on any enchanted item (a `{enchantments}` line in the lore lists them there
+in the weapon's own colours instead).
 
 They look like 1.21.11 items: with the server resource pack each has its own 3D model
-(`item-model`), its own tooltip frame and background in its colours (`tooltip-style`, 1.21.2+),
-and no old purple enchantment shimmer (`glint: false`), since the models have their own glowing
-parts. Custom model data (1001 to 1005) is still set for older clients.
+(`item-model`) and its own tooltip frame and background in its colours (`tooltip-style`,
+1.21.2+). Custom model data (1001 to 1005) is still set for older clients. `glint: false`
+turns the shimmer off.
 
 Every ability has its own 3D effect from the pack (crimson slashes, candy rings, a void rift, a
 shockwave, gravestones, a rune circle, falling stars, a black hole...), shown with display
 entities: the server says where an effect starts and ends, and the players' game animates it
-smoothly in between. Effects are never saved with the world. Every ability and hit also has its
-own sound from the pack, with a quiet vanilla sound under it for players without the pack.
+smoothly in between. Effects are never saved with the world. Every ability, passive and hit has
+its own sound from the pack (with a quiet vanilla sound under the ability sounds for players
+without the pack), each weapon has its own sound when you take it in hand, and its sword or axe
+hits have their own hit sound.
 
 Every weapon has a **passive** that works on its own, and two abilities. Several abilities can
 be **pressed again** while they are still going: a second dash, a return, a dive. The boss bar
@@ -182,9 +185,9 @@ for each weapon.
 **Updating from an older version:** nothing to do. On start the settings of abilities that
 were replaced (Blood Moon, Sugar Rush, and everything from 1.1 and older), the action bar
 settings and messages that no longer exist are removed. Settings, lore and names still at an
-older version's default (for example Crimson Flash's 20s cooldown from 1.2) become the new
-defaults, and enchantments still at the old Sharpness VI become the new ones. Anything you
-changed yourself is kept. Everything is saved in `config.yml`.
+older version's default (for example Crimson Flash's 20s cooldown from 1.2, or 1.3.0's lore
+and shimmer setting) become the new defaults, and enchantments still at the old Sharpness VI
+become the new ones. Anything you changed yourself is kept. Everything is saved in `config.yml`.
 
 ## Building and testing
 
@@ -193,7 +196,7 @@ cd legendary
 mvn -B package   # runs the tests, writes target/Legendary-<version>.jar
 ```
 
-`mvn test` runs 56 tests on a simulated server:
+`mvn test` runs 57 tests on a simulated server:
 - **Every ability and passive:** what it hits and when (Crimson Flash's two charges and
   bleeding, Iaido's counter and crescent, Crimson Edge's count, the hook's yank, stun and
   grapple, the cyclone deflecting arrows, Sugar High's crash, the rift's pull, snap and lift,
@@ -202,7 +205,8 @@ mvn -B package   # runs the tests, writes target/Legendary-<version>.jar
   cooldowns and the Starforged lockout.
 - **Protection:** protected players are never hurt, pulled, yanked or swapped; creative and PvP-off;
   counters and dodges ignore protection checks.
-- **Look:** enchantments, item model, tooltip style, no glint, the lore's enchantment lines,
+- **Look:** enchantments listed by the game, the shimmer, item model, tooltip style, the lore's
+  own enchantment lines when asked for,
   the boss bars (names, times, progress, flashing, hidden when put away), and the 3D effects
   being cleaned up.
 - **Storage:** blocking for every container type, bundles, armour stands, pots, hoppers, mobs

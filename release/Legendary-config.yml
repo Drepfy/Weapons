@@ -56,21 +56,22 @@ display:
 
 # Each weapon: its name and lore ({key} / {sneak-key} = the keys that use its abilities,
 # {<ability>.<setting>} = a value below, such as {crimson-flash.cooldown}, {<ability>.name} = the
-# ability's name, {enchantments} = the enchantments listed in the weapon's style), resource pack
-# looks, enchantments and abilities. Damage is in health points (2 = one heart) and is reduced by
-# armour like a sword hit. An ability can be renamed with "name:" in its section.
+# ability's name), resource pack looks, enchantments and abilities. The enchantments show under
+# the name like on any enchanted item (put a "{enchantments}" line in the lore to list them there
+# in the weapon's own style instead). Damage is in health points (2 = one heart) and is reduced
+# by armour like a sword hit. An ability can be renamed with "name:" in its section.
 #
 # item-model and tooltip-style come from the server resource pack (1.21.4+ clients): the 3D
 # model, and the weapon's own tooltip frame. Without the pack, tooltip styles show as a missing
 # texture: if players may join without it (require-resource-pack=false), set them to "".
-# glint: the enchantment shine (off: the models have their own glowing parts).
+# glint: the enchantment shimmer.
 weapons:
   kurogane:
     name: "<gradient:#F5F5F5:#C21E3A>&lKurogane</gradient>"
     custom-model-data: 1001
     item-model: "legendary:kurogane"
     tooltip-style: "legendary:kurogane"
-    glint: false
+    glint: true
     unbreakable: true
     enchantments:
       sharpness: 7
@@ -92,8 +93,6 @@ weapons:
       - ""
       - "&#FF4D6A{sneak-key} &8» &f{iaido.name} &8({iaido.cooldown})"
       - "&7Block the next hit and strike back from behind."
-      - ""
-      - "{enchantments}"
     abilities:
       crimson-flash:
         cooldown: 16s
@@ -137,7 +136,7 @@ weapons:
     custom-model-data: 1002
     item-model: "legendary:sugarcrash"
     tooltip-style: "legendary:sugarcrash"
-    glint: false
+    glint: true
     unbreakable: true
     enchantments:
       sharpness: 7
@@ -158,8 +157,6 @@ weapons:
       - ""
       - "&#FF7AC3{sneak-key} &8» &f{candy-cyclone.name} &8({candy-cyclone.cooldown})"
       - "&7Become a candy tornado. Arrows bounce off."
-      - ""
-      - "{enchantments}"
     abilities:
       candy-hook:
         cooldown: 14s
@@ -205,7 +202,7 @@ weapons:
     custom-model-data: 1003
     item-model: "legendary:riftblade"
     tooltip-style: "legendary:riftblade"
-    glint: false
+    glint: true
     unbreakable: true
     enchantments:
       sharpness: 7
@@ -226,8 +223,6 @@ weapons:
       - ""
       - "&#B76BFF{sneak-key} &8» &f{rift-swap.name} &8({rift-swap.cooldown})"
       - "&7Swap places. Press again to go back."
-      - ""
-      - "{enchantments}"
     abilities:
       void-rend:
         cooldown: 20s
@@ -266,7 +261,7 @@ weapons:
     custom-model-data: 1004
     item-model: "legendary:gravebreaker"
     tooltip-style: "legendary:gravebreaker"
-    glint: false
+    glint: true
     unbreakable: true
     enchantments:
       sharpness: 7
@@ -286,8 +281,6 @@ weapons:
       - ""
       - "&#FF8A3D{sneak-key} &8» &f{grave-rise.name} &8({grave-rise.cooldown})"
       - "&7Gravestones burst up and weigh them down."
-      - ""
-      - "{enchantments}"
     abilities:
       executioners-leap:
         cooldown: 18s
@@ -336,7 +329,7 @@ weapons:
     custom-model-data: 1005
     item-model: "legendary:starforged"
     tooltip-style: "legendary:starforged"
-    glint: false
+    glint: true
     unbreakable: true
     enchantments:
       sharpness: 7
@@ -356,8 +349,6 @@ weapons:
       - ""
       - "&#6FD6FF{sneak-key} &8» &f{singularity.name} &8({singularity.cooldown})"
       - "&7A black hole pulls, then explodes."
-      - ""
-      - "{enchantments}"
     abilities:
       starfall:
         cooldown: 24s
@@ -410,6 +401,8 @@ weapons:
 # Sounds: "<sound> [volume] [pitch]". The legendary:... sounds are in the server resource pack;
 # the quiet vanilla sound after them is for players without it.
 sounds:
+  # <weapon>-equip plays when you take a legendary in hand, <weapon>-melee on its sword or axe
+  # hits, and each ability has its own.
   crimson-flash: ["legendary:kurogane.flash 1 1", "entity.player.attack.sweep 0.3 1.5"]
   crimson-flash-end: ["legendary:kurogane.sheathe 0.9 1"]
   crimson-cut: ["legendary:kurogane.cut 1 1", "entity.player.attack.crit 0.3 1.2"]
@@ -418,17 +411,24 @@ sounds:
   iaido-parry: ["legendary:kurogane.parry 1 1", "item.shield.block 0.4 1.4"]
   iaido-counter: ["legendary:kurogane.counter 1 1", "entity.player.attack.crit 0.3 0.9"]
   kurogane-hit: ["legendary:kurogane.hit 0.9 1"]
+  kurogane-equip: ["legendary:kurogane.draw 0.7 1"]
+  kurogane-melee: ["legendary:kurogane.hit 0.45 1.15"]
   bleed: ["legendary:kurogane.bleed 0.5 1"]
   candy-cyclone: ["legendary:sugarcrash.cyclone 1 1", "entity.breeze.wind_burst 0.2 1.3"]
   candy-hook: ["legendary:sugarcrash.hook 1 1", "entity.fishing_bobber.throw 0.4 1.2"]
   candy-hook-catch: ["legendary:sugarcrash.catch 1 1", "entity.fishing_bobber.retrieve 0.4 1.3"]
   sugar-high-full: ["legendary:sugarcrash.full 0.7 1", "block.amethyst_block.chime 0.4 1.6"]
   sugar-crash: ["legendary:sugarcrash.crash 1 1", "entity.firework_rocket.large_blast 0.35 1.2"]
+  sugar-high-stack: ["legendary:sugarcrash.pop 0.5 1"]
+  sugarcrash-equip: ["legendary:sugarcrash.equip 0.7 1"]
+  sugarcrash-melee: ["legendary:sugarcrash.pop 0.45 0.9"]
   candy-cyclone-hit: ["legendary:sugarcrash.pop 0.6 1"]
   candy-burst: ["legendary:sugarcrash.burst 1 1", "entity.firework_rocket.blast 0.35 1.3"]
   void-rend: ["legendary:riftblade.rend 1 1", "entity.enderman.teleport 0.3 0.6"]
   void-rend-snap: ["legendary:riftblade.snap 1 1", "entity.evoker.cast_spell 0.25 0.6"]
   riftblade-hit: ["legendary:riftblade.hit 0.9 1"]
+  riftblade-equip: ["legendary:riftblade.equip 0.7 1"]
+  riftblade-melee: ["legendary:riftblade.hit 0.45 1.15"]
   rift-swap: ["legendary:riftblade.swap 1 1", "entity.enderman.teleport 0.3 1.3"]
   rift-return: ["legendary:riftblade.return 1 1", "entity.enderman.teleport 0.3 0.9"]
   phase-shift: ["legendary:riftblade.phase 1 1", "entity.enderman.teleport 0.3 1.6"]
@@ -437,12 +437,16 @@ sounds:
   executioners-dive: ["legendary:gravebreaker.dive 1 1", "entity.breeze.wind_burst 0.3 0.6"]
   last-rites: ["legendary:gravebreaker.rites 0.9 1", "block.bell.resonate 0.25 0.6"]
   gravebreaker-hit: ["legendary:gravebreaker.hit 0.9 1"]
+  gravebreaker-equip: ["legendary:gravebreaker.equip 0.7 1"]
+  gravebreaker-melee: ["legendary:gravebreaker.hit 0.45 1.1"]
   grave-rise: ["legendary:gravebreaker.rumble 1 1"]
   grave-rise-stone: ["legendary:gravebreaker.stone 0.9 1", "block.deepslate.break 0.35 0.7"]
   starfall: ["legendary:starforged.call 1 1", "block.beacon.activate 0.3 1.6"]
   starfall-star: ["legendary:starforged.fall 0.8 1"]
   starfall-impact: ["legendary:starforged.impact 1 1", "entity.firework_rocket.twinkle 0.3 1.2"]
   starforged-hit: ["legendary:starforged.hit 0.9 1"]
+  starforged-equip: ["legendary:starforged.equip 0.7 1"]
+  starforged-melee: ["legendary:starforged.hit 0.45 1.15"]
   starstruck: ["legendary:starforged.starstruck 0.9 1", "entity.firework_rocket.twinkle 0.3 1.5"]
   singularity: ["legendary:starforged.singularity 0.8 1", "block.portal.trigger 0.12 1.4"]
   singularity-nova: ["legendary:starforged.nova 1 1", "entity.generic.explode 0.3 1.3"]

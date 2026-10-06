@@ -416,6 +416,7 @@ final class Sugarcrash implements Kit, Listener {
             return;
         }
         state.stacks++;
+        plugin.fx().sound(attacker.getLocation(), "sugar-high-stack", 0.12f * state.stacks); // Higher each stack.
         // Faster with the sugar: Speed I from a third of the stacks, Speed II from two thirds.
         int level = state.stacks * 3 >= max * 2 ? 2 : state.stacks * 3 >= max ? 1 : 0;
         Hits.effect(attacker, "speed", level, settings.ticks("stack-duration"));

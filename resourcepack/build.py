@@ -87,7 +87,7 @@ def files():
             dispatch(item, [(cmd, f'legendary:item/{name}') for cmd, name in weapons]))
     # ---- the abilities' effects (display entities) and sounds ----
     for name in fx.EFFECTS:
-        out[f'assets/legendary/textures/fx/{name}.png'] = textures.png.encode(fx.texture(name))
+        out[f'assets/legendary/textures/item/fx/{name}.png'] = textures.png.encode(fx.texture(name))
         out[f'assets/legendary/models/fx/{name}.json'] = as_json(fx.model(name))
         out[f'assets/legendary/items/fx/{name}.json'] = as_json(fx.item(name))
     events = {}

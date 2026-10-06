@@ -73,7 +73,7 @@ shown, and `models/render.py` draws the showcase. `python3 textures.py --preview
   faint glow at the edge, and a thin frame shading from one colour to another with small gems
   in the corners. Nine-sliced like the vanilla one, so it fits any length of lore. Drawn by
   `tooltips.py`.
-- **Ability effects** (`items/fx/*.json`, `models/fx`, `textures/fx`): 19 glowing effects the
+- **Ability effects** (`items/fx/*.json`, `models/fx`, `textures/item/fx`): 19 glowing effects the
   abilities show with display entities: Kurogane's crimson streak, slash, cut and rune circle;
   Sugarcrash's candy-cane hook, candy burst, candy ring and the dizzy candy stars over a stunned
   player; Riftblade's rift, void portal and void burst; Gravebreaker's shockwave, ember ring and
@@ -81,9 +81,14 @@ shown, and `models/render.py` draws the showcase. `python3 textures.py --preview
   painted with soft edges at 64 to 256 pixels by `fx.py` (flat ones lie on the ground, upright
   ones stand facing the viewer), lit at full brightness so they glow at night. Without the pack
   they show as paper.
-- **Sounds** (`sounds/legendary/<weapon>/*.ogg`, `sounds.json`): 36 sounds, for every ability,
-  passive and hit (`legendary:kurogane.parry`, `legendary:sugarcrash.hook`,
-  `legendary:starforged.nova`...), with subtitles. They are made from scratch by
-  `sounds/make_sounds.py` (`pip install numpy soundfile`): blade swishes and clangs, whooshes,
-  sparkles, void hums, rumbles, bells and impacts built from noise and tones. The `.ogg` files
-  are kept in the repository, so `build.py` only copies them.
+- **Sounds** (`sounds/legendary/<weapon>/*.ogg`, `sounds.json`): 41 sounds, for every ability,
+  passive and hit, and one for taking each weapon in hand (`legendary:kurogane.parry`,
+  `legendary:sugarcrash.hook`, `legendary:kurogane.draw`...), with subtitles. They are made from
+  scratch by `sounds/make_sounds.py` (`pip install numpy soundfile`): blade swishes and clangs,
+  whooshes, sparkles, void hums, rumbles, bells and impacts built from noise and tones. The `.ogg`
+  files are kept in the repository, so `build.py` only copies them.
+
+After `build.py`, `python3 check.py` checks the pack against the plugin: every file parses,
+every model, texture, effect and sound the plugin uses is there, and every texture a model uses
+is in `textures/item/` or `textures/block/`. Minecraft only loads item model textures from those
+folders: anywhere else they show as the purple and black missing texture.

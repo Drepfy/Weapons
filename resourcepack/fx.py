@@ -460,7 +460,9 @@ def _face(uv, flip=False):
 
 def model(name):
     painter, size, kind = EFFECTS[name]
-    texture_id = f'legendary:fx/{name}'
+    # Item models only find textures in the item (or block) folders: they are stitched into the
+    # block atlas, and a texture anywhere else shows as the purple and black missing texture.
+    texture_id = f'legendary:item/fx/{name}'
     full = [0, 0, 16, 16]
     if kind == 'flat':
         elements = [{'from': [0, 8, 0], 'to': [16, 8, 16], 'shade': False, 'light_emission': 15,

@@ -236,6 +236,7 @@ public final class Abilities implements Listener {
         WeaponItems.Tag tag = melee(event);
         if (tag != null && event.getFinalDamage() > 0) {
             kits.get(tag.type()).landed((Player) event.getDamager(), (LivingEntity) event.getEntity(), tag);
+            plugin.fx().sound(event.getEntity().getLocation(), tag.type().key() + "-melee");
         }
     }
 

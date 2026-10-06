@@ -33,6 +33,8 @@ public final class Hud {
 
     private final LegendaryPlugin plugin;
     private final Map<UUID, Bars> bars = new HashMap<>();
+    /** The legendary each player held last time (for the sound when one is taken in hand). */
+    private final Map<UUID, WeaponType> holding = new HashMap<>();
     /** player:ability → the tick its flash ends. */
     private final Map<String, Long> shakes = new HashMap<>();
 
@@ -81,12 +83,18 @@ public final class Hud {
                 it.remove();
             }
         }
+        holding.keySet().removeIf(id -> Bukkit.getPlayer(id) == null);
         shakes.values().removeIf(until -> until <= now);
     }
 
     private void update(Player player, long now) {
         Settings settings = plugin.settings();
         WeaponItems.Tag tag = plugin.items().read(player.getInventory().getItemInMainHand());
+        WeaponType held = tag == null || player.isDead() ? null : tag.type();
+        WeaponType before = held == null ? holding.remove(player.getUniqueId()) : holding.put(player.getUniqueId(), held);
+        if (held != null && held != before) {
+            plugin.fx().sound(player.getLocation(), held.key() + "-equip"); // Drawn.
+        }
         if (tag == null || !settings.bossBars() || player.isDead()) {
             hide(player);
             return;
@@ -154,6 +162,7 @@ public final class Hud {
     }
 
     public void clearAll() {
+        holding.clear();
         for (Bars current : bars.values()) {
             current.byAbility.values().forEach(BossBar::removeAll);
         }

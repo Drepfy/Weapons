@@ -331,16 +331,16 @@ class LegendaryTest {
             // The 1.21 look: its own model and tooltip frame from the pack, no old-style shimmer.
             assertModern("legendary:" + type.key(), meta::getItemModel);
             assertModern("legendary:" + type.key(), meta::getTooltipStyle);
-            assertEquals(Boolean.FALSE, meta.getEnchantmentGlintOverride());
-            assertTrue(meta.hasItemFlag(ItemFlag.HIDE_ENCHANTS), "the lore lists them in the weapon's style instead");
+            assertFalse(meta.hasEnchantmentGlintOverride(), "the enchantment shimmer, as usual");
+            assertFalse(meta.hasItemFlag(ItemFlag.HIDE_ENCHANTS), "the game lists them under the name, like on any item");
+            assertFalse(meta.hasItemFlag(ItemFlag.HIDE_UNBREAKABLE));
             String name = ChatColor.stripColor(meta.getDisplayName());
             assertEquals(type.key(), name.toLowerCase(), "named " + name);
             String lore = ChatColor.stripColor(String.join("\n", meta.getLore()));
             for (Ability ability : type.abilities()) {
                 assertTrue(lore.contains(plugin.settings().ability(ability).name()), type + " lore names " + ability);
             }
-            assertTrue(lore.contains("Sharpness VII") && lore.contains("Unbreakable"), lore);
-            assertTrue(lore.contains(axe ? "Efficiency V" : "Sweeping Edge III"), lore);
+            assertFalse(lore.contains("Sharpness"), "not twice: " + lore);
             assertFalse(lore.contains(WeaponItems.shortId(id(item))), "no tracking number in the lore");
             assertFalse(lore.contains("LEGENDARY"), "no LEGENDARY line at the bottom");
             assertEquals(WeaponRecord.State.HELD, record(item).state());
@@ -1508,9 +1508,35 @@ class LegendaryTest {
         assertEquals(6, saved.getInt("weapons.kurogane.abilities.crimson-flash.damage"));
         assertEquals(10, saved.getInt("weapons.kurogane.abilities.crimson-flash.range"), "own value kept");
         assertEquals("4s", saved.getString("weapons.sugarcrash.abilities.candy-cyclone.duration"));
-        assertEquals(12, saved.getStringList("weapons.kurogane.lore").size(), "the lore with the passive");
+        assertEquals(10, saved.getStringList("weapons.kurogane.lore").size(), "the lore with the passive");
         assertEquals(10.0, plugin.settings().ability(Ability.CRIMSON_FLASH).num("range"));
         assertEquals(9.0, plugin.settings().ability(Ability.IAIDO).num("damage"));
+    }
+
+    @Test
+    void aConfigFrom13GetsTheShimmerAndTheEnchantmentList() {
+        org.bukkit.configuration.file.YamlConfiguration old = org.bukkit.configuration.file.YamlConfiguration
+                .loadConfiguration(new java.io.InputStreamReader(plugin.getResource("previous-text.yml"),
+                        java.nio.charset.StandardCharsets.UTF_8));
+        for (WeaponType type : WeaponType.values()) {
+            plugin.getConfig().set("weapons." + type.key() + ".glint", false);
+            plugin.getConfig().set("weapons." + type.key() + ".lore", old.getStringList("v1_3_0.weapons." + type.key() + ".lore"));
+        }
+        plugin.getConfig().set("weapons.starforged.glint", null);
+        plugin.getConfig().set("weapons.starforged.lore", List.of("&bMine", "{enchantments}")); // Their own.
+        plugin.saveConfig();
+        assertEquals(List.of(), plugin.reload());
+        assertTrue(plugin.settings().look(WeaponType.KUROGANE).glint(), "1.3.0's default (no shimmer) is updated");
+        assertEquals(10, plugin.settings().look(WeaponType.KUROGANE).lore().size());
+        PlayerMock steve = player("Steve", 0, 0);
+        ItemMeta sword = give(steve, WeaponType.KUROGANE).getItemMeta();
+        assertFalse(sword.hasItemFlag(ItemFlag.HIDE_ENCHANTS));
+        assertFalse(String.join("\n", sword.getLore()).contains("Sharpness"));
+        // A lore that still lists them itself keeps doing so, in the weapon's style.
+        ItemMeta axe = give(steve, WeaponType.STARFORGED).getItemMeta();
+        List<String> lore = axe.getLore().stream().map(ChatColor::stripColor).toList();
+        assertEquals(List.of("Mine", "Sharpness VII  ✦  Efficiency V", "Fortune III  ✦  Unbreakable"), lore);
+        assertTrue(axe.hasItemFlag(ItemFlag.HIDE_ENCHANTS), "not twice");
     }
 
     @Test
@@ -1536,7 +1562,7 @@ class LegendaryTest {
 
         plugin.reload();
         List<String> lore = plugin.getConfig().getStringList("weapons.kurogane.lore");
-        assertEquals(12, lore.size(), "the new lore");
+        assertEquals(10, lore.size(), "the new lore");
         assertTrue(String.join("\n", lore).contains("{crimson-flash.name}"));
         assertEquals("&cLegendaries can't go in containers.", plugin.getConfig().getString("messages.storage-blocked"));
         assertTrue(plugin.getConfig().getStringList("weapons.sugarcrash.lore").contains(
@@ -1545,24 +1571,21 @@ class LegendaryTest {
                 "&#B76BFF{key} &8» &f{void-rend.name} &8({void-rend.cooldown})"));
         assertEquals("<gradient:#E9C6FF:#A855F7>&lRiftblade</gradient>", plugin.getConfig().getString("weapons.riftblade.name"),
                 "brighter on the dark tooltip");
-        assertEquals(12, plugin.getConfig().getStringList("weapons.gravebreaker.lore").size());
+        assertEquals(10, plugin.getConfig().getStringList("weapons.gravebreaker.lore").size());
         assertFalse(String.join("\n", plugin.getConfig().getStringList("weapons.gravebreaker.lore")).contains("LEGENDARY"));
         assertEquals(List.of("&bMy own lore"), plugin.getConfig().getStringList("weapons.starforged.lore"));
         assertEquals("&cNo alts!", plugin.getConfig().getString("messages.alt-blocked"));
         // It is saved, so it sticks after the next restart.
         org.bukkit.configuration.file.YamlConfiguration saved = org.bukkit.configuration.file.YamlConfiguration
                 .loadConfiguration(new java.io.File(plugin.getDataFolder(), "config.yml"));
-        assertEquals(12, saved.getStringList("weapons.kurogane.lore").size());
-        // Weapons already out get the new lore too, the enchantments listed two to a line.
+        assertEquals(10, saved.getStringList("weapons.kurogane.lore").size());
+        // Weapons already out get the new lore too.
         PlayerMock steve = player("Steve", 0, 0);
         ItemStack sword = give(steve, WeaponType.KUROGANE);
         List<String> itemLore = sword.getItemMeta().getLore().stream().map(ChatColor::stripColor).toList();
-        assertEquals(14, itemLore.size(), String.join("\n", itemLore));
-        assertEquals("Unbreakable", itemLore.get(itemLore.size() - 1), "the enchantments are the last lines");
+        assertEquals(10, itemLore.size(), String.join("\n", itemLore));
         assertTrue(itemLore.contains("F » Crimson Flash (16s)"), String.join("\n", itemLore));
         assertTrue(itemLore.contains("Passive » Crimson Edge"), String.join("\n", itemLore));
-        assertTrue(itemLore.contains("Sharpness VII  ✦  Fire Aspect II"), String.join("\n", itemLore));
-        assertTrue(itemLore.contains("Unbreakable"), String.join("\n", itemLore));
     }
 
 

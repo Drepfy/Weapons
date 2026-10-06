@@ -225,6 +225,9 @@ def kurogane():
 
     deep = sweep_noise(0.14, 1400, 7500, 0.45, 18) * env(0.14, 0.006, 0.09)
     s['edge'] = finish(reverb(at(0.6, [(0, deep, 1.0), (0.05, wet, 0.6), (0.05, thump(0.3, 130, 55, 0.12), 0.8)]), 0.6, 0.2))
+
+    unsheathe = band(noise(0.45, 19), 3000, 9000) * swell(0.45, 0.4, 1.4) * env(0.45, 0.0, 0.42, 0.3)
+    s['draw'] = finish(reverb(at(1.0, [(0, unsheathe, 0.6), (0.38, norm(shing), 0.7)]), 1.0, 0.3, 6000), peak=0.75)
     return s
 
 
@@ -270,6 +273,9 @@ def sugarcrash():
     crack = band(noise(0.3, 27), 800, 9000) * env(0.3, 0.001, 0.08)
     bells = [(0.02 + rng.uniform(0, 0.4), norm(_blip(rng.uniform(1200, 3600), 0.3)), 0.3) for _ in range(14)]
     s['burst'] = finish(reverb(at(1.1, [(0, crack, 0.9), (0, thump(0.5, 120, 45, 0.2), 0.8)] + bells), 1.0, 0.3))
+
+    s['equip'] = finish(reverb(at(0.9, [(k * 0.07, norm(_blip(f, 0.35)), 0.5) for k, f in enumerate((1568, 2093, 2637))]
+                                  + [(0, sweep_noise(0.3, 1500, 6000, 0.6, 28) * env(0.3, 0.05, 0.2), 0.3)]), 0.9, 0.35), peak=0.65)
     return s
 
 
@@ -312,6 +318,12 @@ def riftblade():
     s['return'] = finish(reverb(at(0.9, [(0, down2, 0.35), (0.15, up2, 0.35),
                                          (0, sweep_noise(0.7, 5000, 500, 0.8, 38) * env(0.7, 0.05, 0.5), 0.6),
                                          (0.15, thump(0.3, 180, 70, 0.1), 0.5)]), 1.0, 0.35, 3500))
+
+    t = time(0.9)
+    hum = tone(0.9, 70) * tone(0.9, 104) * swell(0.9, 0.5, 2.0) * env(0.9, 0.0, 0.8, 0.5)
+    shimmer = tone(0.9, 900, 1300, vibrato=(6, 0.02)) * swell(0.9, 0.5, 2.0) * env(0.9, 0.0, 0.8, 0.5)
+    s['equip'] = finish(reverb(at(1.0, [(0, hum, 0.8), (0, shimmer, 0.12),
+                                        (0.3, sweep_noise(0.5, 2500, 400, 0.6, 39) * env(0.5, 0.05, 0.4), 0.4)]), 1.1, 0.35, 3000), peak=0.7)
     return s
 
 
@@ -348,6 +360,11 @@ def gravebreaker():
     toll = bell(2.2, 196, 2.0, ((1, 1), (2.0, 0.5), (2.4, 0.4), (3.0, 0.25), (4.2, 0.15)))
     whisper = band(noise(1.2, 59), 1500, 5000) * swell(1.2, 0.3, 2.0) * env(1.2, 0.0, 1.0, 0.3)
     s['rites'] = finish(reverb(at(2.2, [(0, norm(toll), 0.9), (0.05, whisper, 0.15)]), 2.0, 0.35, 2500), peak=0.8)
+
+    iron = bell(0.9, 330, 0.5, ((1, 1), (2.1, 0.5), (3.3, 0.3), (5.2, 0.15)))
+    s['equip'] = finish(drive(reverb(at(1.0, [(0, thump(0.5, 120, 50, 0.18), 0.9), (0, norm(iron), 0.45),
+                                              (0.02, band(noise(0.15, 51), 400, 3000) * env(0.15, 0.002, 0.06), 0.5)]),
+                                     0.9, 0.25, 2000), 1.3), peak=0.75)
     return s
 
 
@@ -391,6 +408,10 @@ def starforged():
     tinkle = sum(bell(0.7, f, 0.3) for f in (2349, 3136, 3951))
     s['starstruck'] = finish(reverb(at(0.8, [(0, small, 0.7), (0, thump(0.4, 130, 55, 0.15), 0.8), (0.005, norm(tinkle), 0.45)]),
                                     0.8, 0.3, 6000))
+
+    sparkle = sum(bell(1.0, f, 0.6) for f in (1046.5, 1568, 2093))
+    s['equip'] = finish(reverb(at(1.0, [(0, sweep_noise(0.35, 1500, 7000, 0.6, 61) * swell(0.35, 0.35), 0.4),
+                                        (0.3, norm(sparkle), 0.6)]), 1.2, 0.4, 7000), peak=0.7)
     return s
 
 
