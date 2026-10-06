@@ -11,7 +11,7 @@ import java.util.Locale;
 public enum WeaponType {
 
     KUROGANE("kurogane", Material.NETHERITE_SWORD, Ability.CRIMSON_FLASH, Ability.IAIDO, Ability.CRIMSON_EDGE),
-    SUGARCRASH("sugarcrash", Material.NETHERITE_SWORD, Ability.CANDY_HOOK, Ability.CANDY_CYCLONE, Ability.SUGAR_HIGH),
+    SUGARCRASH("sugarcrash", Material.NETHERITE_SWORD, Ability.CANDY_HOOK, Ability.CANDY_BARRAGE, Ability.SUGAR_HIGH),
     RIFTBLADE("riftblade", Material.NETHERITE_SWORD, Ability.VOID_REND, Ability.RIFT_SWAP, Ability.PHASE_SHIFT),
     GRAVEBREAKER("gravebreaker", Material.NETHERITE_AXE, Ability.EXECUTIONERS_LEAP, Ability.GRAVE_RISE, Ability.LAST_RITES),
     STARFORGED("starforged", Material.NETHERITE_AXE, Ability.STARFALL, Ability.SINGULARITY, Ability.STARSTRUCK);
@@ -36,6 +36,16 @@ public enum WeaponType {
 
     public Material material() {
         return material;
+    }
+
+    /** A fully charged hit with the bare item, before enchantments (vanilla's tooltip number). */
+    public double attackDamage() {
+        return material == Material.NETHERITE_AXE ? 10.0 : 8.0;
+    }
+
+    /** Hits per second at full charge. */
+    public double attackSpeed() {
+        return material == Material.NETHERITE_AXE ? 1.0 : 1.6;
     }
 
     /** F, or right-click. */

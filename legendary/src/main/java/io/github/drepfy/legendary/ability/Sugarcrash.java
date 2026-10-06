@@ -10,11 +10,12 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
-import org.bukkit.entity.Projectile;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.player.PlayerAnimationEvent;
+import org.bukkit.event.player.PlayerAnimationType;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
@@ -30,9 +31,9 @@ import java.util.UUID;
  *   <li><b>Candy Hook</b>: throws a candy-cane hook on a candy rope. A player (or monster) it
  *   catches is yanked to you and stunned for a moment; a wall or the ground it catches pulls you
  *   to it instead (no fall damage).</li>
- *   <li><b>Candy Cyclone</b>: the scythe spins into a candy-striped tornado around the player,
- *   who can keep moving (faster). It drags nearby players in and shreds them, deflects arrows,
- *   then bursts outwards.</li>
+ *   <li><b>Candy Barrage</b>: candy canes appear and float round the player's head. Each swing
+ *   of the scythe (or Shift + F again) fires one where they look; the cooldown starts when they
+ *   are all fired or the time is up.</li>
  *   <li><b>Sugar High</b> (passive): each hit adds a sugar stack and speeds you up; at full
  *   stacks the next hit is a Sugar Crash, a candy explosion round the target.</li>
  * </ul>
@@ -45,7 +46,10 @@ final class Sugarcrash implements Kit, Listener {
 
     private final LegendaryPlugin plugin;
     private final List<Hook> hooks = new ArrayList<>();
-    private final Map<UUID, Cyclone> cyclones = new HashMap<>();
+    /** Weapon → the candy canes floating round its holder's head. */
+    private final Map<UUID, Barrage> barrages = new HashMap<>();
+    /** Candy canes in flight. */
+    private final List<Cane> canes = new ArrayList<>();
     private final Map<UUID, Sugar> sugar = new HashMap<>();
     /** Attacker → the target their Sugar Crash is landing on. */
     private final Map<UUID, UUID> crashing = new HashMap<>();
@@ -69,17 +73,33 @@ final class Sugarcrash implements Kit, Listener {
         }
     }
 
-    private static final class Cyclone {
+    private static final class Barrage {
         final Player player;
         final long until;
-        long nextHit;
-        final List<Visuals.Effect> rings = new ArrayList<>();
-        int turn;
+        /** How many there were at first (their places round the head). */
+        final int total;
+        final List<Visuals.Effect> floating = new ArrayList<>();
+        long nextShot;
 
-        Cyclone(Player player, long until, long nextHit) {
+        Barrage(Player player, long until, int total) {
             this.player = player;
             this.until = until;
-            this.nextHit = nextHit;
+            this.total = total;
+        }
+    }
+
+    private static final class Cane {
+        final Player player;
+        final Vector direction;
+        final Visuals.Effect effect;
+        Location position;
+        double travelled;
+
+        Cane(Player player, Location position, Vector direction, Visuals.Effect effect) {
+            this.player = player;
+            this.position = position;
+            this.direction = direction;
+            this.effect = effect;
         }
     }
 
@@ -96,21 +116,28 @@ final class Sugarcrash implements Kit, Listener {
 
     @Override
     public Result use(Player player, WeaponItems.Tag weapon, Ability ability) {
-        return ability == Ability.CANDY_HOOK ? hook(player) : cyclone(player);
+        return ability == Ability.CANDY_HOOK ? hook(player) : barrage(player, weapon);
+    }
+
+    @Override
+    public boolean recast(Player player, WeaponItems.Tag weapon, Ability ability) {
+        Barrage barrage = ability == Ability.CANDY_BARRAGE ? barrages.get(weapon.id()) : null;
+        if (barrage == null || !barrage.player.equals(player)) {
+            return false;
+        }
+        fire(weapon.id(), barrage);
+        return true;
     }
 
     @Override
     public long active(Player player, WeaponItems.Tag weapon, Ability ability, long now) {
-        if (ability != Ability.CANDY_CYCLONE) {
-            return 0;
-        }
-        Cyclone cyclone = cyclones.get(player.getUniqueId());
-        return cyclone == null ? 0 : Math.max(0, cyclone.until - now);
+        Barrage barrage = ability == Ability.CANDY_BARRAGE ? barrages.get(weapon.id()) : null;
+        return barrage == null || !barrage.player.equals(player) ? 0 : Math.max(0, barrage.until - now);
     }
 
     @Override
     public long activeLength(Ability ability) {
-        return ability == Ability.CANDY_CYCLONE ? plugin.settings().ability(ability).ticks("duration") : 0;
+        return ability == Ability.CANDY_BARRAGE ? plugin.settings().ability(ability).ticks("duration") : 0;
     }
 
     /** Sugar stacks a player has (for tests). */
@@ -128,10 +155,21 @@ final class Sugarcrash implements Kit, Listener {
             }
             return false;
         });
-        Cyclone cyclone = cyclones.remove(player.getUniqueId());
-        if (cyclone != null) {
-            cyclone.rings.forEach(Visuals.Effect::remove);
+        for (Iterator<Map.Entry<UUID, Barrage>> it = barrages.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<UUID, Barrage> barrage = it.next();
+            if (barrage.getValue().player.equals(player)) {
+                it.remove();
+                barrage.getValue().floating.forEach(Visuals.Effect::remove);
+                plugin.abilities().startCooldown(barrage.getKey(), Ability.CANDY_BARRAGE);
+            }
         }
+        canes.removeIf(cane -> {
+            if (cane.player.equals(player)) {
+                cane.effect.remove();
+                return true;
+            }
+            return false;
+        });
         sugar.remove(player.getUniqueId());
         crashing.remove(player.getUniqueId());
     }
@@ -144,17 +182,22 @@ final class Sugarcrash implements Kit, Listener {
                 it.remove();
             }
         }
-        for (Iterator<Cyclone> it = cyclones.values().iterator(); it.hasNext(); ) {
-            Cyclone cyclone = it.next();
-            if (!cyclone.player.isOnline() || cyclone.player.isDead()) {
-                cyclone.rings.forEach(Visuals.Effect::remove);
+        for (Iterator<Map.Entry<UUID, Barrage>> it = barrages.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<UUID, Barrage> entry = it.next();
+            Barrage barrage = entry.getValue();
+            if (!barrage.player.isOnline() || barrage.player.isDead() || now >= barrage.until
+                    || barrage.floating.isEmpty()) {
                 it.remove();
+                barrage.floating.forEach(cane -> cane.vanish(0, 3));
+                plugin.abilities().startCooldown(entry.getKey(), Ability.CANDY_BARRAGE);
                 continue;
             }
-            cycloneTick(cyclone, now);
-            if (now >= cyclone.until) {
+            circle(barrage, now, 2);
+        }
+        for (Iterator<Cane> it = canes.iterator(); it.hasNext(); ) {
+            Cane cane = it.next();
+            if (!cane.player.isOnline() || cane.player.isDead() || caneTick(cane)) {
                 it.remove();
-                burst(cyclone);
             }
         }
         sugar.values().removeIf(state -> now >= state.until);
@@ -296,103 +339,141 @@ final class Sugarcrash implements Kit, Listener {
         plugin.fx().view(point).particle(Fx.CRIT, point, 12, 0.2, 0.2, 0.2, 0.2);
     }
 
-    // ---- Candy Cyclone -------------------------------------------------------------------------------------
+    // ---- Candy Barrage ------------------------------------------------------------------------------------
 
-    private Result cyclone(Player player) {
-        AbilitySettings settings = plugin.settings().ability(Ability.CANDY_CYCLONE);
+    private Result barrage(Player player, WeaponItems.Tag weapon) {
+        Barrage old = barrages.remove(weapon.id());
+        if (old != null) {
+            // Still floating over whoever had the scythe before: theirs ends, the cooldown starts.
+            old.floating.forEach(cane -> cane.vanish(0, 3));
+            plugin.abilities().startCooldown(weapon.id(), Ability.CANDY_BARRAGE);
+            return Result.HANDLED;
+        }
+        AbilitySettings settings = plugin.settings().ability(Ability.CANDY_BARRAGE);
         long now = plugin.tick();
-        int duration = settings.ticks("duration");
-        Cyclone cyclone = new Cyclone(player, now + duration, now + 1);
-        double radius = settings.num("radius");
-        // Three candy rings stacked into a tornado, each spinning its own way.
-        double[][] rings = {{0.25, radius * 2.0}, {1.05, radius * 1.6}, {1.85, radius * 1.15}};
-        for (double[] ring : rings) {
-            Vector offset = new Vector(0, ring[0], 0);
-            Visuals.Effect effect = plugin.visuals().spawn("candy_ring", player.getLocation().add(offset))
-                    .size(0.4).send(0)
-                    .animate(1, 5, e -> e.size(ring[1]))
-                    .follow(player, offset, duration);
-            cyclone.rings.add(effect);
+        int count = settings.whole("canes");
+        Barrage barrage = new Barrage(player, now + settings.ticks("duration"), count);
+        for (int i = 0; i < count; i++) {
+            Location at = player.getLocation().add(0, player.getHeight() + 0.4, 0);
+            barrage.floating.add(plugin.visuals().spawn("candy_hook", at).billboard().size(0.05).send(0)
+                    .animate(1 + i, 3, e -> e.size(0.6)));
         }
-        cyclones.put(player.getUniqueId(), cyclone);
-        Hits.effect(player, "speed", settings.whole("speed-level"), duration);
-        plugin.fx().sound(player.getLocation(), "candy-cyclone");
-        return Result.FIRED;
+        circle(barrage, now, 1);
+        barrages.put(weapon.id(), barrage);
+        plugin.fx().sound(player.getLocation(), "candy-barrage");
+        Location head = player.getLocation().add(0, player.getHeight() + 0.4, 0);
+        plugin.fx().view(head).dust(head, PINK, 1.2f, 16, 0.6);
+        return Result.HANDLED; // The cooldown starts once the canes are fired or the time is up.
     }
 
-    private void cycloneTick(Cyclone cyclone, long now) {
-        Player player = cyclone.player;
-        if (now % 4 == 0) {
-            cyclone.turn += 1;
-            for (int i = 0; i < cyclone.rings.size(); i++) {
-                int sign = i % 2 == 0 ? 1 : -1;
-                double angle = sign * cyclone.turn * 100.0;
-                cyclone.rings.get(i).turn(angle).send(4);
-            }
+    /** Keeps the floating canes in a slowly turning ring over the player's head, bobbing a little. */
+    private void circle(Barrage barrage, long now, int glide) {
+        Player player = barrage.player;
+        Location head = player.getLocation().add(0, player.getHeight() + 0.45, 0);
+        double radius = 0.55 + 0.06 * barrage.total;
+        for (int i = 0; i < barrage.floating.size(); i++) {
+            double angle = Math.PI * 2 * i / barrage.total + now * 0.08;
+            double bob = Math.sin(now * 0.2 + i) * 0.08;
+            barrage.floating.get(i).moveTo(head.clone().add(Math.cos(angle) * radius, bob, Math.sin(angle) * radius), glide);
         }
-        AbilitySettings settings = plugin.settings().ability(Ability.CANDY_CYCLONE);
-        double radius = settings.num("radius");
-        Location center = player.getLocation().add(0, 1.0, 0);
-        Fx.View view = plugin.fx().view(center);
-        double spin = now * 0.6;
-        for (int i = 0; i < 3; i++) {
-            double a = spin + i * (Math.PI * 2 / 3);
-            Location point = center.clone().add(Math.cos(a) * radius * 0.8, (i - 1) * 0.6, Math.sin(a) * radius * 0.8);
-            view.dust(point, i == 0 ? PINK : i == 1 ? SUGAR : CANDY_RED, 1.5f, 2, 0.1);
-        }
-        if (now < cyclone.nextHit) {
+    }
+
+    /** A swing with the scythe in hand fires the next cane. */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onSwing(PlayerAnimationEvent event) {
+        if (barrages.isEmpty() || event.getAnimationType() != PlayerAnimationType.ARM_SWING) {
             return;
         }
-        cyclone.nextHit = now + settings.ticks("interval");
-        for (LivingEntity target : plugin.hits().around(player, center, radius)) {
-            Vector in = player.getLocation().toVector().subtract(target.getLocation().toVector()).setY(0);
+        Player player = event.getPlayer();
+        WeaponItems.Tag held = plugin.items().read(player.getInventory().getItemInMainHand());
+        Barrage barrage = held == null ? null : barrages.get(held.id());
+        if (barrage != null && barrage.player.equals(player)) {
+            fire(held.id(), barrage);
+        }
+    }
+
+    /** Fires the next floating cane where the player looks. */
+    private void fire(UUID weapon, Barrage barrage) {
+        long now = plugin.tick();
+        if (now < barrage.nextShot || barrage.floating.isEmpty()) {
+            return;
+        }
+        AbilitySettings settings = plugin.settings().ability(Ability.CANDY_BARRAGE);
+        barrage.nextShot = now + settings.ticks("shot-gap");
+        Player player = barrage.player;
+        Visuals.Effect effect = barrage.floating.remove(barrage.floating.size() - 1);
+        Location eye = player.getEyeLocation();
+        Vector direction = eye.getDirection().normalize();
+        Location start = eye.clone().add(direction.clone().multiply(0.7)).add(0, 0.15, 0);
+        effect.size(0.7).send(1).moveTo(start, 1);
+        canes.add(new Cane(player, start, direction, effect));
+        plugin.fx().sound(player.getLocation(), "candy-barrage-shot", 0.05f * barrage.floating.size());
+        if (barrage.floating.isEmpty()) {
+            barrages.remove(weapon);
+            plugin.abilities().startCooldown(weapon, Ability.CANDY_BARRAGE);
+        }
+    }
+
+    /** Moves a cane on; true when it is done. */
+    private boolean caneTick(Cane cane) {
+        AbilitySettings settings = plugin.settings().ability(Ability.CANDY_BARRAGE);
+        Player player = cane.player;
+        World world = cane.position.getWorld();
+        if (world == null || !world.equals(player.getWorld())) {
+            cane.effect.remove();
+            return true;
+        }
+        double step = settings.num("speed");
+        Location from = cane.position.clone();
+        Location to = from.clone().add(cane.direction.clone().multiply(step));
+        Location wall = null;
+        Location last = from.clone();
+        for (double d = 0.25; d <= step + 1.0E-6; d += 0.25) {
+            Location point = from.clone().add(cane.direction.clone().multiply(d));
+            if (Geo.solid(point)) {
+                wall = last;
+                break;
+            }
+            last = point;
+        }
+        Location reached = wall != null ? wall : to;
+        // A candy-striped trail.
+        Fx.View view = plugin.fx().view(from);
+        double length = reached.distance(from);
+        int i = 0;
+        for (double d = 0.0; d < length; d += 0.6, i++) {
+            view.dust(from.clone().add(cane.direction.clone().multiply(d)), i % 2 == 0 ? CANDY_RED : SUGAR, 0.9f, 1, 0.0);
+        }
+        List<LivingEntity> caught = plugin.hits().along(player, from, reached, 0.5);
+        if (!caught.isEmpty()) {
+            LivingEntity target = caught.get(0);
+            Location at = Geo.middle(target);
+            cane.effect.moveTo(at, 1).vanish(1, 2);
             if (plugin.hits().hurt(player, target, settings.num("damage"))) {
-                if (in.lengthSquared() > 0.25) {
-                    Vector pull = in.normalize().multiply(settings.num("pull"));
-                    target.setVelocity(target.getVelocity().multiply(0.5).add(pull.setY(0.05)));
+                if (settings.num("knockback") > 0) {
+                    Hits.knock(target, cane.direction, settings.num("knockback"), 0.15);
                 }
-                plugin.fx().sound(target.getLocation(), "candy-cyclone-hit");
-                view.dust(Geo.middle(target), PINK, 1.2f, 5, 0.25);
+                plugin.fx().sound(at, "candy-barrage-hit");
+                plugin.visuals().spawn("candy_burst", at).billboard().size(0.2).send(0)
+                        .animate(1, 3, e -> e.size(1.1))
+                        .vanish(4, 3);
+                plugin.fx().view(at).dust(at, PINK, 1.2f, 8, 0.3);
             }
+            return true;
         }
-    }
-
-    /** Arrows and other shots bounce off the cyclone. */
-    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
-    public void onShot(EntityDamageByEntityEvent event) {
-        if (event.getDamager() instanceof Projectile projectile && event.getEntity() instanceof Player player
-                && cyclones.containsKey(player.getUniqueId()) && !plugin.hits().probing()) {
-            event.setCancelled(true);
-            projectile.setVelocity(projectile.getVelocity().multiply(-0.6));
-            plugin.fx().sound(player.getLocation(), "candy-cyclone-hit");
-            plugin.fx().view(projectile.getLocation()).particle(Fx.CRIT, projectile.getLocation(), 8, 0.1, 0.1, 0.1, 0.2);
+        if (wall != null) {
+            cane.effect.moveTo(wall, 1).vanish(2, 3);
+            plugin.fx().view(wall).particle(Fx.CRIT, wall, 8, 0.15, 0.15, 0.15, 0.15);
+            return true;
         }
-    }
-
-    private void burst(Cyclone cyclone) {
-        Player player = cyclone.player;
-        AbilitySettings settings = plugin.settings().ability(Ability.CANDY_CYCLONE);
-        double radius = settings.num("radius") + 0.5;
-        for (Visuals.Effect ring : cyclone.rings) {
-            ring.animate(1, 3, e -> e.size(radius * 2.6)).vanish(4, 3);
+        cane.position = to;
+        cane.travelled += step;
+        cane.effect.moveTo(to, 1);
+        if (cane.travelled >= settings.num("range")) {
+            cane.effect.vanish(0, 3);
+            return true;
         }
-        Location center = player.getLocation().add(0, 1.0, 0);
-        plugin.fx().sound(center, "candy-burst");
-        plugin.visuals().spawn("candy_burst", player.getLocation().add(0, 0.1, 0)).size(1.0).send(0)
-                .animate(1, 5, e -> e.size(radius * 2.4).turn(180))
-                .vanish(6, 4);
-        Fx.View view = plugin.fx().view(center);
-        view.particle(Fx.FIREWORK, center, 40, radius / 2, 0.6, radius / 2, 0.15);
-        view.dust(center, PINK, 2.0f, 40, radius / 2);
-        if (settings.num("burst-damage") <= 0) {
-            return;
-        }
-        for (LivingEntity target : plugin.hits().around(player, center, radius)) {
-            if (plugin.hits().hurt(player, target, settings.num("burst-damage"))) {
-                Vector away = Geo.away(player.getLocation(), target.getLocation(), Geo.flat(player.getLocation()));
-                Hits.knock(target, away, settings.num("burst-knockback"), settings.num("burst-lift"));
-            }
-        }
+        return false;
     }
 
     // ---- Sugar High (passive) --------------------------------------------------------------------------------

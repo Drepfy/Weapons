@@ -583,3 +583,98 @@ v1_3_0:
         - "&7A black hole pulls, then explodes."
         - ""
         - "{enchantments}"
+
+# 1.3.1 to 1.3.3: the lore before the real attack damage lines, and the ability damage before
+# it went through armour.
+v1_3_3:
+  weapons:
+    kurogane:
+      lore:
+        - "&8Legendary Katana"
+        - ""
+        - "&#FF4D6APassive &8» &f{crimson-edge.name}"
+        - "&7Every 3rd hit in a row cuts deep and bleeds."
+        - ""
+        - "&#FF4D6A{key} &8» &f{crimson-flash.name} &8({crimson-flash.cooldown})"
+        - "&7Dash through enemies. Press again to dash twice."
+        - ""
+        - "&#FF4D6A{sneak-key} &8» &f{iaido.name} &8({iaido.cooldown})"
+        - "&7Block the next hit and strike back from behind."
+      abilities:
+        iaido:
+          damage: 9
+          slash-damage: 6
+    sugarcrash:
+      lore:
+        - "&8Legendary Candy Scythe"
+        - ""
+        - "&#FF7AC3Passive &8» &f{sugar-high.name}"
+        - "&7Hits build sugar and speed. Full: a candy blast."
+        - ""
+        - "&#FF7AC3{key} &8» &f{candy-hook.name} &8({candy-hook.cooldown})"
+        - "&7Hook a player to you, or a wall to fly to it."
+        - ""
+        - "&#FF7AC3{sneak-key} &8» &f{candy-cyclone.name} &8({candy-cyclone.cooldown})"
+        - "&7Become a candy tornado. Arrows bounce off."
+      abilities:
+        candy-hook:
+          damage: 3
+        sugar-high:
+          splash-damage: 3
+    riftblade:
+      lore:
+        - "&8Legendary Void Sword"
+        - ""
+        - "&#B76BFFPassive &8» &f{phase-shift.name}"
+        - "&7Sometimes a hit passes through you."
+        - ""
+        - "&#B76BFF{key} &8» &f{void-rend.name} &8({void-rend.cooldown})"
+        - "&7A rift pulls them in, blinds and lifts them."
+        - ""
+        - "&#B76BFF{sneak-key} &8» &f{rift-swap.name} &8({rift-swap.cooldown})"
+        - "&7Swap places. Press again to go back."
+      abilities:
+        void-rend:
+          damage: 7
+        rift-swap:
+          damage: 3
+    gravebreaker:
+      lore:
+        - "&8Legendary Battle Axe"
+        - ""
+        - "&#FF8A3DPassive &8» &f{last-rites.name}"
+        - "&7Hits finish weak players. Kills reset the leap."
+        - ""
+        - "&#FF8A3D{key} &8» &f{executioners-leap.name} &8({executioners-leap.cooldown})"
+        - "&7Leap and slam. Press again to dive."
+        - ""
+        - "&#FF8A3D{sneak-key} &8» &f{grave-rise.name} &8({grave-rise.cooldown})"
+        - "&7Gravestones burst up and weigh them down."
+      abilities:
+        executioners-leap:
+          damage: 8
+          edge-damage: 4
+          dive-bonus: 3
+        grave-rise:
+          damage: 6
+          tomb-damage: 5
+    starforged:
+      lore:
+        - "&8Legendary Celestial Axe"
+        - ""
+        - "&#6FD6FFPassive &8» &f{starstruck.name}"
+        - "&7Every 4th hit in a row calls a star down on them."
+        - ""
+        - "&#6FD6FF{key} &8» &f{starfall.name} &8({starfall.cooldown})"
+        - "&7Rain stars down. The circle follows your aim."
+        - ""
+        - "&#6FD6FF{sneak-key} &8» &f{singularity.name} &8({singularity.cooldown})"
+        - "&7A black hole pulls, then explodes."
+      abilities:
+        starfall:
+          damage: 4
+          max-hits: 3
+        singularity:
+          nova-damage: 7
+        starstruck:
+          damage: 4

@@ -185,6 +185,9 @@ public final class Tracker implements Listener {
                 missingSince.remove(record.id());
                 continue;
             }
+            if (!plugin.settings().markLost()) {
+                continue; // Off: it stays registered to its holder until staff remove it.
+            }
             if (missingFor(record.id()) >= LOST_AFTER_MS) {
                 missingSince.remove(record.id());
                 registry().lost(record, "not in " + holder.getName() + "'s inventory");
@@ -424,6 +427,9 @@ public final class Tracker implements Listener {
             World world = record.world() == null ? null : Bukkit.getWorld(record.world());
             if (world == null || !entitiesLoaded(world, (int) Math.floor(record.x()) >> 4, (int) Math.floor(record.z()) >> 4)) {
                 missingSince.remove(record.id()); // Unloaded: it is simply not here to see.
+                continue;
+            }
+            if (!plugin.settings().markLost()) {
                 continue;
             }
             if (missingFor(record.id()) >= LOST_AFTER_MS) {

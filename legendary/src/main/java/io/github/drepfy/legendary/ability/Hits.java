@@ -6,6 +6,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.damage.DamageSource;
 import org.bukkit.damage.DamageType;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.ArmorStand;
@@ -15,6 +16,8 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Tameable;
+import org.bukkit.inventory.EntityEquipment;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -37,9 +40,10 @@ import java.util.function.Supplier;
  *
  * <p>Every hit is dealt in the attacker's name, like a sword hit, so protection plugins
  * (no-PvP regions, claims, spawn), PvP being off, combat tagging, kill credit and death
- * messages all work as usual, and armour reduces it. Knockback and effects are only applied
- * when the hit was allowed: a player standing in a protected area is never pushed, slowed
- * or pulled.
+ * messages all work as usual. With true-damage on (the default) it goes straight through
+ * armour and the Protection enchantment: 6 damage takes 3 hearts whatever the target wears
+ * (Resistance and absorption hearts still count). Knockback and effects are only applied when
+ * the hit was allowed: a player standing in a protected area is never pushed, slowed or pulled.
  */
 public final class Hits implements Listener {
 
@@ -49,12 +53,17 @@ public final class Hits implements Listener {
     }
 
     private final Supplier<Settings> settings;
-    private Damager damager = (target, amount, attacker) -> target.damage(amount, attacker);
+    private Damager damager;
     private Hit pending;
     private boolean probing;
 
     public Hits(Supplier<Settings> settings) {
         this.settings = settings;
+        this.damager = (target, amount, attacker) -> {
+            if (!settings.get().trueDamage() || !dealTrue(target, amount, attacker)) {
+                target.damage(amount, attacker); // A hit like a sword's: armour reduces it.
+            }
+        };
     }
 
     public void setDamager(Damager damager) {
@@ -129,6 +138,46 @@ public final class Hits implements Listener {
             target.setNoDamageTicks(invulnerable);
         }
         return hit.landed;
+    }
+
+    /**
+     * Damage that ignores armour, dealt in the attacker's name (kill credit, combat tags and
+     * "was killed by ... using Kurogane" death messages, like any hit). Magic damage goes through
+     * armour but not Protection, so it is raised to make up for it.
+     *
+     * @return false on servers too old for damage sources (then it is dealt like a sword hit)
+     */
+    private static boolean dealTrue(LivingEntity target, double amount, Player attacker) {
+        DamageSource source;
+        try {
+            source = DamageSource.builder(DamageType.INDIRECT_MAGIC).withCausingEntity(attacker)
+                    .withDirectEntity(attacker).build();
+        } catch (RuntimeException | LinkageError e) {
+            return false;
+        }
+        target.damage(throughProtection(target, amount), source);
+        return true;
+    }
+
+    /**
+     * How much to deal so that {@code amount} is left after the Protection enchantment (each level
+     * on each piece takes 4% off magic damage, at most 80%).
+     */
+    public static double throughProtection(LivingEntity target, double amount) {
+        int levels = 0;
+        try {
+            EntityEquipment equipment = target.getEquipment();
+            if (equipment != null) {
+                for (ItemStack piece : equipment.getArmorContents()) {
+                    if (piece != null) {
+                        levels += piece.getEnchantmentLevel(Enchantment.PROTECTION);
+                    }
+                }
+            }
+        } catch (RuntimeException | LinkageError e) {
+            return amount;
+        }
+        return amount / (1.0 - Math.min(20, levels) / 25.0);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

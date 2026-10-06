@@ -10,11 +10,13 @@ import java.util.Map;
 public record Settings(
         String prefix,
         boolean oneOfEach,
+        boolean markLost,
         boolean dropOnDeath,
         Alts alts,
         List<String> blockedCommands,
         Controls controls,
         HitMobs hitMobs,
+        boolean trueDamage,
         boolean bossBars,
         boolean barsWhenReady,
         Map<WeaponType, Look> looks,

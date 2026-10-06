@@ -37,6 +37,7 @@ public final class SettingsLoader {
 
         String prefix = in.string("prefix");
         boolean oneOfEach = in.bool("one-of-each");
+        boolean markLost = in.bool("mark-lost");
         boolean dropOnDeath = in.bool("drop-on-death");
         Settings.Alts alts = new Settings.Alts(in.bool("alt-protection.enabled"),
                 (long) (in.duration("alt-protection.remember-ip", 3600, 3650L * 86_400) * 1000),
@@ -53,6 +54,7 @@ public final class SettingsLoader {
         }
         Settings.Controls controls = in.choice("controls", Settings.Controls.class);
         Settings.HitMobs hitMobs = in.choice("hit-mobs", Settings.HitMobs.class);
+        boolean trueDamage = in.bool("true-damage");
         boolean bossBars = in.bool("display.boss-bars");
         boolean barsWhenReady = in.bool("display.boss-bars-when-ready");
 
@@ -98,8 +100,8 @@ public final class SettingsLoader {
                 messages.put(key, in.string("messages." + key));
             }
         }
-        return new Settings(prefix, oneOfEach, dropOnDeath, alts, List.copyOf(blocked), controls, hitMobs, bossBars,
-                barsWhenReady, looks, abilities, sounds, messages, List.copyOf(warnings));
+        return new Settings(prefix, oneOfEach, markLost, dropOnDeath, alts, List.copyOf(blocked), controls, hitMobs,
+                trueDamage, bossBars, barsWhenReady, looks, abilities, sounds, messages, List.copyOf(warnings));
     }
 
     private static Settings.Look look(Reader in, String base, List<String> warnings) {

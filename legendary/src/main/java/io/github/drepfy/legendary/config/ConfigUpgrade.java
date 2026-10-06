@@ -9,14 +9,14 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Brings an older config.yml up to date: settings of abilities that were replaced, the action
- * bar settings and messages that no longer exist are removed, and enchantments still at the
- * old default (Sharpness 6) become the new ones. Texts and settings still at an old default are
- * handled by {@link TextUpdate}.
+ * Brings an older config.yml up to date: settings of abilities that were replaced (Candy Cyclone
+ * in 1.4), the action bar settings and the messages and sounds that no longer exist are removed,
+ * and enchantments still at the old default (Sharpness 6) become the new ones. Texts and
+ * settings still at an old default are handled by {@link TextUpdate}.
  */
 public final class ConfigUpgrade {
 
-    public static final int VERSION = 3;
+    public static final int VERSION = 4;
 
     private ConfigUpgrade() {
     }
@@ -33,13 +33,15 @@ public final class ConfigUpgrade {
                 changes.add("removed " + old + " (cooldowns are boss bars now)");
             }
         }
-        ConfigurationSection messages = config.getConfigurationSection("messages");
-        ConfigurationSection defaultMessages = defaults.getConfigurationSection("messages");
-        if (messages != null && defaultMessages != null) {
-            for (String key : new ArrayList<>(messages.getKeys(false))) {
-                if (!defaultMessages.contains(key)) {
-                    messages.set(key, null);
-                    changes.add("removed messages." + key);
+        for (String part : List.of("messages", "sounds")) {
+            ConfigurationSection section = config.getConfigurationSection(part);
+            ConfigurationSection fresh = defaults.getConfigurationSection(part);
+            if (section != null && fresh != null) {
+                for (String key : new ArrayList<>(section.getKeys(false))) {
+                    if (!fresh.contains(key)) {
+                        section.set(key, null);
+                        changes.add("removed " + part + "." + key);
+                    }
                 }
             }
         }

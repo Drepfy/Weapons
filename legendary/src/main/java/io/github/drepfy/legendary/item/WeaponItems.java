@@ -118,10 +118,14 @@ public final class WeaponItems {
         meta.setDisplayName("§r" + Text.color(fill(look.name(), values)));
         List<String> lore = new ArrayList<>();
         boolean listsEnchantments = false;
+        boolean listsAttack = false;
         for (String line : look.lore()) {
             if (line.trim().equals("{enchantments}")) {
                 listsEnchantments = true;
                 lore.addAll(enchantmentLines(look));
+            } else if (line.trim().equals("{attack}")) {
+                listsAttack = true;
+                lore.addAll(attackLines(type, look));
             } else {
                 lore.add(line.isEmpty() ? "" : "§r" + Text.color(fill(line, values)));
             }
@@ -145,13 +149,19 @@ public final class WeaponItems {
         } else {
             meta.removeItemFlags(ItemFlag.HIDE_ENCHANTS, ItemFlag.HIDE_UNBREAKABLE);
         }
+        // The lore shows the real attack damage instead of vanilla's (which leaves Sharpness out).
+        if (listsAttack) {
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+        } else {
+            meta.removeItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+        }
         PersistentDataContainer data = meta.getPersistentDataContainer();
         data.set(idKey, PersistentDataType.STRING, id.toString());
         data.set(typeKey, PersistentDataType.STRING, type.key());
         data.set(lookKey, PersistentDataType.STRING, lookHash(type, id));
     }
 
-    /** 1.21.2+: the resource pack model, the weapon's own tooltip frame, and no old-style shine. */
+    /** 1.21.2+: the resource pack model, the weapon's own tooltip frame, and the shimmer. */
     private static void modern(ItemMeta meta, Settings.Look look) {
         try {
             meta.setItemModel(look.itemModel().isEmpty() ? null : NamespacedKey.fromString(look.itemModel()));
@@ -164,7 +174,8 @@ public final class WeaponItems {
             // No tooltip styles before 1.21.2.
         }
         try {
-            meta.setEnchantmentGlintOverride(look.glint() ? null : Boolean.FALSE);
+            // Always shimmering (like the Heart items), whatever it is enchanted with; or never.
+            meta.setEnchantmentGlintOverride(look.glint());
         } catch (RuntimeException | LinkageError ignored) {
             // No glint override before 1.20.5.
         }
@@ -189,6 +200,47 @@ public final class WeaponItems {
             lines.add("§r" + line);
         }
         return lines;
+    }
+
+    /**
+     * The vanilla attack lines, with the real numbers: "When in Main Hand:", " 12 Attack Damage",
+     * " 1.6 Attack Speed". Vanilla shows a Sharpness VII netherite sword as 8 Attack Damage, but
+     * it hits for 12 (Sharpness adds 0.5 per level plus 0.5).
+     */
+    private List<String> attackLines(WeaponType type, Settings.Look look) {
+        Settings current = settings.get();
+        List<String> lines = new ArrayList<>();
+        String header = current.message("lore-attack-header");
+        if (!header.isEmpty()) {
+            lines.add("§r" + Text.color(header));
+        }
+        String damage = current.message("lore-attack-damage");
+        if (!damage.isEmpty()) {
+            lines.add("§r" + Text.format(damage, "damage", number(attackDamage(type, look))));
+        }
+        String speed = current.message("lore-attack-speed");
+        if (!speed.isEmpty()) {
+            lines.add("§r" + Text.format(speed, "speed", number(type.attackSpeed())));
+        }
+        return lines;
+    }
+
+    /** What a fully charged hit does before armour: the weapon's own damage plus Sharpness. */
+    public static double attackDamage(WeaponType type, Settings.Look look) {
+        int sharpness = 0;
+        for (Map.Entry<String, Integer> enchantment : look.enchantments().entrySet()) {
+            String key = enchantment.getKey();
+            if (key.equals("sharpness") || key.equals("minecraft:sharpness")) {
+                sharpness = enchantment.getValue();
+            }
+        }
+        return type.attackDamage() + (sharpness > 0 ? 0.5 * sharpness + 0.5 : 0.0);
+    }
+
+    /** 12.0 → "12", 11.5 → "11.5". */
+    static String number(double value) {
+        double rounded = Math.round(value * 10.0) / 10.0;
+        return rounded == Math.rint(rounded) ? Long.toString((long) rounded) : Double.toString(rounded);
     }
 
     /** "fire_aspect" → "Fire Aspect". */
@@ -234,7 +286,8 @@ public final class WeaponItems {
         Settings current = settings.get();
         return Integer.toHexString((current.look(type).toString() + placeholders(type, id)
                 + current.message("lore-enchantment") + current.message("lore-separator")
-                + current.message("lore-unbreakable") + "/2").hashCode());
+                + current.message("lore-unbreakable") + current.message("lore-attack-header")
+                + current.message("lore-attack-damage") + current.message("lore-attack-speed") + "/3").hashCode());
     }
 
     private static String fill(String text, Map<String, String> values) {

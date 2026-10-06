@@ -14,28 +14,38 @@ import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
 
-import java.util.EnumMap;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
- * While a legendary is held, a boss bar at the top of the screen for each of its abilities that
- * is recharging: the ability's name and how long until it can be used again, the bar filling up
- * as it recharges (and running down while an ability lasts or can be pressed again). A ready
- * ability has no bar, unless display.boss-bars-when-ready is on. The action bar is left to other
- * plugins (the Combat plugin's timer).
+ * A boss bar at the top of the screen for each legendary ability that is running or recharging:
+ * the ability's name and how long until it can be used again, the bar filling up as it recharges
+ * (and running down while an ability lasts or can be pressed again). The bars stay while the
+ * weapon is in the inventory, so switching to another item does not hide a cooldown. A ready
+ * ability has no bar, unless display.boss-bars-when-ready is on (then the weapon in hand shows
+ * all its bars). The action bar is left to other plugins (the Combat plugin's timer).
  */
 public final class Hud {
 
     /** How long the bar flashes when an ability is used too early. */
     private static final int SHAKE_TICKS = 6;
+    /** How often each inventory is looked through for legendaries not in hand (ticks). */
+    private static final int CARRIED_EVERY = 10;
 
     private final LegendaryPlugin plugin;
-    private final Map<UUID, Bars> bars = new HashMap<>();
+    /** player → (weapon:ability → its bar), in the order they appeared. */
+    private final Map<UUID, Map<String, Shown>> bars = new HashMap<>();
     /** The legendary each player held last time (for the sound when one is taken in hand). */
     private final Map<UUID, WeaponType> holding = new HashMap<>();
+    /** player → the legendaries in their inventory, looked up every {@link #CARRIED_EVERY} ticks. */
+    private final Map<UUID, List<WeaponItems.Tag>> carried = new HashMap<>();
     /** player:ability → the tick its flash ends. */
     private final Map<String, Long> shakes = new HashMap<>();
 
@@ -43,14 +53,7 @@ public final class Hud {
         this.plugin = plugin;
     }
 
-    /** One player's bars, for the weapon they are holding. */
-    private static final class Bars {
-        final WeaponType type;
-        final Map<Ability, BossBar> byAbility = new EnumMap<>(Ability.class);
-
-        Bars(WeaponType type) {
-            this.type = type;
-        }
+    private record Shown(Ability ability, BossBar bar) {
     }
 
     /** A short message above the hotbar (nothing to aim at, a swap refused...). */
@@ -67,8 +70,12 @@ public final class Hud {
 
     /** The bars a player sees right now (for tests). */
     public Map<Ability, BossBar> bars(Player player) {
-        Bars current = bars.get(player.getUniqueId());
-        return current == null ? Map.of() : Map.copyOf(current.byAbility);
+        Map<String, Shown> shown = bars.get(player.getUniqueId());
+        Map<Ability, BossBar> byAbility = new LinkedHashMap<>();
+        if (shown != null) {
+            shown.values().forEach(bar -> byAbility.putIfAbsent(bar.ability(), bar.bar()));
+        }
+        return byAbility;
     }
 
     /** Every couple of ticks. */
@@ -76,64 +83,94 @@ public final class Hud {
         for (Player player : Bukkit.getOnlinePlayers()) {
             update(player, now);
         }
-        for (Iterator<Map.Entry<UUID, Bars>> it = bars.entrySet().iterator(); it.hasNext(); ) {
-            Map.Entry<UUID, Bars> entry = it.next();
+        for (Iterator<Map.Entry<UUID, Map<String, Shown>>> it = bars.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<UUID, Map<String, Shown>> entry = it.next();
             Player player = Bukkit.getPlayer(entry.getKey());
             if (player == null || !player.isOnline()) {
-                entry.getValue().byAbility.values().forEach(BossBar::removeAll);
+                entry.getValue().values().forEach(shown -> shown.bar().removeAll());
                 it.remove();
             }
         }
         holding.keySet().removeIf(id -> Bukkit.getPlayer(id) == null);
+        carried.keySet().removeIf(id -> Bukkit.getPlayer(id) == null);
         shakes.values().removeIf(until -> until <= now);
     }
 
     private void update(Player player, long now) {
         Settings settings = plugin.settings();
-        WeaponItems.Tag tag = plugin.items().read(player.getInventory().getItemInMainHand());
-        WeaponType held = tag == null || player.isDead() ? null : tag.type();
-        WeaponType before = held == null ? holding.remove(player.getUniqueId()) : holding.put(player.getUniqueId(), held);
+        UUID id = player.getUniqueId();
+        WeaponItems.Tag tag = player.isDead() ? null : plugin.items().read(player.getInventory().getItemInMainHand());
+        WeaponType held = tag == null ? null : tag.type();
+        WeaponType before = held == null ? holding.remove(id) : holding.put(id, held);
         if (held != null && held != before) {
             plugin.fx().sound(player.getLocation(), held.key() + "-equip"); // Drawn.
         }
-        if (tag == null || !settings.bossBars() || player.isDead()) {
+        if (!settings.bossBars() || player.isDead()) {
             hide(player);
             return;
         }
-        Bars current = bars.get(player.getUniqueId());
-        if (current == null || current.type != tag.type()) {
-            hide(player);
-            current = new Bars(tag.type());
-            bars.put(player.getUniqueId(), current);
+        // The one in hand first, then the rest of the inventory (looked through now and then).
+        List<WeaponItems.Tag> weapons = new ArrayList<>();
+        if (tag != null) {
+            weapons.add(tag);
         }
-        Settings.Look look = settings.look(tag.type());
-        for (Ability ability : tag.type().actives()) {
-            BossBar bar = current.byAbility.get(ability);
-            if (!settings.barsWhenReady() && plugin.abilities().active(player, tag, ability, now) <= 0
-                    && plugin.abilities().cooldown(tag, ability, now) <= 0) {
-                // Ready: no bar (it only shows while the ability runs or recharges).
-                if (bar != null) {
-                    bar.removeAll();
-                    current.byAbility.remove(ability);
+        List<WeaponItems.Tag> inInventory = carried.get(id);
+        if (inInventory == null || now % CARRIED_EVERY == 0) {
+            inInventory = plugin.tracker().carried(player);
+            carried.put(id, inInventory);
+        }
+        for (WeaponItems.Tag other : inInventory) {
+            if (tag == null || !other.id().equals(tag.id())) {
+                weapons.add(other);
+            }
+        }
+        Map<String, Shown> shown = bars.get(id);
+        Set<String> wanted = new HashSet<>();
+        for (WeaponItems.Tag weapon : weapons) {
+            Settings.Look look = settings.look(weapon.type());
+            for (Ability ability : weapon.type().actives()) {
+                long active = plugin.abilities().active(player, weapon, ability, now);
+                long left = plugin.abilities().cooldown(weapon, ability, now);
+                if (active <= 0 && left <= 0 && !(weapon == tag && settings.barsWhenReady())) {
+                    continue; // Ready: no bar (it only shows while the ability runs or recharges).
                 }
-                continue;
+                String key = weapon.id() + ":" + ability.key();
+                if (!wanted.add(key)) {
+                    continue;
+                }
+                if (shown == null) {
+                    shown = new LinkedHashMap<>();
+                    bars.put(id, shown);
+                }
+                Shown bar = shown.get(key);
+                if (bar == null) {
+                    bar = new Shown(ability, Bukkit.createBossBar("", look.barColor(), BarStyle.SOLID));
+                    bar.bar().addPlayer(player);
+                    shown.put(key, bar);
+                }
+                draw(player, weapon, ability, bar.bar(), look, now, active, left);
             }
-            if (bar == null) {
-                bar = Bukkit.createBossBar("", look.barColor(), BarStyle.SOLID);
-                bar.addPlayer(player);
-                current.byAbility.put(ability, bar);
+        }
+        if (shown != null) {
+            for (Iterator<Map.Entry<String, Shown>> it = shown.entrySet().iterator(); it.hasNext(); ) {
+                Map.Entry<String, Shown> entry = it.next();
+                if (!wanted.contains(entry.getKey())) {
+                    entry.getValue().bar().removeAll();
+                    it.remove();
+                }
             }
-            draw(player, tag, ability, bar, look, now);
+            if (shown.isEmpty()) {
+                bars.remove(id);
+            }
         }
     }
 
-    private void draw(Player player, WeaponItems.Tag tag, Ability ability, BossBar bar, Settings.Look look, long now) {
+    private void draw(Player player, WeaponItems.Tag tag, Ability ability, BossBar bar, Settings.Look look, long now,
+                      long active, long left) {
         Settings settings = plugin.settings();
         AbilitySettings ability0 = settings.ability(ability);
         String name = ability0.name();
         String color = Text.color(look.barText());
-        long active = plugin.abilities().active(player, tag, ability, now);
-        long left = plugin.abilities().cooldown(tag, ability, now);
         String title;
         double progress;
         if (active > 0) {
@@ -165,16 +202,17 @@ public final class Hud {
     }
 
     private void hide(Player player) {
-        Bars current = bars.remove(player.getUniqueId());
-        if (current != null) {
-            current.byAbility.values().forEach(BossBar::removeAll);
+        Map<String, Shown> shown = bars.remove(player.getUniqueId());
+        if (shown != null) {
+            shown.values().forEach(bar -> bar.bar().removeAll());
         }
     }
 
     public void clearAll() {
         holding.clear();
-        for (Bars current : bars.values()) {
-            current.byAbility.values().forEach(BossBar::removeAll);
+        carried.clear();
+        for (Map<String, Shown> shown : bars.values()) {
+            shown.values().forEach(bar -> bar.bar().removeAll());
         }
         bars.clear();
     }

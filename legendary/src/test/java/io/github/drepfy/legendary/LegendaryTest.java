@@ -34,6 +34,8 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryPickupItemEvent;
 import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.event.player.PlayerAnimationEvent;
+import org.bukkit.event.player.PlayerAnimationType;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -157,6 +159,11 @@ class LegendaryTest {
                 player.getInventory().getItemInOffHand(), player.getInventory().getItemInMainHand());
         server.getPluginManager().callEvent(event);
         return event;
+    }
+
+    /** A left-click (the arm swings). */
+    private void swing(PlayerMock player) {
+        server.getPluginManager().callEvent(new PlayerAnimationEvent(player, PlayerAnimationType.ARM_SWING));
     }
 
     /** Shift + F: the second ability. */
@@ -328,10 +335,11 @@ class LegendaryTest {
                     : Map.of("sharpness", 7, "fire_aspect", 2, "looting", 3, "sweeping_edge", 3), enchantments, type.key());
             assertTrue(meta.isUnbreakable());
             assertTrue(meta.hasCustomModelData(), "older clients still get the model");
-            // The 1.21 look: its own model and tooltip frame from the pack, no old-style shimmer.
+            // The 1.21 look: its own model and tooltip frame from the pack, always shimmering.
             assertModern("legendary:" + type.key(), meta::getItemModel);
             assertModern("legendary:" + type.key(), meta::getTooltipStyle);
-            assertFalse(meta.hasEnchantmentGlintOverride(), "the enchantment shimmer, as usual");
+            assertTrue(meta.hasEnchantmentGlintOverride() && meta.getEnchantmentGlintOverride(),
+                    "the shimmer is always on, like on the Heart items");
             assertFalse(meta.hasItemFlag(ItemFlag.HIDE_ENCHANTS), "the game lists them under the name, like on any item");
             assertFalse(meta.hasItemFlag(ItemFlag.HIDE_UNBREAKABLE));
             String name = ChatColor.stripColor(meta.getDisplayName());
@@ -341,6 +349,10 @@ class LegendaryTest {
                 assertTrue(lore.contains(plugin.settings().ability(ability).name()), type + " lore names " + ability);
             }
             assertFalse(lore.contains("Sharpness"), "not twice: " + lore);
+            // The real attack damage, Sharpness VII included (vanilla would say 8 and 10).
+            assertTrue(lore.endsWith("When in Main Hand:\n " + (axe ? "14 Attack Damage\n 1 Attack Speed"
+                    : "12 Attack Damage\n 1.6 Attack Speed")), lore);
+            assertTrue(meta.hasItemFlag(ItemFlag.HIDE_ATTRIBUTES), "instead of vanilla's lines");
             assertFalse(lore.contains(WeaponItems.shortId(id(item))), "no tracking number in the lore");
             assertFalse(lore.contains("LEGENDARY"), "no LEGENDARY line at the bottom");
             assertEquals(WeaponRecord.State.HELD, record(item).state());
@@ -675,15 +687,26 @@ class LegendaryTest {
     }
 
     @Test
-    void aWeaponThatVanishesIsMarkedLostAndCanBeReplaced() {
+    void aWeaponThatVanishesStaysWithItsHolderUnlessMarkLostIsOn() {
+        PlayerMock admin = player("Admin", 5, 5);
+        admin.setOp(true);
         PlayerMock steve = player("Steve", 0, 0);
         ItemStack old = give(steve, WeaponType.SUGARCRASH);
         UUID oldId = id(old);
+        chat(admin);
         steve.getInventory().clear(); // /clear, or a plugin deleting it
+        tick(10 * 20);
+        assertEquals(WeaponRecord.State.HELD, plugin.registry().get(oldId).state(), "not marked lost by default");
+        assertFalse(has(chat(admin), "marked as lost"), "and no alert");
+
+        plugin.getConfig().set("mark-lost", true);
+        plugin.saveConfig();
+        assertEquals(List.of(), plugin.reload());
         tick(60);
         assertEquals(WeaponRecord.State.HELD, plugin.registry().get(oldId).state(), "not after a moment (creative cursor)");
         tick(6 * 20);
         assertEquals(WeaponRecord.State.LOST, plugin.registry().get(oldId).state());
+        assertTrue(has(chat(admin), "marked as lost"), "staff are told");
         command("legendary give Steve sugarcrash");
         assertEquals(1, count(steve, WeaponType.SUGARCRASH), "a lost weapon can be given out again");
         assertEquals(WeaponRecord.State.REMOVED, plugin.registry().get(oldId).state(), "the old one is retired");
@@ -730,7 +753,6 @@ class LegendaryTest {
     @Test
     void fUsesTheAbilitiesAndKeepsTheWeaponInHand() {
         PlayerMock steve = player("Steve", 0, 0);
-        PlayerMock near = player("Near", 3, 0);
         ItemStack scythe = give(steve, WeaponType.SUGARCRASH);
         rightClick(steve);
         assertEquals(0, cooldown(scythe, Ability.CANDY_HOOK), "right-click no longer uses abilities");
@@ -739,10 +761,10 @@ class LegendaryTest {
         assertTrue(cooldown(scythe, Ability.CANDY_HOOK) > 0, "F: Candy Hook");
         assertEquals(scythe, steve.getInventory().getItemInMainHand());
         sneakUseKey(steve);
-        tick(2);
-        assertTrue(near.getHealth() < 20.0, "Shift + F: Candy Cyclone");
+        assertTrue(plugin.abilities().active(steve, plugin.items().read(scythe), Ability.CANDY_BARRAGE, plugin.tick()) > 0,
+                "Shift + F: Candy Barrage");
         String lore = ChatColor.stripColor(String.join("\n", scythe.getItemMeta().getLore()));
-        assertTrue(lore.contains("F » Candy Hook") && lore.contains("Shift + F » Candy Cyclone"), lore);
+        assertTrue(lore.contains("F » Candy Hook") && lore.contains("Shift + F » Candy Barrage"), lore);
         assertTrue(lore.contains("Passive » Sugar High"), lore);
         // A legendary in the offhand swaps back to the main hand as usual.
         steve.getInventory().setItemInMainHand(new ItemStack(Material.BREAD));
@@ -760,7 +782,7 @@ class LegendaryTest {
         rightClick(steve);
         assertTrue(cooldown(scythe, Ability.CANDY_HOOK) > 0, "right-click: Candy Hook");
         String lore = ChatColor.stripColor(String.join("\n", steve.getInventory().getItemInMainHand().getItemMeta().getLore()));
-        assertTrue(lore.contains("Right-click » Candy Hook") && lore.contains("Sneak + right-click » Candy Cyclone"), lore);
+        assertTrue(lore.contains("Right-click » Candy Hook") && lore.contains("Sneak + right-click » Candy Barrage"), lore);
 
         controls("both");
         PlayerMock alex = player("Alex", 9, 0);
@@ -859,12 +881,12 @@ class LegendaryTest {
         EntityDamageByEntityEvent hit = melee(alex, steve, 6.0);
         assertTrue(hit.isCancelled(), "blocked");
         assertEquals(4.8, steve.getLocation().getZ(), 1.0E-6, "now behind Alex");
-        assertEquals(11.0, alex.getHealth(), 1.0E-6, "a 9 damage counter");
+        assertEquals(8.0, alex.getHealth(), 1.0E-6, "a 12 damage counter");
         assertEquals(14.0, steve.getHealth(), 1.0E-6, "and two hearts back");
         assertFalse(steve.hasPotionEffect(PotionEffectType.SLOWNESS));
         assertFalse(melee(alex, steve, 6.0).isCancelled(), "only the first hit");
         tick(25);
-        assertTrue(alex.getHealth() < 11.0, "bleeding");
+        assertTrue(alex.getHealth() < 8.0, "bleeding");
     }
 
     @Test
@@ -877,7 +899,7 @@ class LegendaryTest {
         tick(20);
         assertEquals(20.0, alex.getHealth());
         tick(15);
-        assertEquals(14.0, alex.getHealth(), 1.0E-6, "the crescent: 6 damage");
+        assertEquals(12.0, alex.getHealth(), 1.0E-6, "the crescent: 8 damage");
         assertEquals(20.0, far.getHealth(), "6 blocks long");
     }
 
@@ -915,7 +937,7 @@ class LegendaryTest {
         tick(2);
         assertEquals(20.0, alex.getHealth(), "the hook takes a moment to fly");
         tick(5);
-        assertEquals(17.0, alex.getHealth(), 1.0E-6, "caught");
+        assertEquals(14.0, alex.getHealth(), 1.0E-6, "caught: 3 hearts");
         assertTrue(alex.getVelocity().getZ() < -0.5 && alex.getVelocity().getY() > 0.2, "yanked towards Steve");
         tick(8);
         assertTrue(alex.hasPotionEffect(PotionEffectType.SLOWNESS), "stunned");
@@ -941,29 +963,61 @@ class LegendaryTest {
     }
 
     @Test
-    void candyCycloneDragsInShredsDeflectsArrowsThenBursts() {
+    void candyBarrageFloatsCanesThatFireOnEachSwing() {
         PlayerMock steve = player("Steve", 0, 0);
-        PlayerMock alex = player("Alex", 3, 0);
-        PlayerMock far = player("Far", 12, 0);
-        give(steve, WeaponType.SUGARCRASH);
+        PlayerMock alex = player("Alex", 0, 10);
+        ItemStack scythe = give(steve, WeaponType.SUGARCRASH);
+        int before = plugin.visuals().count();
         sneakUseKey(steve);
-        assertTrue(steve.hasPotionEffect(PotionEffectType.SPEED), "faster while spinning");
-        tick(2);
-        assertEquals(18.5, alex.getHealth(), 1.0E-6, "shredded");
-        assertTrue(alex.getVelocity().getX() < 0, "dragged in");
-        org.bukkit.entity.Arrow arrow = world.spawn(new Location(world, 5.5, 65, 0.5), org.bukkit.entity.Arrow.class);
-        arrow.setShooter(far);
-        arrow.setVelocity(new Vector(-2, 0, 0));
-        EntityDamageByEntityEvent shot = new EntityDamageByEntityEvent(arrow, steve,
-                EntityDamageEvent.DamageCause.PROJECTILE, DamageSource.builder(DamageType.ARROW)
-                .withCausingEntity(far).withDirectEntity(arrow).build(), 6.0);
-        server.getPluginManager().callEvent(shot);
-        assertTrue(shot.isCancelled(), "arrows bounce off");
-        assertTrue(arrow.getVelocity().getX() > 0, "back the way it came");
-        tick(80);
-        assertEquals(20.0 - 10 * 1.5 - 4.0, alex.getHealth(), 1.0E-6, "every 0.4s for 4s, then the burst");
-        assertTrue(alex.getVelocity().getX() > 0.5, "the burst throws them out");
-        assertEquals(20.0, far.getHealth());
+        assertEquals(before + 5, plugin.visuals().count(), "five candy canes over Steve's head");
+        assertEquals(0, cooldown(scythe, Ability.CANDY_BARRAGE), "no cooldown while they float");
+        tick(4);
+        assertEquals(20.0, alex.getHealth(), "nothing until Steve swings");
+
+        swing(steve);
+        tick(6);
+        assertEquals(17.0, alex.getHealth(), 1.0E-6, "a cane: 1.5 hearts");
+        swing(steve);
+        swing(steve); // Too soon after the last: not fired.
+        tick(6);
+        assertEquals(14.0, alex.getHealth(), 1.0E-6, "one cane per swing");
+        sneakUseKey(steve); // Shift + F again fires one too.
+        tick(6);
+        assertEquals(11.0, alex.getHealth(), 1.0E-6);
+
+        // With something else in hand, a swing fires nothing, but the bar still counts down.
+        steve.getInventory().setHeldItemSlot(8);
+        swing(steve);
+        tick(6);
+        assertEquals(11.0, alex.getHealth(), 1.0E-6);
+        assertNotNull(plugin.hud().bars(steve).get(Ability.CANDY_BARRAGE), "the bar stays after switching");
+        steve.getInventory().setHeldItemSlot(0);
+        swing(steve);
+        tick(6);
+        swing(steve);
+        tick(6);
+        assertEquals(5.0, alex.getHealth(), 1.0E-6, "five canes, 7.5 hearts in all");
+        assertTrue(cooldown(scythe, Ability.CANDY_BARRAGE) > 21 * 20, "all fired: the cooldown starts");
+        swing(steve);
+        tick(6);
+        assertEquals(5.0, alex.getHealth(), 1.0E-6, "none left");
+        assertEquals(before, plugin.visuals().count(), "all the canes are gone");
+    }
+
+    @Test
+    void candyBarrageCanesFadeAfterAWhile() {
+        PlayerMock steve = player("Steve", 0, 0);
+        ItemStack scythe = give(steve, WeaponType.SUGARCRASH);
+        int before = plugin.visuals().count();
+        sneakUseKey(steve);
+        tick(7 * 20);
+        assertEquals(0, cooldown(scythe, Ability.CANDY_BARRAGE));
+        assertEquals(before + 5, plugin.visuals().count());
+        tick(30);
+        assertTrue(cooldown(scythe, Ability.CANDY_BARRAGE) > 21 * 20, "8s later the rest fade and the cooldown starts");
+        assertEquals(before, plugin.visuals().count());
+        sneakUseKey(steve);
+        assertEquals(before, plugin.visuals().count(), "not again until it recharges");
     }
 
     @Test
@@ -981,7 +1035,7 @@ class LegendaryTest {
         assertTrue(steve.getActivePotionEffects().stream().anyMatch(effect -> effect.getType().equals(PotionEffectType.SPEED)
                 && effect.getAmplifier() == 1), "Speed II with the sugar");
         assertEquals(9.0, melee(steve, alex, 5.0).getDamage(), 1.0E-6, "full: the Sugar Crash (+4)");
-        assertEquals(17.0, bob.getHealth(), 1.0E-6, "the candy blast hits who is near");
+        assertEquals(14.0, bob.getHealth(), 1.0E-6, "the candy blast hits who is near");
         assertTrue(bob.getVelocity().length() > 0.5);
         tick(12);
         assertEquals(5.0, melee(steve, alex, 5.0).getDamage(), 1.0E-6, "and starts again");
@@ -1000,7 +1054,7 @@ class LegendaryTest {
         assertEquals(20.0, alex.getHealth(), "the rift pulls first");
         assertTrue(alex.getVelocity().getX() < 0, "towards the rift");
         tick(25);
-        assertEquals(13.0, alex.getHealth(), 1.0E-6, "then snaps shut");
+        assertEquals(10.0, alex.getHealth(), 1.0E-6, "then snaps shut: 5 hearts");
         assertTrue(alex.hasPotionEffect(PotionEffectType.DARKNESS));
         assertTrue(alex.hasPotionEffect(PotionEffectType.LEVITATION), "lifted helplessly");
         assertEquals(20.0, far.getHealth());
@@ -1015,7 +1069,7 @@ class LegendaryTest {
         sneakUseKey(steve);
         assertEquals(6.5, steve.getLocation().getZ(), 1.0E-6);
         assertEquals(0.5, alex.getLocation().getZ(), 1.0E-6);
-        assertEquals(17.0, alex.getHealth(), 1.0E-6);
+        assertEquals(14.0, alex.getHealth(), 1.0E-6);
         assertTrue(alex.hasPotionEffect(PotionEffectType.NAUSEA), "dizzy from the void");
         assertEquals(0, cooldown(blade, Ability.RIFT_SWAP), "the echo is open");
         steve.teleport(new Location(world, 4.5, 64, 9.5), PlayerTeleportEvent.TeleportCause.COMMAND); // Ran off.
@@ -1095,7 +1149,7 @@ class LegendaryTest {
         assertTrue(fall.isCancelled(), "no fall damage from the leap");
         steve.setVelocity(new Vector()); // Landed.
         tick(1);
-        assertEquals(20.0 - 5.6, alex.getHealth(), 1.0E-6, "3 of 5 blocks out: between 8 at the centre and 4 at the edge");
+        assertEquals(20.0 - 8.4, alex.getHealth(), 1.0E-6, "3 of 5 blocks out: between 12 at the centre and 6 at the edge");
         assertEquals(0.7, alex.getVelocity().getY(), 1.0E-6, "thrown up");
         assertTrue(alex.getVelocity().getZ() > 0.3, "and away");
         assertTrue(alex.hasPotionEffect(PotionEffectType.SLOWNESS));
@@ -1119,7 +1173,7 @@ class LegendaryTest {
         assertTrue(steve.getVelocity().getY() <= -0.6, "plunging down");
         assertTrue(steve.getVelocity().getZ() > 0.3, "at where Steve looks");
         tick(1);
-        double normal = 20.0 - 5.6;
+        double normal = 20.0 - 8.4;
         assertTrue(alex.getHealth() < normal - 2, "a bigger slam: " + alex.getHealth());
         assertTrue(edge.getHealth() < 20.0, "and a wider one (6 blocks out)");
         useKey(steve);
@@ -1137,14 +1191,14 @@ class LegendaryTest {
         tick(2);
         assertEquals(20.0, alex.getHealth(), "the stones rise one after another");
         tick(6);
-        assertEquals(14.0, alex.getHealth(), 1.0E-6);
+        assertEquals(12.0, alex.getHealth(), 1.0E-6, "4 hearts");
         assertEquals(0.9, alex.getVelocity().getY(), 1.0E-6, "launched");
         assertEquals(2, alex.getPotionEffect(PotionEffectType.SLOWNESS).getAmplifier(), "Slowness III");
         assertTrue(alex.hasPotionEffect(PotionEffectType.MINING_FATIGUE));
         assertEquals(20.0, bob.getHealth());
         tick(20);
-        assertEquals(15.0, bob.getHealth(), 1.0E-6, "the tomb at the end bursts");
-        assertEquals(14.0, alex.getHealth(), 1.0E-6, "hit once");
+        assertEquals(14.0, bob.getHealth(), 1.0E-6, "the tomb at the end bursts: 3 hearts");
+        assertEquals(12.0, alex.getHealth(), 1.0E-6, "hit once");
         assertEquals(20.0, aside.getHealth(), "only on the line");
         for (int z = 0; z <= 13; z++) {
             assertEquals(Material.STONE, world.getBlockAt(0, 63, z).getType(), "no block is changed");
@@ -1230,7 +1284,7 @@ class LegendaryTest {
         useKey(steve);
         assertEquals(0, plugin.abilities().active(steve, tag, Ability.STARFALL, plugin.tick()), "Starfall is locked");
         tick(70);
-        assertEquals(12.0, alex.getHealth(), 1.0E-6, "then the nova");
+        assertEquals(9.0, alex.getHealth(), 1.0E-6, "then the nova: 5 hearts");
         assertTrue(alex.getVelocity().getX() > 0.5, "throws everyone out");
         assertEquals(1, alex.getPotionEffect(PotionEffectType.SLOWNESS).getAmplifier(), "and slows them");
     }
@@ -1245,11 +1299,11 @@ class LegendaryTest {
             tick(12);
         }
         // The swings themselves are not applied here: only the star hurts.
-        assertEquals(16.0, alex.getHealth(), 1.0E-6, "a star fell on the 4th hit");
+        assertEquals(14.0, alex.getHealth(), 1.0E-6, "a star fell on the 4th hit");
         assertEquals(0.5, alex.getVelocity().getY(), 1.0E-6, "and launched them");
         melee(steve, alex, 5.0);
         tick(12);
-        assertEquals(16.0, alex.getHealth(), 1.0E-6, "the count starts again");
+        assertEquals(14.0, alex.getHealth(), 1.0E-6, "the count starts again");
     }
 
     // ---- fairness ---------------------------------------------------------------------------------------
@@ -1295,6 +1349,9 @@ class LegendaryTest {
 
     @Test
     void countersAndDodgesIgnoreProtectionChecks() {
+        plugin.getConfig().set("weapons.riftblade.abilities.phase-shift.chance", 0); // No lucky dodge of the counter.
+        plugin.saveConfig();
+        assertEquals(List.of(), plugin.reload());
         PlayerMock steve = player("Steve", 2, 5);
         PlayerMock alex = player("Alex", 0, 0);
         give(steve, WeaponType.KUROGANE);
@@ -1385,14 +1442,22 @@ class LegendaryTest {
         assertEquals(List.of(), actionBars(steve), "the action bar is left to the Combat plugin");
         assertFalse(steve.hasMetadata("vanillasmp:actionbar"));
 
-        // Put away: the bars go; taken out again, the recharging one is back.
+        // Put away: the recharging one stays while the axe is in the inventory...
         steve.getInventory().setHeldItemSlot(8);
         tick(4);
-        assertTrue(plugin.hud().bars(steve).isEmpty());
-        assertFalse(starfall.getPlayers().contains(steve));
+        assertEquals(java.util.Set.of(Ability.STARFALL), plugin.hud().bars(steve).keySet(), "still counting down");
+        assertTrue(starfall.getPlayers().contains(steve));
         steve.getInventory().setHeldItemSlot(0);
         tick(4);
         assertEquals(java.util.Set.of(Ability.STARFALL), plugin.hud().bars(steve).keySet());
+        // ...and goes when the axe does.
+        ItemStack axe = steve.getInventory().getItemInMainHand();
+        steve.getInventory().setItemInMainHand(null);
+        tick(12);
+        assertTrue(plugin.hud().bars(steve).isEmpty(), "not carried: no bar");
+        assertFalse(starfall.getPlayers().contains(steve));
+        steve.getInventory().setItemInMainHand(axe);
+        tick(4);
         // Ready again: no bar.
         tick(24 * 20);
         assertTrue(plugin.hud().bars(steve).isEmpty(), "ready: the bar is gone");
@@ -1499,7 +1564,7 @@ class LegendaryTest {
         assertEquals(List.of(), plugin.reload(), "nothing left to warn about");
         org.bukkit.configuration.file.YamlConfiguration saved = org.bukkit.configuration.file.YamlConfiguration
                 .loadConfiguration(new java.io.File(plugin.getDataFolder(), "config.yml"));
-        assertEquals(3, saved.getInt("config-version"));
+        assertEquals(4, saved.getInt("config-version"));
         assertFalse(saved.isSet("display.action-bar"));
         assertFalse(saved.isSet("display.ready-sound"));
         assertFalse(saved.isSet("messages.hud-edge"));
@@ -1539,16 +1604,16 @@ class LegendaryTest {
         assertEquals(List.of(), plugin.reload(), "nothing left to warn about");
         org.bukkit.configuration.file.YamlConfiguration saved = org.bukkit.configuration.file.YamlConfiguration
                 .loadConfiguration(new java.io.File(plugin.getDataFolder(), "config.yml"));
-        assertEquals(3, saved.getInt("config-version"));
+        assertEquals(4, saved.getInt("config-version"));
         assertFalse(saved.isSet("weapons.kurogane.abilities.blood-moon"), "replaced by Iaido");
         assertFalse(saved.isSet("weapons.sugarcrash.abilities.sugar-rush"), "replaced by Candy Hook");
         assertEquals("16s", saved.getString("weapons.kurogane.abilities.crimson-flash.cooldown"), "the new default");
         assertEquals(6, saved.getInt("weapons.kurogane.abilities.crimson-flash.damage"));
         assertEquals(10, saved.getInt("weapons.kurogane.abilities.crimson-flash.range"), "own value kept");
-        assertEquals("4s", saved.getString("weapons.sugarcrash.abilities.candy-cyclone.duration"));
-        assertEquals(10, saved.getStringList("weapons.kurogane.lore").size(), "the lore with the passive");
+        assertFalse(saved.isSet("weapons.sugarcrash.abilities.candy-cyclone"), "replaced by Candy Barrage");
+        assertEquals(12, saved.getStringList("weapons.kurogane.lore").size(), "the lore with the passive and attack");
         assertEquals(10.0, plugin.settings().ability(Ability.CRIMSON_FLASH).num("range"));
-        assertEquals(9.0, plugin.settings().ability(Ability.IAIDO).num("damage"));
+        assertEquals(12.0, plugin.settings().ability(Ability.IAIDO).num("damage"));
     }
 
     @Test
@@ -1565,7 +1630,7 @@ class LegendaryTest {
         plugin.saveConfig();
         assertEquals(List.of(), plugin.reload());
         assertTrue(plugin.settings().look(WeaponType.KUROGANE).glint(), "1.3.0's default (no shimmer) is updated");
-        assertEquals(10, plugin.settings().look(WeaponType.KUROGANE).lore().size());
+        assertEquals(12, plugin.settings().look(WeaponType.KUROGANE).lore().size());
         PlayerMock steve = player("Steve", 0, 0);
         ItemMeta sword = give(steve, WeaponType.KUROGANE).getItemMeta();
         assertFalse(sword.hasItemFlag(ItemFlag.HIDE_ENCHANTS));
@@ -1600,32 +1665,83 @@ class LegendaryTest {
 
         plugin.reload();
         List<String> lore = plugin.getConfig().getStringList("weapons.kurogane.lore");
-        assertEquals(10, lore.size(), "the new lore");
+        assertEquals(12, lore.size(), "the new lore");
         assertTrue(String.join("\n", lore).contains("{crimson-flash.name}"));
         assertEquals("&cLegendaries can't go in containers.", plugin.getConfig().getString("messages.storage-blocked"));
         assertTrue(plugin.getConfig().getStringList("weapons.sugarcrash.lore").contains(
-                "&#FF7AC3{sneak-key} &8» &f{candy-cyclone.name} &8({candy-cyclone.cooldown})"));
+                "&#FF7AC3{sneak-key} &8» &f{candy-barrage.name} &8({candy-barrage.cooldown})"));
         assertTrue(plugin.getConfig().getStringList("weapons.riftblade.lore").contains(
                 "&#B76BFF{key} &8» &f{void-rend.name} &8({void-rend.cooldown})"));
         assertEquals("<gradient:#E9C6FF:#A855F7>&lRiftblade</gradient>", plugin.getConfig().getString("weapons.riftblade.name"),
                 "brighter on the dark tooltip");
-        assertEquals(10, plugin.getConfig().getStringList("weapons.gravebreaker.lore").size());
+        assertEquals(12, plugin.getConfig().getStringList("weapons.gravebreaker.lore").size());
         assertFalse(String.join("\n", plugin.getConfig().getStringList("weapons.gravebreaker.lore")).contains("LEGENDARY"));
         assertEquals(List.of("&bMy own lore"), plugin.getConfig().getStringList("weapons.starforged.lore"));
         assertEquals("&cNo alts!", plugin.getConfig().getString("messages.alt-blocked"));
         // It is saved, so it sticks after the next restart.
         org.bukkit.configuration.file.YamlConfiguration saved = org.bukkit.configuration.file.YamlConfiguration
                 .loadConfiguration(new java.io.File(plugin.getDataFolder(), "config.yml"));
-        assertEquals(10, saved.getStringList("weapons.kurogane.lore").size());
+        assertEquals(12, saved.getStringList("weapons.kurogane.lore").size());
         // Weapons already out get the new lore too.
         PlayerMock steve = player("Steve", 0, 0);
         ItemStack sword = give(steve, WeaponType.KUROGANE);
         List<String> itemLore = sword.getItemMeta().getLore().stream().map(ChatColor::stripColor).toList();
-        assertEquals(10, itemLore.size(), String.join("\n", itemLore));
+        assertEquals(14, itemLore.size(), String.join("\n", itemLore));
         assertTrue(itemLore.contains("F » Crimson Flash (16s)"), String.join("\n", itemLore));
         assertTrue(itemLore.contains("Passive » Crimson Edge"), String.join("\n", itemLore));
     }
 
+
+    @Test
+    void aConfigFrom133GetsTrueDamageCandyBarrageAndTheAttackLines() {
+        org.bukkit.configuration.file.YamlConfiguration old = org.bukkit.configuration.file.YamlConfiguration
+                .loadConfiguration(new java.io.InputStreamReader(plugin.getResource("previous-text.yml"),
+                        java.nio.charset.StandardCharsets.UTF_8));
+        org.bukkit.configuration.file.FileConfiguration config = plugin.getConfig();
+        config.set("config-version", 3);
+        for (WeaponType type : WeaponType.values()) {
+            config.set("weapons." + type.key() + ".lore", old.getStringList("v1_3_3.weapons." + type.key() + ".lore"));
+        }
+        config.set("weapons.kurogane.abilities.iaido.damage", 9); // 1.3's default...
+        config.set("weapons.riftblade.abilities.void-rend.damage", 8); // ...and this server's own value.
+        config.set("weapons.sugarcrash.abilities.candy-cyclone.duration", "4s");
+        config.set("sounds.candy-cyclone", List.of("legendary:sugarcrash.cyclone 1 1"));
+        plugin.saveConfig();
+
+        assertEquals(List.of(), plugin.reload(), "nothing left to warn about");
+        org.bukkit.configuration.file.YamlConfiguration saved = org.bukkit.configuration.file.YamlConfiguration
+                .loadConfiguration(new java.io.File(plugin.getDataFolder(), "config.yml"));
+        assertEquals(4, saved.getInt("config-version"));
+        assertEquals(12, saved.getInt("weapons.kurogane.abilities.iaido.damage"), "the new default");
+        assertEquals(8, saved.getInt("weapons.riftblade.abilities.void-rend.damage"), "own value kept");
+        assertFalse(saved.isSet("weapons.sugarcrash.abilities.candy-cyclone"));
+        assertFalse(saved.isSet("sounds.candy-cyclone"));
+        assertTrue(saved.getStringList("weapons.sugarcrash.lore").contains(
+                "&#FF7AC3{sneak-key} &8» &f{candy-barrage.name} &8({candy-barrage.cooldown})"));
+        assertTrue(plugin.settings().trueDamage());
+
+        PlayerMock steve = player("Steve", 0, 0);
+        ItemMeta axe = give(steve, WeaponType.GRAVEBREAKER).getItemMeta();
+        List<String> lore = axe.getLore().stream().map(ChatColor::stripColor).toList();
+        assertEquals(List.of("When in Main Hand:", " 14 Attack Damage", " 1 Attack Speed"),
+                lore.subList(lore.size() - 3, lore.size()), String.join("\n", lore));
+        assertTrue(axe.hasItemFlag(ItemFlag.HIDE_ATTRIBUTES));
+    }
+
+    @Test
+    void protectionIsMadeUpForSoAbilityDamageIsTrue() {
+        PlayerMock alex = player("Alex", 0, 0);
+        assertEquals(8.0, io.github.drepfy.legendary.ability.Hits.throughProtection(alex, 8.0), 1.0E-9, "no armour");
+        org.bukkit.enchantments.Enchantment protection = io.github.drepfy.legendary.util.Compat.enchantment("protection");
+        ItemStack[] armour = {new ItemStack(Material.NETHERITE_BOOTS), new ItemStack(Material.NETHERITE_LEGGINGS),
+                new ItemStack(Material.NETHERITE_CHESTPLATE), new ItemStack(Material.NETHERITE_HELMET)};
+        for (ItemStack piece : armour) {
+            piece.addEnchantment(protection, 4);
+        }
+        alex.getEquipment().setArmorContents(armour);
+        double dealt = io.github.drepfy.legendary.ability.Hits.throughProtection(alex, 8.0);
+        assertEquals(8.0, dealt * (1.0 - 16 / 25.0), 1.0E-9, "Protection IV x4 takes 64% of magic damage: made up for");
+    }
 
     private List<String> freshWarnings() {
         java.io.File file = new java.io.File(plugin.getDataFolder(), "config.yml");

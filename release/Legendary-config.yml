@@ -1,10 +1,10 @@
 # Legendary Weapons. After editing, run /legendary reload.
 #
 # Controls: F (the swap-offhand key) uses a weapon's first ability, Shift + F its second. Pressing
-# again while one is still going recasts it (Crimson Flash's second dash, Rift Swap's return,
-# Executioner's Leap's dive).
+# again while one is still going recasts it (Crimson Flash's second dash, Candy Barrage's next
+# cane, Rift Swap's return, Executioner's Leap's dive).
 # Times: 8s, 2.5s, 1m, 30d.
-config-version: 3
+config-version: 4
 prefix: "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ » &r"
 
 # Which keys use the abilities:
@@ -17,6 +17,11 @@ controls: offhand
 # Only one of each weapon can exist. /legendary give refuses a second Kurogane while the first
 # is still around; remove it first (/legendary remove), or give a new one if it was lost.
 one-of-each: true
+
+# Mark a weapon as lost (and tell staff) when it is no longer in its holder's inventory or on
+# the ground, so it can be given out again. Off: a weapon stays registered to its last holder
+# until staff remove it (/legendary remove * <weapon>). Copies are deleted either way.
+mark-lost: false
 
 # Legendaries always drop on the ground when their holder dies, even with keepInventory on,
 # so they can be won. They never go into grave or death-chest plugins either way.
@@ -49,25 +54,32 @@ blocked-commands:
 # What the abilities hit besides players: hostile (monsters), all (every mob) or none.
 hit-mobs: hostile
 
+# Ability damage goes straight through armour and Protection: damage 8 takes 4 hearts, whatever
+# the target wears (Resistance and absorption hearts still count). Sword and axe hits are not
+# changed. false = armour reduces ability damage like it reduces a sword hit.
+true-damage: true
+
 display:
-  # While holding a legendary, a boss bar for each ability that is recharging: its name and how
-  # long until it can be used again (the bar fills up as it recharges, and goes away when the
-  # ability is ready).
+  # A boss bar for each ability that is recharging: its name and how long until it can be used
+  # again (the bar fills up as it recharges, and goes away when the ability is ready). The bars
+  # stay while you hold something else, as long as the legendary is in your inventory.
   boss-bars: true
-  # Also show the bars of abilities that are ready (just their name, a full bar).
+  # Also show the bars of abilities that are ready (just their name, a full bar), for the
+  # legendary in your hand.
   boss-bars-when-ready: false
 
 # Each weapon: its name and lore ({key} / {sneak-key} = the keys that use its abilities,
 # {<ability>.<setting>} = a value below, such as {crimson-flash.cooldown}, {<ability>.name} = the
 # ability's name), resource pack looks, enchantments and abilities. The enchantments show under
 # the name like on any enchanted item (put a "{enchantments}" line in the lore to list them there
-# in the weapon's own style instead). Damage is in health points (2 = one heart) and is reduced
-# by armour like a sword hit. An ability can be renamed with "name:" in its section.
+# in the weapon's own style instead). An "{attack}" line shows the weapon's real attack damage,
+# Sharpness included (the vanilla tooltip leaves Sharpness out). Damage is in health points
+# (2 = one heart); see true-damage above. An ability can be renamed with "name:" in its section.
 #
 # item-model and tooltip-style come from the server resource pack (1.21.4+ clients): the 3D
 # model, and the weapon's own tooltip frame. Without the pack, tooltip styles show as a missing
 # texture: if players may join without it (require-resource-pack=false), set them to "".
-# glint: the enchantment shimmer.
+# glint: the enchantment shimmer (always on, like the Heart items; false = never).
 weapons:
   kurogane:
     name: "<gradient:#F5F5F5:#C21E3A>&lKurogane</gradient>"
@@ -96,6 +108,8 @@ weapons:
       - ""
       - "&#FF4D6A{sneak-key} &8» &f{iaido.name} &8({iaido.cooldown})"
       - "&7Block the next hit and strike back from behind."
+      - ""
+      - "{attack}"
     abilities:
       crimson-flash:
         cooldown: 16s
@@ -118,11 +132,11 @@ weapons:
         # arrow) is blocked, and if the attacker is within reach you appear behind them and cut.
         stance: 1.5s
         reach: 12
-        damage: 9
+        damage: 12
         # Health back when the counter cut lands (2 = one heart).
         heal: 4
         # Nothing came: the stance is released as a crimson crescent this long in front of you.
-        slash-damage: 6
+        slash-damage: 8
         slash-range: 6
       crimson-edge:
         # Passive: every 3rd sword hit in a row on the same target (no more than window apart;
@@ -158,8 +172,10 @@ weapons:
       - "&#FF7AC3{key} &8» &f{candy-hook.name} &8({candy-hook.cooldown})"
       - "&7Hook a player to you, or a wall to fly to it."
       - ""
-      - "&#FF7AC3{sneak-key} &8» &f{candy-cyclone.name} &8({candy-cyclone.cooldown})"
-      - "&7Become a candy tornado. Arrows bounce off."
+      - "&#FF7AC3{sneak-key} &8» &f{candy-barrage.name} &8({candy-barrage.cooldown})"
+      - "&7Candy canes float over you. Swing to fire them."
+      - ""
+      - "{attack}"
     abilities:
       candy-hook:
         cooldown: 14s
@@ -168,26 +184,27 @@ weapons:
         speed: 1.6
         # A player (or monster) it catches: damage, how hard they are yanked to you, and how
         # long they are stunned after (too slow to walk away).
-        damage: 3
+        damage: 6
         yank: 1.0
         stun: 0.75s
         # A wall or the ground it catches: how hard you are pulled to it (0 = not at all).
         # No fall damage after.
         grapple: 1.0
-      candy-cyclone:
-        cooldown: 28s
-        # You can keep moving while it spins (with Speed at speed-level). Arrows bounce off.
-        duration: 4s
-        radius: 4.5
-        # Every interval, players in the tornado take this and are dragged in.
-        damage: 1.5
-        interval: 0.4s
-        pull: 0.25
-        speed-level: 2
-        # When it ends it bursts, throwing everyone out.
-        burst-damage: 4
-        burst-knockback: 1.2
-        burst-lift: 0.5
+      candy-barrage:
+        cooldown: 22s
+        # Candy canes float round your head for duration. Swing the scythe (or press Shift + F
+        # again) to fire one where you look. The cooldown starts once they are all fired or the
+        # time is up.
+        canes: 5
+        duration: 8s
+        # Each cane: damage (3 = 1.5 hearts), how fast it flies (blocks per tick), how far, and
+        # how hard it pushes.
+        damage: 3
+        speed: 2.4
+        range: 32
+        knockback: 0.3
+        # The shortest time between two shots.
+        shot-gap: 0.25s
       sugar-high:
         # Passive: each scythe hit adds a stack (they last stack-duration; hits less than
         # min-hit-gap apart do not count) and speeds you up. At full stacks the next hit is a
@@ -196,7 +213,7 @@ weapons:
         stack-duration: 4s
         min-hit-gap: 0.5s
         crash-damage: 4
-        splash-damage: 3
+        splash-damage: 6
         splash-radius: 3
         knockback: 0.8
 
@@ -226,6 +243,8 @@ weapons:
       - ""
       - "&#B76BFF{sneak-key} &8» &f{rift-swap.name} &8({rift-swap.cooldown})"
       - "&7Swap places. Press again to go back."
+      - ""
+      - "{attack}"
     abilities:
       void-rend:
         cooldown: 20s
@@ -238,14 +257,14 @@ weapons:
         # ...then snaps shut: damage, Darkness, and Levitation for lift (0 = none) for everyone
         # within radius.
         radius: 3.2
-        damage: 7
+        damage: 10
         darkness: 3s
         lift: 1s
       rift-swap:
         cooldown: 28s
         # Swaps with the first player (or monster) in sight within range.
         range: 20
-        damage: 3
+        damage: 6
         nausea: 3s
         # With nobody in sight: blink this far forward instead.
         blink: 10
@@ -284,6 +303,8 @@ weapons:
       - ""
       - "&#FF8A3D{sneak-key} &8» &f{grave-rise.name} &8({grave-rise.cooldown})"
       - "&7Gravestones burst up and weigh them down."
+      - ""
+      - "{attack}"
     abilities:
       executioners-leap:
         cooldown: 18s
@@ -292,8 +313,8 @@ weapons:
         leap-forward: 0.9
         # The slam: damage at the centre, falling to edge-damage at the edge of the radius.
         radius: 5
-        damage: 8
-        edge-damage: 4
+        damage: 12
+        edge-damage: 6
         launch: 0.7
         push: 0.6
         # Slowness level and how long it lasts (0 = none).
@@ -303,7 +324,7 @@ weapons:
         # bigger slam with dive-bonus extra damage.
         dive-range: 18
         dive-speed: 1.8
-        dive-bonus: 3
+        dive-bonus: 2
       grave-rise:
         cooldown: 28s
         # The line of gravestones: how far it reaches, how many, and the time between them.
@@ -311,7 +332,7 @@ weapons:
         stones: 6
         interval: 0.15s
         width: 1.5
-        damage: 6
+        damage: 8
         launch: 0.9
         # Slowness and Mining Fatigue for whoever a stone hits (level 0 = none).
         slow-level: 3
@@ -320,7 +341,7 @@ weapons:
         fatigue-duration: 3s
         # The last stone bursts as a tomb: damage to everyone within tomb-radius (0 = no tomb).
         tomb-radius: 3
-        tomb-damage: 5
+        tomb-damage: 6
       last-rites:
         # Passive: axe hits on players below threshold of their health (0.4 = 40%) do bonus
         # more damage (0.25 = +25%). Killing a player with the axe in hand makes the leap ready.
@@ -352,6 +373,8 @@ weapons:
       - ""
       - "&#6FD6FF{sneak-key} &8» &f{singularity.name} &8({singularity.cooldown})"
       - "&7A black hole pulls, then explodes."
+      - ""
+      - "{attack}"
     abilities:
       starfall:
         cooldown: 24s
@@ -363,9 +386,9 @@ weapons:
         interval: 0.2s
         # Each star: who is within star-radius of where it lands.
         star-radius: 2
-        damage: 4
+        damage: 6
         # A player is hit by at most this many stars of one Starfall.
-        max-hits: 3
+        max-hits: 2
         launch: 0.6
         # While the stars fall, the circle moves towards where you look, this many blocks a
         # tick (0 = it stays where it opened).
@@ -380,7 +403,7 @@ weapons:
         # A player caught by it takes this once (it is what lets protection plugins keep players
         # in no-PvP areas out of it).
         grip-damage: 1
-        nova-damage: 7
+        nova-damage: 10
         nova-knockback: 1.4
         nova-lift: 0.55
         # Slowness after the nova (level 0 = none).
@@ -397,7 +420,7 @@ weapons:
         window: 4s
         min-hit-gap: 0.5s
         delay: 0.5s
-        damage: 4
+        damage: 6
         radius: 1.8
         launch: 0.5
 
@@ -417,7 +440,9 @@ sounds:
   kurogane-equip: ["legendary:kurogane.draw 0.7 1"]
   kurogane-melee: ["legendary:kurogane.hit 0.45 1.15"]
   bleed: ["legendary:kurogane.bleed 0.5 1"]
-  candy-cyclone: ["legendary:sugarcrash.cyclone 1 1", "entity.breeze.wind_burst 0.2 1.3"]
+  candy-barrage: ["legendary:sugarcrash.full 1 1.15", "block.amethyst_block.chime 0.4 1.4"]
+  candy-barrage-shot: ["legendary:sugarcrash.hook 0.8 1.35", "entity.snowball.throw 0.4 1.2"]
+  candy-barrage-hit: ["legendary:sugarcrash.pop 1 1", "entity.player.attack.crit 0.3 1.4"]
   candy-hook: ["legendary:sugarcrash.hook 1 1", "entity.fishing_bobber.throw 0.4 1.2"]
   candy-hook-catch: ["legendary:sugarcrash.catch 1 1", "entity.fishing_bobber.retrieve 0.4 1.3"]
   sugar-high-full: ["legendary:sugarcrash.full 0.7 1", "block.amethyst_block.chime 0.4 1.6"]
@@ -425,8 +450,6 @@ sounds:
   sugar-high-stack: ["legendary:sugarcrash.pop 0.5 1"]
   sugarcrash-equip: ["legendary:sugarcrash.equip 0.7 1"]
   sugarcrash-melee: ["legendary:sugarcrash.pop 0.45 0.9"]
-  candy-cyclone-hit: ["legendary:sugarcrash.pop 0.6 1"]
-  candy-burst: ["legendary:sugarcrash.burst 1 1", "entity.firework_rocket.blast 0.35 1.3"]
   void-rend: ["legendary:riftblade.rend 1 1", "entity.enderman.teleport 0.3 0.6"]
   void-rend-snap: ["legendary:riftblade.snap 1 1", "entity.evoker.cast_spell 0.25 0.6"]
   riftblade-hit: ["legendary:riftblade.hit 0.9 1"]
@@ -466,6 +489,10 @@ messages:
   lore-enchantment: "&#AFB6C2{name} &f{level}"
   lore-separator: "  &8✦  "
   lore-unbreakable: "&#AFB6C2Unbreakable"
+  # How {attack} shows the weapon's attack damage (Sharpness included) and speed, like vanilla.
+  lore-attack-header: "&7When in Main Hand:"
+  lore-attack-damage: " &2{damage} Attack Damage"
+  lore-attack-speed: " &2{speed} Attack Speed"
   # Above the hotbar.
   no-target: "&7Nothing to aim at within {range} blocks."
   swap-refused: "&cThe rift can't take you there."
