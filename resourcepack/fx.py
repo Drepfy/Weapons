@@ -49,6 +49,88 @@ def _paint(size, shade, ss=2):
     return rows
 
 
+def _dilate(px, r):
+    """Thicker lines: every texel takes the most solid texel within r of it (across, then down)."""
+    n = len(px)
+    across = []
+    for row in px:
+        out = []
+        for x in range(n):
+            best = row[x]
+            for k in range(max(0, x - r), min(n, x + r + 1)):
+                if row[k][3] > best[3]:
+                    best = row[k]
+            out.append(best)
+        across.append(out)
+    down = [[None] * n for _ in range(n)]
+    for x in range(n):
+        for y in range(n):
+            best = across[y][x]
+            for k in range(max(0, y - r), min(n, y + r + 1)):
+                if across[k][x][3] > best[3]:
+                    best = across[k][x]
+            down[y][x] = best
+    return down
+
+
+def _blur(px, r):
+    """A soft blur (two box blurs each way) of colour weighted by alpha: (r, g, b, a) floats."""
+    n = len(px)
+    grid = [[(p[0] * p[3], p[1] * p[3], p[2] * p[3], p[3]) for p in row] for row in px]
+
+    def box(line):
+        out, acc, w = [], [0.0] * 4, 2 * r + 1
+        padded = [line[0]] * r + line + [line[-1]] * r
+        for k in range(w):
+            for q in range(4):
+                acc[q] += padded[k][q]
+        for x in range(n):
+            out.append(tuple(a / w for a in acc))
+            if x + w < len(padded):
+                for q in range(4):
+                    acc[q] += padded[x + w][q] - padded[x][q]
+        return out
+
+    for _ in range(2):
+        grid = [box(row) for row in grid]
+        cols = [box([grid[y][x] for y in range(n)]) for x in range(n)]
+        grid = [[cols[x][y] for x in range(n)] for y in range(n)]
+    return grid
+
+
+def bold(rows, grow=0, halo=0.0, spread=0, solid=1.0):
+    """Easier to see in daylight and from afar: lines thickened by grow texels, a soft glow of
+    their own colour spread texels wide round them (at halo strength), and faint parts made more
+    solid (alpha -> 1 - (1 - alpha) ** solid)."""
+    px = [[(p[0] / 255, p[1] / 255, p[2] / 255, p[3] / 255) for p in row] for row in rows]
+    if grow:
+        px = _dilate(px, grow)
+    if halo and spread:
+        glow = _blur(px, spread)
+        mixed = []
+        for row, grow_row in zip(px, glow):
+            out = []
+            for (r, g, b, a), (gr, gg, gb, ga) in zip(row, grow_row):
+                ha = clamp(ga * halo)
+                if ga > 1e-6 and ha > 0:
+                    oa = a + ha * (1 - a)
+                    k = ha * (1 - a)
+                    out.append(((r * a + gr / ga * k) / oa, (g * a + gg / ga * k) / oa, (b * a + gb / ga * k) / oa, oa))
+                else:
+                    out.append((r, g, b, a))
+            mixed.append(out)
+        px = mixed
+    result = []
+    for row in px:
+        line = []
+        for r, g, b, a in row:
+            a = 1 - (1 - clamp(a)) ** solid
+            line.append((0, 0, 0, 0) if a <= 0.004 else
+                        (int(round(255 * clamp(r))), int(round(255 * clamp(g))), int(round(255 * clamp(b))), int(round(255 * a))))
+        result.append(line)
+    return result
+
+
 def _glow(d, width):
     return math.exp(-(d / width) ** 2)
 
@@ -445,12 +527,37 @@ EFFECTS = {
 }
 
 
+# How each effect is made easier to see (Legendary 1.4.1): (thicker by, glow strength, glow width
+# in texels, solidness). Thin lines get thicker; everything gets a glow of its own colour.
+BOLD = {
+    'crimson_slash': (0, 0.55, 4, 1.5),
+    'crimson_streak': (1, 0.7, 5, 1.7),
+    'crimson_cut': (2, 0.7, 4, 1.7),
+    'rune_crimson': (1, 0.6, 5, 1.6),
+    'candy_hook': (0, 0.4, 3, 1.2),
+    'stun_ring': (1, 0.6, 3, 1.6),
+    'candy_burst': (2, 0.6, 4, 1.6),
+    'rift': (0, 0.5, 4, 1.3),
+    'void_portal': (0, 0.3, 3, 1.4),
+    'void_burst': (2, 0.6, 4, 1.6),
+    'shockwave': (2, 0.5, 5, 1.7),
+    'ember_ring': (1, 0.4, 3, 1.4),
+    'rune_star': (2, 0.6, 5, 1.6),
+    'star': (0, 0.7, 3, 1.6),
+    'nova': (1, 0.4, 4, 1.4),
+    'accretion': (0, 0.3, 4, 1.4),
+}
+
+
 def texture(name):
     """RGBA rows."""
     painter, size, kind = EFFECTS[name]
     if kind == 'stone':
         return gravestone_texture(size)
-    return _paint(size, painter)
+    rows = _paint(size, painter)
+    if name in BOLD:
+        rows = bold(rows, *BOLD[name])
+    return rows
 
 
 def _face(uv, flip=False):

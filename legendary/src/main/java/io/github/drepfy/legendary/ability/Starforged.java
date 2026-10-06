@@ -218,11 +218,11 @@ final class Starforged implements Kit {
     /** One star: it falls for 6 ticks, then bursts. */
     private void star(Player player, Location spot, Map<UUID, Integer> hits) {
         Location sky = spot.clone().add(random.nextDouble() * 4 - 2, 14, random.nextDouble() * 4 - 2);
-        Visuals.Effect star = plugin.visuals().spawn("star", sky).billboard().size(1.4).send(0);
+        Visuals.Effect star = plugin.visuals().spawn("star", sky).billboard().size(1.9).send(0);
         plugin.visuals().later(1, () -> star.moveTo(spot.clone().add(0, 0.6, 0), 5));
         plugin.fx().sound(sky, "starfall-star");
         plugin.visuals().later(6, () -> {
-            star.animate(1, 2, e -> e.size(2.6)).vanish(3, 2);
+            star.animate(1, 2, e -> e.size(3.4)).vanish(5, 4);
             impact(player, spot, hits);
         });
     }
@@ -233,7 +233,7 @@ final class Starforged implements Kit {
         plugin.fx().sound(spot, "starfall-impact");
         plugin.visuals().spawn("nova", spot.clone().add(0, 0.08, 0)).size(0.4).turn(random.nextInt(360)).send(0)
                 .animate(1, 4, e -> e.size(radius * 2.4))
-                .vanish(5, 3);
+                .vanish(9, 6);
         Fx.View view = plugin.fx().view(spot);
         Location up = spot.clone().add(0, 0.4, 0);
         view.particle(Fx.FLASH, up, 1, 0, 0, 0, 0);
@@ -273,9 +273,9 @@ final class Starforged implements Kit {
         Location center = ground.clone().add(0, 1.6, 0);
         double radius = settings.num("radius");
         Visuals.Effect core = plugin.visuals().spawn("black_hole", center).billboard().size(0.1).send(0)
-                .animate(1, 6, e -> e.size(2.4));
+                .animate(1, 6, e -> e.size(3.0));
         Visuals.Effect disk = plugin.visuals().spawn("accretion", center).size(0.1).send(0)
-                .animate(1, 8, e -> e.size(radius * 0.9));
+                .animate(1, 8, e -> e.size(radius * 1.1));
         holes.put(player.getUniqueId(), new Hole(player, center, now + duration, core, disk));
         plugin.fx().sound(center, "singularity");
         return Result.FIRED;
@@ -339,10 +339,10 @@ final class Starforged implements Kit {
             plugin.fx().sound(hole.center, "singularity-nova");
             plugin.visuals().spawn("nova", hole.center.clone().add(0, -1.5, 0)).size(0.5).send(0)
                     .animate(1, 5, e -> e.size(radius * 2.4).turn(90))
-                    .vanish(6, 4);
+                    .vanish(10, 6);
             plugin.visuals().spawn("star", hole.center).billboard().size(0.5).send(0)
-                    .animate(1, 3, e -> e.size(5.0))
-                    .vanish(4, 3);
+                    .animate(1, 3, e -> e.size(6.5))
+                    .vanish(7, 5);
             Fx.View view = plugin.fx().view(hole.center);
             view.particle(Fx.FLASH, hole.center, 1, 0, 0, 0, 0);
             view.particle(Fx.SONIC_BOOM, hole.center, 1, 0, 0, 0, 0);
@@ -381,11 +381,11 @@ final class Starforged implements Kit {
             return;
         }
         Location sky = target.getLocation().add(random.nextDouble() - 0.5, 9, random.nextDouble() - 0.5);
-        Visuals.Effect star = plugin.visuals().spawn("star", sky).billboard().size(0.9).send(0);
+        Visuals.Effect star = plugin.visuals().spawn("star", sky).billboard().size(1.3).send(0);
         plugin.visuals().later(1, () -> star.moveTo(Geo.middle(target), 4));
         plugin.fx().sound(sky, "starfall-star");
         plugin.visuals().later(5, () -> {
-            star.animate(1, 2, e -> e.size(2.0)).vanish(3, 2);
+            star.animate(1, 2, e -> e.size(2.8)).vanish(5, 4);
             AbilitySettings settings = plugin.settings().ability(Ability.STARSTRUCK);
             Location at = target.isValid() ? target.getLocation() : sky;
             plugin.fx().sound(at, "starstruck");

@@ -135,8 +135,8 @@ final class Gravebreaker implements Kit, Listener {
         plugin.abilities().softLanding(player, 80);
         plugin.fx().sound(player.getLocation(), "executioners-leap");
         plugin.visuals().spawn("shockwave", player.getLocation().add(0, 0.06, 0)).size(0.8).send(0)
-                .animate(1, 4, e -> e.size(2.2))
-                .vanish(5, 3);
+                .animate(1, 4, e -> e.size(2.8))
+                .vanish(9, 5);
         return Result.FIRED;
     }
 
@@ -161,9 +161,9 @@ final class Gravebreaker implements Kit, Listener {
         plugin.abilities().softLanding(player, 60);
         plugin.fx().sound(player.getLocation(), "executioners-dive");
         Location at = player.getLocation().add(0, 1.0, 0);
-        plugin.visuals().spawn("ember_ring", at).billboard().size(0.5).send(0)
-                .animate(1, 3, e -> e.size(2.4))
-                .vanish(4, 3);
+        plugin.visuals().spawn("ember_ring", at).billboard().size(0.6).send(0)
+                .animate(1, 3, e -> e.size(3.0))
+                .vanish(8, 5);
     }
 
     private void slam(Player player, boolean dived) {
@@ -177,10 +177,10 @@ final class Gravebreaker implements Kit, Listener {
         Visuals visuals = plugin.visuals();
         visuals.spawn("shockwave", center.clone().add(0, 0.06, 0)).size(1.0).turn(random.nextInt(360)).send(0)
                 .animate(1, 6, e -> e.size(radius * 2.2))
-                .vanish(16, 6);
+                .vanish(24, 10);
         visuals.spawn("ember_ring", center.clone().add(0, 0.1, 0)).size(0.6).send(0)
                 .animate(1, 4, e -> e.size(radius * 1.4))
-                .vanish(5, 4);
+                .vanish(9, 6);
         rocks(center, dived ? 11 : 7);
         Fx.View view = plugin.fx().view(center);
         view.particle(Fx.EXPLOSION, center.clone().add(0, 0.5, 0), dived ? 4 : 2, 0.6, 0.2, 0.6, 0);
@@ -295,7 +295,7 @@ final class Gravebreaker implements Kit, Listener {
         plugin.fx().sound(at, "executioners-slam");
         plugin.visuals().spawn("shockwave", at.clone().add(0, 0.06, 0)).size(0.6).send(0)
                 .animate(1, 4, e -> e.size(radius * 2.2))
-                .vanish(8, 5);
+                .vanish(16, 8);
         rocks(at, 6);
         plugin.fx().view(at).particle(Fx.SOUL, at.clone().add(0, 0.5, 0), 20, radius / 2, 0.3, radius / 2, 0.04);
         if (settings.num("tomb-damage") <= 0) {
@@ -340,7 +340,7 @@ final class Gravebreaker implements Kit, Listener {
         plugin.fx().sound(killer.getLocation(), "last-rites");
         Location at = killer.getLocation().add(0, 0.1, 0);
         plugin.visuals().spawn("ember_ring", at).size(0.5).send(0)
-                .animate(1, 4, e -> e.size(3.0))
-                .vanish(5, 4);
+                .animate(1, 4, e -> e.size(3.6))
+                .vanish(9, 6);
     }
 }

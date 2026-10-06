@@ -1001,6 +1001,7 @@ class LegendaryTest {
         swing(steve);
         tick(6);
         assertEquals(5.0, alex.getHealth(), 1.0E-6, "none left");
+        tick(10); // The last hit's candy burst fades.
         assertEquals(before, plugin.visuals().count(), "all the canes are gone");
     }
 

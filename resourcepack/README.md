@@ -46,8 +46,12 @@ glowing parts bloom onto the steel round them. Grips, hafts, collars and the kat
 round (8 or 16 sided, lit as if perfectly round), the outlines of blades and axe heads are
 smooth curves, and their sides are long straight facets that follow the curves, so nothing
 looks stepped when you turn them. They stand upright and are turned onto the diagonal: in the
-inventory they fill the slot from corner to corner, and in the hand the middle of the grip sits
-exactly where a vanilla sword's handle does (a little bigger than a vanilla sword). The glowing
+inventory they fill the slot from corner to corner, and in other players' hands the middle of
+the grip sits exactly where a vanilla sword's handle does (a little bigger than a vanilla sword).
+**In your own hand (first person) the whole weapon is in view:** a vanilla sword mostly sits
+off the right edge of the screen, so the weapons are held further in, leaning towards the
+middle with their face turned to you, the scythe and the axes a little further right so their
+heads never reach the crosshair (`FIRST_PERSON` in `models/common.py`). The glowing
 parts (Kurogane's temper line, Sugarcrash's edge, Riftblade's rift and crystals, Gravebreaker's
 crack, Starforged's edges, lightning, stars and crystal) shimmer through a small animated
 texture, and on newer clients they light up in the dark. No renaming and no mods: the plugin's
@@ -79,8 +83,9 @@ shown, and `models/render.py` draws the showcase. `python3 textures.py --preview
   player; Riftblade's rift, void portal and void burst; Gravebreaker's shockwave, ember ring and
   a 3D gravestone; Starforged's rune circle, star, nova, black hole and accretion disk. Each is
   painted with soft edges at 64 to 256 pixels by `fx.py` (flat ones lie on the ground, upright
-  ones stand facing the viewer), lit at full brightness so they glow at night. Without the pack
-  they show as paper.
+  ones stand facing the viewer), lit at full brightness so they glow at night. Thin lines are
+  thickened and every effect has a soft glow of its own colour round it, so they stand out in
+  daylight and from afar too (`BOLD` in `fx.py`). Without the pack they show as paper.
 - **Sounds** (`sounds/legendary/<weapon>/*.ogg`, `sounds.json`): 41 sounds, for every ability,
   passive and hit, and one for taking each weapon in hand (`legendary:kurogane.parry`,
   `legendary:sugarcrash.hook`, `legendary:kurogane.draw`...), with subtitles. They are made from

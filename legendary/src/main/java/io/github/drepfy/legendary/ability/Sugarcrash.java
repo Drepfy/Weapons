@@ -209,7 +209,7 @@ final class Sugarcrash implements Kit, Listener {
         Location eye = player.getEyeLocation();
         Vector direction = eye.getDirection().normalize();
         Location start = eye.clone().add(direction.clone().multiply(0.6)).subtract(0, 0.25, 0);
-        Visuals.Effect effect = plugin.visuals().spawn("candy_hook", start).billboard().size(0.9).send(0);
+        Visuals.Effect effect = plugin.visuals().spawn("candy_hook", start).billboard().size(1.2).send(0);
         hooks.add(new Hook(player, start, direction, effect));
         plugin.fx().sound(player.getLocation(), "candy-hook");
         return Result.FIRED;
@@ -302,9 +302,9 @@ final class Sugarcrash implements Kit, Listener {
         }
         hook.effect.moveTo(player.getEyeLocation().subtract(0, 0.4, 0), 5).vanish(5, 2);
         plugin.fx().sound(target.getLocation(), "candy-hook-catch");
-        plugin.visuals().spawn("candy_burst", at).billboard().size(0.3).send(0)
-                .animate(1, 3, e -> e.size(1.5))
-                .vanish(4, 3);
+        plugin.visuals().spawn("candy_burst", at).billboard().size(0.4).send(0)
+                .animate(1, 3, e -> e.size(2.0))
+                .vanish(7, 5);
     }
 
     /** Stunned: candy stars circle their head. */
@@ -312,10 +312,10 @@ final class Sugarcrash implements Kit, Listener {
         Hits.stun(target, ticks);
         Vector above = new Vector(0, target.getHeight() + 0.25, 0);
         Visuals.Effect ring = plugin.visuals().spawn("stun_ring", target.getLocation().add(above)).billboard().size(0.2).send(0)
-                .animate(1, 3, e -> e.size(1.1))
+                .animate(1, 3, e -> e.size(1.4))
                 .follow(target, above, ticks);
         for (int t = 4; t < ticks; t += 4) {
-            double size = (t / 4) % 2 == 0 ? 1.1 : 1.0;
+            double size = (t / 4) % 2 == 0 ? 1.4 : 1.25;
             ring.animate(t, 4, e -> e.size(size));
         }
         ring.vanish(ticks, 3);
@@ -356,7 +356,7 @@ final class Sugarcrash implements Kit, Listener {
         for (int i = 0; i < count; i++) {
             Location at = player.getLocation().add(0, player.getHeight() + 0.4, 0);
             barrage.floating.add(plugin.visuals().spawn("candy_hook", at).billboard().size(0.05).send(0)
-                    .animate(1 + i, 3, e -> e.size(0.6)));
+                    .animate(1 + i, 3, e -> e.size(0.8)));
         }
         circle(barrage, now, 1);
         barrages.put(weapon.id(), barrage);
@@ -405,7 +405,7 @@ final class Sugarcrash implements Kit, Listener {
         Location eye = player.getEyeLocation();
         Vector direction = eye.getDirection().normalize();
         Location start = eye.clone().add(direction.clone().multiply(0.7)).add(0, 0.15, 0);
-        effect.size(0.7).send(1).moveTo(start, 1);
+        effect.size(0.9).send(1).moveTo(start, 1);
         canes.add(new Cane(player, start, direction, effect));
         plugin.fx().sound(player.getLocation(), "candy-barrage-shot", 0.05f * barrage.floating.size());
         if (barrage.floating.isEmpty()) {
@@ -454,9 +454,9 @@ final class Sugarcrash implements Kit, Listener {
                     Hits.knock(target, cane.direction, settings.num("knockback"), 0.15);
                 }
                 plugin.fx().sound(at, "candy-barrage-hit");
-                plugin.visuals().spawn("candy_burst", at).billboard().size(0.2).send(0)
-                        .animate(1, 3, e -> e.size(1.1))
-                        .vanish(4, 3);
+                plugin.visuals().spawn("candy_burst", at).billboard().size(0.3).send(0)
+                        .animate(1, 3, e -> e.size(1.6))
+                        .vanish(6, 5);
                 plugin.fx().view(at).dust(at, PINK, 1.2f, 8, 0.3);
             }
             return true;
@@ -519,7 +519,7 @@ final class Sugarcrash implements Kit, Listener {
         plugin.fx().sound(at, "sugar-crash");
         plugin.visuals().spawn("candy_burst", at).billboard().size(0.4).send(0)
                 .animate(1, 3, e -> e.size(settings.num("splash-radius") * 2.0))
-                .vanish(4, 3);
+                .vanish(7, 5);
         Fx.View view = plugin.fx().view(at);
         view.particle(Fx.FIREWORK, at, 25, 0.4, 0.4, 0.4, 0.2);
         view.dust(at, PINK, 1.8f, 20, 0.8);

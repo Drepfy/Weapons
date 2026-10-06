@@ -103,7 +103,7 @@ final class Riftblade implements Kit, Listener {
         }
         Location at = from.clone().add(0, 1.0, 0);
         Visuals.Effect effect = plugin.visuals().spawn("void_portal", at).billboard().size(0.2).send(0)
-                .animate(1, 4, e -> e.size(1.6));
+                .animate(1, 4, e -> e.size(2.0));
         echoes.put(weapon.id(), new Echo(player, from, plugin.tick() + echo, effect));
         return Result.HANDLED; // The cooldown starts once the echo is used or fades.
     }
@@ -194,11 +194,11 @@ final class Riftblade implements Kit, Listener {
         Vector direction = Geo.flat(start);
         Location end = Geo.dash(start, direction, settings.num("distance"));
         Location center = end.clone().add(0, 1.2, 0);
-        Visuals.Effect rift = plugin.visuals().spawn("rift", center).facing(direction).size(0.08, 3.0, 1.0).send(0)
-                .animate(1, 4, e -> e.size(1.9, 3.6, 1.0));
+        Visuals.Effect rift = plugin.visuals().spawn("rift", center).facing(direction).size(0.1, 3.6, 1.0).send(0)
+                .animate(1, 4, e -> e.size(2.4, 4.4, 1.0));
         plugin.visuals().spawn("void_portal", center.clone().add(direction.clone().multiply(-0.05)))
                 .facing(direction).size(0.2).send(0)
-                .animate(1, 5, e -> e.size(2.6))
+                .animate(1, 5, e -> e.size(3.2))
                 .vanish(6 + settings.ticks("pull-time"), 4);
         long snap = plugin.tick() + settings.ticks("pull-time");
         rends.put(player.getUniqueId(), new Rend(player, center, snap, rift));
@@ -247,7 +247,7 @@ final class Riftblade implements Kit, Listener {
         rend.rift.animate(1, 3, e -> e.size(0.02, 4.2, 1.0)).life(5);
         plugin.visuals().spawn("void_burst", rend.center).billboard().size(0.4).send(0)
                 .animate(1, 3, e -> e.size(settings.num("radius") * 2.2))
-                .vanish(4, 3);
+                .vanish(8, 6);
         plugin.fx().sound(rend.center, "void-rend-snap");
         Fx.View view = plugin.fx().view(rend.center);
         view.particle(Fx.FLASH, rend.center, 1, 0, 0, 0, 0);
@@ -332,8 +332,8 @@ final class Riftblade implements Kit, Listener {
     private void portal(Location at) {
         Location middle = at.clone().add(0, 1.0, 0);
         plugin.visuals().spawn("void_portal", middle).billboard().size(0.2).send(0)
-                .animate(1, 3, e -> e.size(2.4))
-                .vanish(8, 5);
+                .animate(1, 3, e -> e.size(3.0))
+                .vanish(12, 7);
         Fx.View view = plugin.fx().view(middle);
         view.particle(Fx.REVERSE_PORTAL, middle, 40, 0.4, 0.9, 0.4, 0.1);
         view.dust(middle, VOID, 1.8f, 20, 0.5);

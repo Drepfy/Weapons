@@ -294,12 +294,12 @@ final class Kurogane implements Kit, Listener {
     private void drawFlash(Location start, Location end, Vector direction, double length) {
         Location middle = start.clone().add(end).multiply(0.5).add(0, 1.0, 0);
         Visuals visuals = plugin.visuals();
-        visuals.spawn("crimson_streak", middle).facing(direction).size(0.2, 1.4, 0.2).send(0)
-                .animate(1, 3, e -> e.size(1.0, 1.6, length + 1.0))
-                .vanish(10, 6);
-        visuals.spawn("crimson_slash", end.clone().add(0, 1.1, 0)).facing(direction).tilt(-18).size(0.6).send(0)
-                .animate(1, 3, e -> e.size(3.2))
-                .vanish(5, 4);
+        visuals.spawn("crimson_streak", middle).facing(direction).size(0.3, 1.8, 0.3).send(0)
+                .animate(1, 3, e -> e.size(1.4, 2.2, length + 1.5))
+                .vanish(16, 8);
+        visuals.spawn("crimson_slash", end.clone().add(0, 1.1, 0)).facing(direction).tilt(-18).size(0.8).send(0)
+                .animate(1, 3, e -> e.size(4.2))
+                .vanish(9, 6);
         Fx.View view = plugin.fx().view(middle);
         for (double d = 0; d <= length; d += 0.5) {
             Location point = start.clone().add(direction.clone().multiply(d)).add(0, 1.0, 0);
@@ -314,9 +314,9 @@ final class Kurogane implements Kit, Listener {
     /** The cut opening on a target: a crimson X that flashes and fades. */
     private void cutFx(LivingEntity target, int tilt) {
         Location at = Geo.middle(target);
-        plugin.visuals().spawn("crimson_cut", at).billboard().tilt(tilt).size(0.3).send(0)
-                .animate(1, 2, e -> e.size(1.8))
-                .vanish(6, 4);
+        plugin.visuals().spawn("crimson_cut", at).billboard().tilt(tilt).size(0.4).send(0)
+                .animate(1, 2, e -> e.size(2.6))
+                .vanish(10, 6);
         Fx.View view = plugin.fx().view(at);
         view.dust(at, CRIMSON, 1.5f, 12, 0.35);
         view.particle(Fx.CRIT, at, 10, 0.3, 0.4, 0.3, 0.3);
@@ -357,7 +357,7 @@ final class Kurogane implements Kit, Listener {
         }
         event.setCancelled(true);
         stances.remove(player.getUniqueId());
-        stance.ring.animate(1, 2, e -> e.size(4.5)).vanish(3, 3);
+        stance.ring.animate(1, 2, e -> e.size(5.5)).vanish(5, 5);
         org.bukkit.potion.PotionEffectType slowness = Compat.effect("slowness");
         if (slowness != null) {
             player.removePotionEffect(slowness);
@@ -380,7 +380,7 @@ final class Kurogane implements Kit, Listener {
             double length = way.length();
             if (length > 0.5) {
                 plugin.visuals().spawn("crimson_streak", from.clone().add(behind).multiply(0.5).add(0, 1.0, 0))
-                        .facing(way).size(0.9, 1.5, length).send(0).vanish(6, 5);
+                        .facing(way).size(1.3, 2.0, length).send(0).vanish(10, 7);
             }
         }
         if (plugin.hits().hurt(player, attacker, settings.num("damage"))) {
@@ -388,9 +388,9 @@ final class Kurogane implements Kit, Listener {
             bleed(player, attacker, edge.num("bleed-damage"), edge.ticks("bleed-duration"));
             Compat.heal(player, settings.num("heal"));
             Location at = Geo.middle(attacker);
-            plugin.visuals().spawn("crimson_slash", at).facing(Geo.flat(player.getLocation())).tilt(30).size(0.8).send(0)
-                    .animate(1, 2, e -> e.size(3.6))
-                    .vanish(4, 4);
+            plugin.visuals().spawn("crimson_slash", at).facing(Geo.flat(player.getLocation())).tilt(30).size(1.0).send(0)
+                    .animate(1, 2, e -> e.size(4.6))
+                    .vanish(8, 6);
             cutFx(attacker, -40);
             plugin.fx().sound(at, "iaido-counter");
         }
@@ -427,9 +427,9 @@ final class Kurogane implements Kit, Listener {
         Vector direction = Geo.flat(player.getLocation());
         Location end = start.clone().add(direction.clone().multiply(settings.num("slash-range")));
         plugin.visuals().spawn("crimson_slash", player.getLocation().add(direction.clone().multiply(2.0)).add(0, 1.1, 0))
-                .facing(direction).tilt(10).size(1.0).send(0)
-                .animate(1, 3, e -> e.size(5.0))
-                .vanish(5, 4);
+                .facing(direction).tilt(10).size(1.2).send(0)
+                .animate(1, 3, e -> e.size(6.0))
+                .vanish(9, 6);
         plugin.fx().sound(player.getLocation(), "crimson-cut");
         if (settings.num("slash-damage") <= 0) {
             return;

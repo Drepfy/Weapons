@@ -49,10 +49,12 @@ turns the shimmer off for good.
 Every ability has its own 3D effect from the pack (crimson slashes, candy canes, a void rift, a
 shockwave, gravestones, a rune circle, falling stars, a black hole...), shown with display
 entities: the server says where an effect starts and ends, and the players' game animates it
-smoothly in between. Effects are never saved with the world. Every ability, passive and hit has
-its own sound from the pack (with a quiet vanilla sound under the ability sounds for players
-without the pack), each weapon has its own sound when you take it in hand, and its sword or axe
-hits have their own hit sound.
+smoothly in between. They are big, glow and stay a moment so they are easy to see in a fight;
+the ones that show an area (Starfall's circle, the slam's cracks) match it exactly, and the ones
+that show a state (Iaido's stance, a stun) last exactly as long as it does. Effects are never
+saved with the world. Every ability, passive and hit has its own sound from the pack (with a
+quiet vanilla sound under the ability sounds for players without the pack), each weapon has its
+own sound when you take it in hand, and its sword or axe hits have their own hit sound.
 
 Every weapon has a **passive** that works on its own, and two abilities. Several abilities can
 be **pressed again** while they are still going: a second dash, a return, a dive. The boss bar
