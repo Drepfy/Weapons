@@ -6,7 +6,7 @@
 
     <groupId>io.github.drepfy</groupId>
     <artifactId>legendary</artifactId>
-    <version>1.4.1</version>
+    <version>1.5.0</version>
     <packaging>jar</packaging>
 
     <name>Legendary</name>

@@ -5,8 +5,11 @@ import io.github.drepfy.legendary.LegendaryPlugin;
 import io.github.drepfy.legendary.WeaponType;
 import io.github.drepfy.legendary.config.AbilitySettings;
 import io.github.drepfy.legendary.item.WeaponItems;
+import io.github.drepfy.legendary.util.Compat;
+import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -16,13 +19,18 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.player.PlayerAnimationEvent;
 import org.bukkit.event.player.PlayerAnimationType;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -34,8 +42,9 @@ import java.util.UUID;
  *   <li><b>Candy Barrage</b>: candy canes appear and float round the player's head. Each swing
  *   of the scythe (or Shift + F again) fires one where they look; the cooldown starts when they
  *   are all fired or the time is up.</li>
- *   <li><b>Sugar High</b> (passive): each hit adds a sugar stack and speeds you up; at full
- *   stacks the next hit is a Sugar Crash, a candy explosion round the target.</li>
+ *   <li><b>Sugar High</b> (passive): Speed I while the scythe is in hand. Each hit adds a sugar
+ *   stack (Speed II from two thirds); at full stacks the next hit is a Sugar Crash, a candy
+ *   explosion round the target.</li>
  * </ul>
  */
 final class Sugarcrash implements Kit, Listener {
@@ -43,6 +52,8 @@ final class Sugarcrash implements Kit, Listener {
     private static final Color PINK = Color.fromRGB(255, 92, 165);
     private static final Color CANDY_RED = Color.fromRGB(225, 30, 60);
     private static final Color SUGAR = Color.fromRGB(255, 245, 250);
+    private static final Color[] STARS = {PINK, SUGAR, Color.fromRGB(255, 70, 90)};
+    private static final ItemStack SUGAR_BITS = new ItemStack(Material.SUGAR);
 
     private final LegendaryPlugin plugin;
     private final List<Hook> hooks = new ArrayList<>();
@@ -53,6 +64,8 @@ final class Sugarcrash implements Kit, Listener {
     private final Map<UUID, Sugar> sugar = new HashMap<>();
     /** Attacker → the target their Sugar Crash is landing on. */
     private final Map<UUID, UUID> crashing = new HashMap<>();
+    /** Players given Speed for holding the scythe. */
+    private final Set<UUID> rushing = new HashSet<>();
 
     Sugarcrash(LegendaryPlugin plugin) {
         this.plugin = plugin;
@@ -61,15 +74,13 @@ final class Sugarcrash implements Kit, Listener {
     private static final class Hook {
         final Player player;
         final Vector direction;
-        final Visuals.Effect effect;
         Location position;
         double travelled;
 
-        Hook(Player player, Location position, Vector direction, Visuals.Effect effect) {
+        Hook(Player player, Location position, Vector direction) {
             this.player = player;
             this.position = position;
             this.direction = direction;
-            this.effect = effect;
         }
     }
 
@@ -78,28 +89,28 @@ final class Sugarcrash implements Kit, Listener {
         final long until;
         /** How many there were at first (their places round the head). */
         final int total;
-        final List<Visuals.Effect> floating = new ArrayList<>();
+        /** How many still float over the head. */
+        int left;
         long nextShot;
 
         Barrage(Player player, long until, int total) {
             this.player = player;
             this.until = until;
             this.total = total;
+            this.left = total;
         }
     }
 
     private static final class Cane {
         final Player player;
         final Vector direction;
-        final Visuals.Effect effect;
         Location position;
         double travelled;
 
-        Cane(Player player, Location position, Vector direction, Visuals.Effect effect) {
+        Cane(Player player, Location position, Vector direction) {
             this.player = player;
             this.position = position;
             this.direction = direction;
-            this.effect = effect;
         }
     }
 
@@ -148,28 +159,15 @@ final class Sugarcrash implements Kit, Listener {
 
     @Override
     public void forget(Player player) {
-        hooks.removeIf(hook -> {
-            if (hook.player.equals(player)) {
-                hook.effect.remove();
-                return true;
-            }
-            return false;
-        });
+        hooks.removeIf(hook -> hook.player.equals(player));
         for (Iterator<Map.Entry<UUID, Barrage>> it = barrages.entrySet().iterator(); it.hasNext(); ) {
             Map.Entry<UUID, Barrage> barrage = it.next();
             if (barrage.getValue().player.equals(player)) {
                 it.remove();
-                barrage.getValue().floating.forEach(Visuals.Effect::remove);
                 plugin.abilities().startCooldown(barrage.getKey(), Ability.CANDY_BARRAGE);
             }
         }
-        canes.removeIf(cane -> {
-            if (cane.player.equals(player)) {
-                cane.effect.remove();
-                return true;
-            }
-            return false;
-        });
+        canes.removeIf(cane -> cane.player.equals(player));
         sugar.remove(player.getUniqueId());
         crashing.remove(player.getUniqueId());
     }
@@ -185,14 +183,18 @@ final class Sugarcrash implements Kit, Listener {
         for (Iterator<Map.Entry<UUID, Barrage>> it = barrages.entrySet().iterator(); it.hasNext(); ) {
             Map.Entry<UUID, Barrage> entry = it.next();
             Barrage barrage = entry.getValue();
-            if (!barrage.player.isOnline() || barrage.player.isDead() || now >= barrage.until
-                    || barrage.floating.isEmpty()) {
+            if (!barrage.player.isOnline() || barrage.player.isDead() || now >= barrage.until || barrage.left <= 0) {
                 it.remove();
-                barrage.floating.forEach(cane -> cane.vanish(0, 3));
+                if (barrage.left > 0 && barrage.player.isOnline()) {
+                    Location head = barrage.player.getLocation().add(0, barrage.player.getHeight() + 0.45, 0);
+                    plugin.fx().view(head).item(head, SUGAR_BITS, 10, 0.5, 0.05); // The rest crumble.
+                }
                 plugin.abilities().startCooldown(entry.getKey(), Ability.CANDY_BARRAGE);
                 continue;
             }
-            circle(barrage, now, 2);
+            if (now % 3 == 0) {
+                circle(barrage, now);
+            }
         }
         for (Iterator<Cane> it = canes.iterator(); it.hasNext(); ) {
             Cane cane = it.next();
@@ -201,6 +203,78 @@ final class Sugarcrash implements Kit, Listener {
             }
         }
         sugar.values().removeIf(state -> now >= state.until);
+        if (now % 5 == 0) {
+            rush();
+        }
+    }
+
+    /** Sugar High: Speed while the scythe is in hand, gone soon after it is put away. */
+    private void rush() {
+        int level = plugin.settings().ability(Ability.SUGAR_HIGH).whole("speed-level");
+        PotionEffectType speed = Compat.effect("speed");
+        if (speed == null) {
+            return;
+        }
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            WeaponItems.Tag held = player.isDead() ? null : plugin.items().read(player.getInventory().getItemInMainHand());
+            if (level > 0 && held != null && held.type() == WeaponType.SUGARCRASH) {
+                // Ambient and without swirls, like a beacon's: it is part of holding the scythe.
+                player.addPotionEffect(new PotionEffect(speed, 40, level - 1, true, false, true));
+                rushing.add(player.getUniqueId());
+            } else if (rushing.remove(player.getUniqueId())) {
+                PotionEffect current = player.getPotionEffect(speed);
+                if (current != null && current.isAmbient() && current.getDuration() <= 40) {
+                    player.removePotionEffect(speed);
+                }
+            }
+        }
+        rushing.removeIf(id -> Bukkit.getPlayer(id) == null);
+    }
+
+    /**
+     * A candy cane drawn in red and white stripes: a shaft of {@code length} along {@code axis}
+     * from {@code base}, curling over at the top towards {@code side}.
+     */
+    private static void cane(Fx.View view, Location base, Vector axis, Vector side, double length, float size) {
+        double r = length * 0.24;
+        double step = 0.075;
+        List<Location> points = new ArrayList<>();
+        for (double t = 0; t <= length; t += step) {
+            points.add(base.clone().add(axis.clone().multiply(t)));
+        }
+        Location top = base.clone().add(axis.clone().multiply(length)).add(side.clone().multiply(r));
+        int arc = Math.max(4, (int) Math.round(Math.PI * r / step));
+        for (int i = 1; i <= arc; i++) {
+            double a = Math.PI - Math.PI * i / arc;
+            points.add(top.clone().add(side.clone().multiply(r * Math.cos(a))).add(axis.clone().multiply(r * Math.sin(a))));
+        }
+        Location end = top.clone().add(side.clone().multiply(r));
+        for (double t = step; t <= r * 0.7; t += step) {
+            points.add(end.clone().subtract(axis.clone().multiply(t)));
+        }
+        for (int i = 0; i < points.size(); i++) {
+            view.dust(points.get(i), (i / 2) % 2 == 0 ? CANDY_RED : SUGAR, size, 1, 0);
+        }
+    }
+
+    /** A burst of sugar: crystals flying out, pink and white dust and sparkles. */
+    private void candyBurst(Location at, double radius, int amount) {
+        Fx.View view = plugin.fx().view(at);
+        view.item(at, SUGAR_BITS, amount, 0.15, 0.2);
+        List<Location> shell = Shapes.sphere(at, radius, amount * 2);
+        for (int i = 0; i < shell.size(); i++) {
+            view.dust(shell.get(i), i % 3 == 0 ? SUGAR : i % 3 == 1 ? PINK : CANDY_RED, 1.2f, 1, 0.05);
+        }
+        view.particle(Fx.FIREWORK, at, amount / 2, 0.1, 0.1, 0.1, 0.15);
+    }
+
+    /** Two directions square to {@code axis}, for drawing a cane along it. */
+    private static Vector across(Vector axis) {
+        Vector side = axis.clone().crossProduct(new Vector(0, 1, 0));
+        if (side.lengthSquared() < 1.0E-4) {
+            side = new Vector(1, 0, 0);
+        }
+        return side.normalize().crossProduct(axis).normalize(); // Up-ish, square to the axis.
     }
 
     // ---- Candy Hook --------------------------------------------------------------------------------------
@@ -209,8 +283,9 @@ final class Sugarcrash implements Kit, Listener {
         Location eye = player.getEyeLocation();
         Vector direction = eye.getDirection().normalize();
         Location start = eye.clone().add(direction.clone().multiply(0.6)).subtract(0, 0.25, 0);
-        Visuals.Effect effect = plugin.visuals().spawn("candy_hook", start).billboard().size(1.2).send(0);
-        hooks.add(new Hook(player, start, direction, effect));
+        hooks.add(new Hook(player, start, direction));
+        cane(plugin.fx().view(start), start.clone().subtract(direction.clone().multiply(0.5)), direction, across(direction),
+                0.6, 0.8f);
         plugin.fx().sound(player.getLocation(), "candy-hook");
         return Result.FIRED;
     }
@@ -221,7 +296,6 @@ final class Sugarcrash implements Kit, Listener {
         Player player = hook.player;
         World world = hook.position.getWorld();
         if (world == null || !world.equals(player.getWorld())) {
-            hook.effect.remove();
             return true;
         }
         double step = settings.num("speed");
@@ -251,12 +325,9 @@ final class Sugarcrash implements Kit, Listener {
         }
         hook.position = to;
         hook.travelled += step;
-        hook.effect.moveTo(to, 1);
-        if (hook.travelled >= settings.num("range")) {
-            hook.effect.moveTo(player.getEyeLocation().subtract(0, 0.4, 0), 4).vanish(3, 2);
-            return true;
-        }
-        return false;
+        cane(plugin.fx().view(to), to.clone().subtract(hook.direction.clone().multiply(0.5)), hook.direction,
+                across(hook.direction), 0.6, 0.8f);
+        return hook.travelled >= settings.num("range");
     }
 
     /** The candy rope from the hand to the hook. */
@@ -279,9 +350,7 @@ final class Sugarcrash implements Kit, Listener {
         AbilitySettings settings = plugin.settings().ability(Ability.CANDY_HOOK);
         Player player = hook.player;
         Location at = Geo.middle(target);
-        hook.effect.moveTo(at, 1);
         if (!plugin.hits().hurt(player, target, Math.max(0.01, settings.num("damage")))) {
-            hook.effect.vanish(2, 2);
             return; // Protected: not pulled.
         }
         Vector way = player.getLocation().toVector().subtract(target.getLocation().toVector()).setY(0);
@@ -300,31 +369,32 @@ final class Sugarcrash implements Kit, Listener {
                 }
             });
         }
-        hook.effect.moveTo(player.getEyeLocation().subtract(0, 0.4, 0), 5).vanish(5, 2);
         plugin.fx().sound(target.getLocation(), "candy-hook-catch");
-        plugin.visuals().spawn("candy_burst", at).billboard().size(0.4).send(0)
-                .animate(1, 3, e -> e.size(2.0))
-                .vanish(7, 5);
+        candyBurst(at, 0.9, 14);
     }
 
-    /** Stunned: candy stars circle their head. */
+    /** Stunned: three candy stars circle their head for as long as it lasts. */
     private void stun(LivingEntity target, int ticks) {
         Hits.stun(target, ticks);
-        Vector above = new Vector(0, target.getHeight() + 0.25, 0);
-        Visuals.Effect ring = plugin.visuals().spawn("stun_ring", target.getLocation().add(above)).billboard().size(0.2).send(0)
-                .animate(1, 3, e -> e.size(1.4))
-                .follow(target, above, ticks);
-        for (int t = 4; t < ticks; t += 4) {
-            double size = (t / 4) % 2 == 0 ? 1.4 : 1.25;
-            ring.animate(t, 4, e -> e.size(size));
+        for (int t = 0; t < ticks; t += 2) {
+            int step = t;
+            plugin.visuals().later(t, () -> {
+                if (!target.isValid() || target.isDead()) {
+                    return;
+                }
+                Location head = target.getLocation().add(0, target.getHeight() + 0.35, 0);
+                Fx.View view = plugin.fx().view(head);
+                List<Location> stars = Shapes.ring(head, 0.45, 3, step * 0.4);
+                for (int i = 0; i < stars.size(); i++) {
+                    view.dust(stars.get(i), STARS[i], 1.1f, 1, 0);
+                }
+            });
         }
-        ring.vanish(ticks, 3);
     }
 
     private void grapple(Hook hook, Location point) {
         AbilitySettings settings = plugin.settings().ability(Ability.CANDY_HOOK);
         Player player = hook.player;
-        hook.effect.moveTo(point, 1).vanish(10, 3);
         Vector way = point.toVector().subtract(player.getLocation().toVector());
         double distance = way.length();
         if (distance < 1.5 || settings.num("grapple") <= 0) {
@@ -336,7 +406,9 @@ final class Sugarcrash implements Kit, Listener {
         player.setFallDistance(0f);
         plugin.abilities().softLanding(player, 60);
         plugin.fx().sound(point, "candy-hook-catch");
-        plugin.fx().view(point).particle(Fx.CRIT, point, 12, 0.2, 0.2, 0.2, 0.2);
+        Fx.View view = plugin.fx().view(point);
+        view.particle(Fx.CRIT, point, 12, 0.2, 0.2, 0.2, 0.2);
+        view.item(point, SUGAR_BITS, 8, 0.1, 0.12);
     }
 
     // ---- Candy Barrage ------------------------------------------------------------------------------------
@@ -345,7 +417,6 @@ final class Sugarcrash implements Kit, Listener {
         Barrage old = barrages.remove(weapon.id());
         if (old != null) {
             // Still floating over whoever had the scythe before: theirs ends, the cooldown starts.
-            old.floating.forEach(cane -> cane.vanish(0, 3));
             plugin.abilities().startCooldown(weapon.id(), Ability.CANDY_BARRAGE);
             return Result.HANDLED;
         }
@@ -353,28 +424,32 @@ final class Sugarcrash implements Kit, Listener {
         long now = plugin.tick();
         int count = settings.whole("canes");
         Barrage barrage = new Barrage(player, now + settings.ticks("duration"), count);
-        for (int i = 0; i < count; i++) {
-            Location at = player.getLocation().add(0, player.getHeight() + 0.4, 0);
-            barrage.floating.add(plugin.visuals().spawn("candy_hook", at).billboard().size(0.05).send(0)
-                    .animate(1 + i, 3, e -> e.size(0.8)));
-        }
-        circle(barrage, now, 1);
         barrages.put(weapon.id(), barrage);
         plugin.fx().sound(player.getLocation(), "candy-barrage");
-        Location head = player.getLocation().add(0, player.getHeight() + 0.4, 0);
-        plugin.fx().view(head).dust(head, PINK, 1.2f, 16, 0.6);
+        // The canes swirl up out of a puff of sugar.
+        Location head = player.getLocation().add(0, player.getHeight() + 0.45, 0);
+        Fx.View view = plugin.fx().view(head);
+        view.item(head, SUGAR_BITS, 14, 0.4, 0.08);
+        List<Location> swirl = Shapes.spiral(player.getLocation().add(0, 0.2, 0), 0.9, player.getHeight() + 0.2, 1.5, 30, 0);
+        for (int i = 0; i < swirl.size(); i++) {
+            view.dust(swirl.get(i), i % 2 == 0 ? CANDY_RED : SUGAR, 0.9f, 1, 0);
+        }
+        circle(barrage, now);
         return Result.HANDLED; // The cooldown starts once the canes are fired or the time is up.
     }
 
-    /** Keeps the floating canes in a slowly turning ring over the player's head, bobbing a little. */
-    private void circle(Barrage barrage, long now, int glide) {
+    /** The canes still floating stand in a ring over the player's head, curling outwards. */
+    private void circle(Barrage barrage, long now) {
         Player player = barrage.player;
-        Location head = player.getLocation().add(0, player.getHeight() + 0.45, 0);
-        double radius = 0.55 + 0.06 * barrage.total;
-        for (int i = 0; i < barrage.floating.size(); i++) {
-            double angle = Math.PI * 2 * i / barrage.total + now * 0.08;
-            double bob = Math.sin(now * 0.2 + i) * 0.08;
-            barrage.floating.get(i).moveTo(head.clone().add(Math.cos(angle) * radius, bob, Math.sin(angle) * radius), glide);
+        Location head = player.getLocation().add(0, player.getHeight() + 0.25, 0);
+        double radius = 0.5 + 0.06 * barrage.total;
+        Fx.View view = plugin.fx().view(head);
+        Vector up = new Vector(0, 1, 0);
+        for (int i = 0; i < barrage.left; i++) {
+            double angle = Math.PI * 2 * i / barrage.total + Math.toRadians(player.getLocation().getYaw());
+            double bob = Math.sin(now * 0.15 + i) * 0.06;
+            Vector out = new Vector(Math.cos(angle), 0, Math.sin(angle));
+            cane(view, head.clone().add(out.clone().multiply(radius)).add(0, bob, 0), up, out, 0.55, 0.65f);
         }
     }
 
@@ -395,20 +470,20 @@ final class Sugarcrash implements Kit, Listener {
     /** Fires the next floating cane where the player looks. */
     private void fire(UUID weapon, Barrage barrage) {
         long now = plugin.tick();
-        if (now < barrage.nextShot || barrage.floating.isEmpty()) {
+        if (now < barrage.nextShot || barrage.left <= 0) {
             return;
         }
         AbilitySettings settings = plugin.settings().ability(Ability.CANDY_BARRAGE);
         barrage.nextShot = now + settings.ticks("shot-gap");
         Player player = barrage.player;
-        Visuals.Effect effect = barrage.floating.remove(barrage.floating.size() - 1);
+        barrage.left--;
         Location eye = player.getEyeLocation();
         Vector direction = eye.getDirection().normalize();
         Location start = eye.clone().add(direction.clone().multiply(0.7)).add(0, 0.15, 0);
-        effect.size(0.9).send(1).moveTo(start, 1);
-        canes.add(new Cane(player, start, direction, effect));
-        plugin.fx().sound(player.getLocation(), "candy-barrage-shot", 0.05f * barrage.floating.size());
-        if (barrage.floating.isEmpty()) {
+        canes.add(new Cane(player, start, direction));
+        plugin.fx().view(start).item(start, SUGAR_BITS, 4, 0.1, 0.05);
+        plugin.fx().sound(player.getLocation(), "candy-barrage-shot", 0.05f * barrage.left);
+        if (barrage.left <= 0) {
             barrages.remove(weapon);
             plugin.abilities().startCooldown(weapon, Ability.CANDY_BARRAGE);
         }
@@ -420,7 +495,6 @@ final class Sugarcrash implements Kit, Listener {
         Player player = cane.player;
         World world = cane.position.getWorld();
         if (world == null || !world.equals(player.getWorld())) {
-            cane.effect.remove();
             return true;
         }
         double step = settings.num("speed");
@@ -437,43 +511,37 @@ final class Sugarcrash implements Kit, Listener {
             last = point;
         }
         Location reached = wall != null ? wall : to;
-        // A candy-striped trail.
+        // The cane spinning through the air, and a candy-striped trail behind it.
         Fx.View view = plugin.fx().view(from);
         double length = reached.distance(from);
         int i = 0;
-        for (double d = 0.0; d < length; d += 0.6, i++) {
-            view.dust(from.clone().add(cane.direction.clone().multiply(d)), i % 2 == 0 ? CANDY_RED : SUGAR, 0.9f, 1, 0.0);
+        for (double d = 0.0; d < length; d += 0.4, i++) {
+            view.dust(from.clone().add(cane.direction.clone().multiply(d)), i % 2 == 0 ? CANDY_RED : SUGAR, 0.7f, 1, 0.0);
         }
+        Vector spin = across(cane.direction).rotateAroundAxis(cane.direction, cane.travelled * 1.3);
+        cane(view, reached.clone().subtract(cane.direction.clone().multiply(0.35)), cane.direction, spin, 0.5, 0.75f);
         List<LivingEntity> caught = plugin.hits().along(player, from, reached, 0.5);
         if (!caught.isEmpty()) {
             LivingEntity target = caught.get(0);
             Location at = Geo.middle(target);
-            cane.effect.moveTo(at, 1).vanish(1, 2);
             if (plugin.hits().hurt(player, target, settings.num("damage"))) {
                 if (settings.num("knockback") > 0) {
                     Hits.knock(target, cane.direction, settings.num("knockback"), 0.15);
                 }
                 plugin.fx().sound(at, "candy-barrage-hit");
-                plugin.visuals().spawn("candy_burst", at).billboard().size(0.3).send(0)
-                        .animate(1, 3, e -> e.size(1.6))
-                        .vanish(6, 5);
-                plugin.fx().view(at).dust(at, PINK, 1.2f, 8, 0.3);
+                candyBurst(at, 0.6, 10);
             }
             return true;
         }
         if (wall != null) {
-            cane.effect.moveTo(wall, 1).vanish(2, 3);
-            plugin.fx().view(wall).particle(Fx.CRIT, wall, 8, 0.15, 0.15, 0.15, 0.15);
+            Fx.View hit = plugin.fx().view(wall);
+            hit.particle(Fx.CRIT, wall, 8, 0.15, 0.15, 0.15, 0.15);
+            hit.item(wall, SUGAR_BITS, 8, 0.1, 0.12); // It shatters.
             return true;
         }
         cane.position = to;
         cane.travelled += step;
-        cane.effect.moveTo(to, 1);
-        if (cane.travelled >= settings.num("range")) {
-            cane.effect.vanish(0, 3);
-            return true;
-        }
-        return false;
+        return cane.travelled >= settings.num("range");
     }
 
     // ---- Sugar High (passive) --------------------------------------------------------------------------------
@@ -517,12 +585,20 @@ final class Sugarcrash implements Kit, Listener {
         AbilitySettings settings = plugin.settings().ability(Ability.SUGAR_HIGH);
         Location at = Geo.middle(target);
         plugin.fx().sound(at, "sugar-crash");
-        plugin.visuals().spawn("candy_burst", at).billboard().size(0.4).send(0)
-                .animate(1, 3, e -> e.size(settings.num("splash-radius") * 2.0))
-                .vanish(7, 5);
+        double splash = settings.num("splash-radius");
+        candyBurst(at, 1.0, 22);
+        // A ring of sugar rolling out over the ground to the edge of the blast.
+        Location ground = target.getLocation().add(0, 0.15, 0);
         Fx.View view = plugin.fx().view(at);
-        view.particle(Fx.FIREWORK, at, 25, 0.4, 0.4, 0.4, 0.2);
-        view.dust(at, PINK, 1.8f, 20, 0.8);
+        for (int k = 1; k <= 3; k++) {
+            double r = splash * k / 3.0;
+            plugin.visuals().later(k - 1, () -> {
+                List<Location> ring = Shapes.ring(ground, r, (int) (10 + r * 8), r);
+                for (int i = 0; i < ring.size(); i++) {
+                    view.dust(ring.get(i), i % 2 == 0 ? PINK : SUGAR, 1.1f, 1, 0);
+                }
+            });
+        }
         Hits.knock(target, Geo.away(attacker.getLocation(), target.getLocation(), Geo.flat(attacker.getLocation())),
                 settings.num("knockback"), 0.35);
         if (settings.num("splash-damage") <= 0) {

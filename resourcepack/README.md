@@ -40,18 +40,20 @@ replaces the heart-only pack and already contains the Heart.
 
 The weapons are **smooth 3D models with high-resolution painted textures** (512 x 512, 32
 texels per model unit, four times sharper than before and not pixel art), in the style of the
-best fantasy weapon packs but our own designs. Every texel is lit smoothly from its own slope, so
+best fantasy weapon packs but our own designs. The materials read as what they are: Kurogane's
+mirror-polished steel with a rolling temper line, sparkling crystals along it and a dark
+burnished back; Sugarcrash's glossy hard candy with a clear shine, sugar sparkles and crisp
+stripes; Riftblade's void steel with violet and blue nebula clouds and stars; Gravebreaker's
+forged blued steel with shallow hammer facets and a mirror-bright ground edge (not rough stone);
+Starforged's star-steel and gold. Polished metal reflects a studio with a crisp horizon, so it
+looks like steel and not grey plastic. Every texel is lit smoothly from its own slope, so
 blades have real bevels and highlights, metal reflects light, gems show their facets and
 glowing parts bloom onto the steel round them. Grips, hafts, collars and the katana's guard are
 round (8 or 16 sided, lit as if perfectly round), the outlines of blades and axe heads are
 smooth curves, and their sides are long straight facets that follow the curves, so nothing
 looks stepped when you turn them. They stand upright and are turned onto the diagonal: in the
-inventory they fill the slot from corner to corner, and in other players' hands the middle of
-the grip sits exactly where a vanilla sword's handle does (a little bigger than a vanilla sword).
-**In your own hand (first person) the whole weapon is in view:** a vanilla sword mostly sits
-off the right edge of the screen, so the weapons are held further in, leaning towards the
-middle with their face turned to you, the scythe and the axes a little further right so their
-heads never reach the crosshair (`FIRST_PERSON` in `models/common.py`). The glowing
+inventory they fill the slot from corner to corner, and in the hand the middle of the grip sits
+exactly where a vanilla sword's handle does (a little bigger than a vanilla sword). The glowing
 parts (Kurogane's temper line, Sugarcrash's edge, Riftblade's rift and crystals, Gravebreaker's
 crack, Starforged's edges, lightning, stars and crystal) shimmer through a small animated
 texture, and on newer clients they light up in the dark. No renaming and no mods: the plugin's
@@ -67,7 +69,7 @@ shown, and `models/render.py` draws the showcase. `python3 textures.py --preview
 `release/Weapons-Showcase.png`, and `python3 textures.py --obj folder` writes every weapon as
 `.obj` + `.mtl` + `.png` to open in Blender or Blockbench (`release/Weapons-3D-Models.zip`).
 
-## 1.21 item look, tooltips, effects and sounds (Legendary 1.2 and 1.3)
+## 1.21 item look and tooltips
 
 - **Item models** (`assets/legendary/items/<weapon>.json`, 1.21.4+): Legendary sets each
   weapon's `item_model` to `legendary:<weapon>`, so the model no longer depends on custom model
@@ -77,23 +79,11 @@ shown, and `models/render.py` draws the showcase. `python3 textures.py --preview
   faint glow at the edge, and a thin frame shading from one colour to another with small gems
   in the corners. Nine-sliced like the vanilla one, so it fits any length of lore. Drawn by
   `tooltips.py`.
-- **Ability effects** (`items/fx/*.json`, `models/fx`, `textures/item/fx`): 19 glowing effects the
-  abilities show with display entities: Kurogane's crimson streak, slash, cut and rune circle;
-  Sugarcrash's candy-cane hook, candy burst, candy ring and the dizzy candy stars over a stunned
-  player; Riftblade's rift, void portal and void burst; Gravebreaker's shockwave, ember ring and
-  a 3D gravestone; Starforged's rune circle, star, nova, black hole and accretion disk. Each is
-  painted with soft edges at 64 to 256 pixels by `fx.py` (flat ones lie on the ground, upright
-  ones stand facing the viewer), lit at full brightness so they glow at night. Thin lines are
-  thickened and every effect has a soft glow of its own colour round it, so they stand out in
-  daylight and from afar too (`BOLD` in `fx.py`). Without the pack they show as paper.
-- **Sounds** (`sounds/legendary/<weapon>/*.ogg`, `sounds.json`): 41 sounds, for every ability,
-  passive and hit, and one for taking each weapon in hand (`legendary:kurogane.parry`,
-  `legendary:sugarcrash.hook`, `legendary:kurogane.draw`...), with subtitles. They are made from
-  scratch by `sounds/make_sounds.py` (`pip install numpy soundfile`): blade swishes and clangs,
-  whooshes, sparkles, void hums, rumbles, bells and impacts built from noise and tones. The `.ogg`
-  files are kept in the repository, so `build.py` only copies them.
+- **No effects or sounds** (Legendary 1.5): the abilities draw their effects with vanilla
+  particles and blocks and play vanilla sounds, so the pack holds only the weapons, their
+  tooltips and the Heart.
 
 After `build.py`, `python3 check.py` checks the pack against the plugin: every file parses,
-every model, texture, effect and sound the plugin uses is there, and every texture a model uses
-is in `textures/item/` or `textures/block/`. Minecraft only loads item model textures from those
-folders: anywhere else they show as the purple and black missing texture.
+every model and texture the weapons use is there, every texture a model uses is in
+`textures/item/` or `textures/block/` (anywhere else it shows as the purple and black missing
+texture), and the plugin asks the pack for no effect model or sound.

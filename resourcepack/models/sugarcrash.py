@@ -38,14 +38,21 @@ def blade_height(s):
 def blade_colour(s):
     q = across(s.x, s.y)
     if q < 0.3:
-        # white candy with a crimson swirl running along the spine
+        # white candy with crisp crimson stripes twisting along the spine
         swirl = (s.x * 1.1 + s.y * 0.9 + q * 3.0) % 1.0
-        c = mix(WHITE, RED, smooth(0.08, 0.04, abs(swirl - 0.5) - 0.12))
-        return mix(c, CANDY(0.7), smooth(0.24, 0.3, q))
-    # deep crimson candy, lighter in the middle as if lit from inside
-    inner = math.exp(-((q - 0.52) / 0.16) ** 2)
-    c = CANDY(0.35 + 0.35 * inner + 0.05 * noise(s.x * 4, s.y * 4, 3))
-    return mix(c, PINK(0.55), smooth(0.66, 0.8, q) * 0.6)
+        c = mix(WHITE, RED, smooth(0.03, 0.0, abs(swirl - 0.5) - 0.14))
+        c = mix(c, (1.0, 1.0, 1.0), 0.5 * math.exp(-((q - 0.1) / 0.035) ** 2))     # shine on the round
+        return mix(c, CANDY(0.7), smooth(0.25, 0.3, q))
+    # deep crimson hard candy, glowing from inside, with a clear glossy shine along the curve
+    inner = math.exp(-((q - 0.5) / 0.15) ** 2)
+    swirl = 0.5 + 0.5 * math.sin((s.x * 0.9 + s.y * 0.7) * 5.0 + q * 9.0)
+    c = CANDY(0.38 + 0.32 * inner + 0.08 * swirl)
+    c = mix(c, PINK(0.6), smooth(0.66, 0.82, q) * 0.65)
+    shine = math.exp(-((q - 0.4) / 0.035) ** 2) * (0.6 + 0.4 * noise(s.x * 3, s.y * 3, 4))
+    c = mix(c, (1.0, 0.92, 0.95), 0.75 * shine)
+    if noise(s.x * 55, s.y * 55, 9) > 0.86:
+        c = mix(c, (1.0, 1.0, 1.0), 0.7)                                # sugar sparkles
+    return c
 
 
 def edge_glow(s, t):
@@ -56,7 +63,7 @@ def edge_glow(s, t):
 
 def shaft_colour(s):
     p = helix(s, 0.8)
-    red = smooth(0.02, -0.02, abs(p - 0.5) - 0.25)          # soft-edged stripes
+    red = smooth(0.012, -0.012, abs(p - 0.5) - 0.25)        # crisp stripes
     return mix(WHITE, RED, red)
 
 

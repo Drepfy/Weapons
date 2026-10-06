@@ -46,15 +46,23 @@ They look like 1.21.11 items: with the server resource pack each has its own 3D 
 1.21.2+). Custom model data (1001 to 1005) is still set for older clients. `glint: false`
 turns the shimmer off for good.
 
-Every ability has its own 3D effect from the pack (crimson slashes, candy canes, a void rift, a
-shockwave, gravestones, a rune circle, falling stars, a black hole...), shown with display
-entities: the server says where an effect starts and ends, and the players' game animates it
-smoothly in between. They are big, glow and stay a moment so they are easy to see in a fight;
-the ones that show an area (Starfall's circle, the slam's cracks) match it exactly, and the ones
-that show a state (Iaido's stance, a stun) last exactly as long as it does. Effects are never
-saved with the world. Every ability, passive and hit has its own sound from the pack (with a
-quiet vanilla sound under the ability sounds for players without the pack), each weapon has its
-own sound when you take it in hand, and its sword or axe hits have their own hit sound.
+**Effects are vanilla particles and blocks**, drawn into shapes the way ability plugins like
+Altar do: crimson slashes that sweep across over a few ticks, X cuts with red chips, a turning
+crimson ring under Iaido, red-and-white candy canes floating over your head and spinning through
+the air, sugar bursting out of every candy hit, a jagged void tear with the warden's sonic boom
+when it snaps, swirling purple columns where Rift Swap moves you, the slam's debris rolling out
+over the ground with the blocks it reaches cracking (only shown), gravestones of real deepslate
+rising out of the ground, a gold and sky-blue rune circle with an eight-pointed star, meteors
+with trails, and a black hole with a turning accretion disk. Nothing pops in: there are no
+pictures to appear or vanish, and nothing is saved with the world. The ones that show an area
+(Starfall's circle, the slam) match it exactly, and the ones that show a state (Iaido's stance,
+a stun) last exactly as long as it does.
+
+**Sounds are vanilla Minecraft sounds**, two or three layered and pitched for each ability (the
+warden's sonic boom, the mace's ground smash, trident riptides, the illusioner's mirror move,
+bells, amethyst, fireworks...), so they sound clean and everyone hears them, pack or not. Each
+weapon makes a quiet sound when you take it in hand; sword and axe hits keep the game's own hit
+sounds. Every sound can be changed (or silenced with `[]`) in `config.yml`.
 
 Every weapon has a **passive** that works on its own, and two abilities. Several abilities can
 be **pressed again** while they are still going: a second dash, a return, a dive. The boss bar
@@ -75,11 +83,12 @@ shows how long you have to press again.
 
 ### Sugarcrash (candy scythe): reach, mobility and burst tempo
 
-- **Sugar High** (passive): each scythe hit adds a sugar stack (up to 5) and speeds you up
-  (Speed I, then Speed II). At full stacks the next hit is a **Sugar Crash**: +4 damage, and a
-  candy blast hurts (3 hearts) and throws everyone round the target.
+- **Sugar High** (passive): **Speed I for as long as the scythe is in your hand** (gone as soon
+  as you put it away; `speed-level`). Each scythe hit adds a sugar stack (up to 5); from two
+  thirds of the way you get Speed II. At full stacks the next hit is a **Sugar Crash**: +4
+  damage, and a candy blast hurts (3 hearts) and throws everyone round the target.
 - **Candy Hook** (F, 14s): throws a candy-cane hook on a candy rope (22 blocks). A player or
-  monster it catches takes 3 hearts, is yanked to you and stunned for a moment (too slow to
+  monster it catches takes 1.5 hearts, is yanked to you and stunned for a moment (too slow to
   walk away). A wall or the ground it catches pulls you to it instead, with no fall damage.
 - **Candy Barrage** (Shift + F, 22s): five candy canes appear and float in a ring over your
   head for 8 seconds. **Swing the scythe** (left-click) to fire one where you look, or press
@@ -227,7 +236,7 @@ cd legendary
 mvn -B package   # runs the tests, writes target/Legendary-<version>.jar
 ```
 
-`mvn test` runs 62 tests on a simulated server:
+`mvn test` runs 64 tests on a simulated server:
 - **Every ability and passive:** what it hits and when (Crimson Flash's two charges and
   bleeding, Iaido's counter and crescent, Crimson Edge's count, the hook's yank, stun and
   grapple, the candy canes (one per swing, the gap between shots, fading), Sugar High's crash, the rift's pull, snap and lift,
@@ -242,6 +251,9 @@ mvn -B package   # runs the tests, writes target/Legendary-<version>.jar
   while recharging, names, times, progress, flashing, staying while the weapon is carried), and
   the 3D effects being cleaned up.
 - **True damage:** Protection made up for so the damage is exact.
+- **Effects and sounds:** no ability shows a picture that pops in (only particles, and real
+  deepslate gravestones that clean up), every sound is a real vanilla sound, and Sugarcrash's
+  Speed comes and goes with the scythe in hand.
 - **Storage:** blocking for every container type, bundles, armour stands, pots, hoppers, mobs
   and crafting.
 - **Duplicates:** copies (which cannot use abilities), creative middle-click, revoked weapons,

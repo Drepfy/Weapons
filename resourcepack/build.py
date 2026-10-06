@@ -15,11 +15,8 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(ROOT, 'lifesteal', 'resourcepack'))
 import textures  # noqa: E402
-import fx  # noqa: E402
 import tooltips  # noqa: E402
 import make_heart  # noqa: E402
-
-SOUNDS = os.path.join(HERE, 'sounds', 'legendary')
 
 OUT = os.path.join(ROOT, 'release', 'VanillaSMP-ResourcePack.zip')
 
@@ -85,30 +82,9 @@ def files():
         # 1.21.4+: item model definitions
         out[f'assets/minecraft/items/{item}.json'] = as_json(
             dispatch(item, [(cmd, f'legendary:item/{name}') for cmd, name in weapons]))
-    # ---- the abilities' effects (display entities) and sounds ----
-    for name in fx.EFFECTS:
-        out[f'assets/legendary/textures/item/fx/{name}.png'] = textures.png.encode(fx.texture(name))
-        out[f'assets/legendary/models/fx/{name}.json'] = as_json(fx.model(name))
-        out[f'assets/legendary/items/fx/{name}.json'] = as_json(fx.item(name))
-    events = {}
-    for weapon in sorted(os.listdir(SOUNDS)):
-        for file in sorted(os.listdir(os.path.join(SOUNDS, weapon))):
-            if file.endswith('.ogg'):
-                sound = file[:-4]
-                with open(os.path.join(SOUNDS, weapon, file), 'rb') as f:
-                    out[f'assets/legendary/sounds/{weapon}/{file}'] = f.read()
-                events[f'{weapon}.{sound}'] = {'sounds': [{'name': f'legendary:{weapon}/{sound}'}],
-                                               'subtitle': f'subtitles.legendary.{weapon}.{sound}'}
-    out['assets/legendary/sounds.json'] = as_json(events)
-    out['assets/legendary/lang/en_us.json'] = as_json(
-        {f'subtitles.legendary.{key}': subtitle(key) for key in events})
+    # The abilities' effects are vanilla particles and blocks, and their sounds vanilla sounds:
+    # nothing for them in the pack.
     return out
-
-
-def subtitle(key):
-    """kurogane.blood_moon -> 'Kurogane: blood moon'"""
-    weapon, sound = key.split('.', 1)
-    return weapon.capitalize() + ': ' + sound.replace('_', ' ')
 
 
 def dispatch(item, entries):

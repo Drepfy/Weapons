@@ -44,6 +44,7 @@ final class Riftblade implements Kit, Listener {
 
     private static final Color VIOLET = Color.fromRGB(165, 80, 255);
     private static final Color VOID = Color.fromRGB(30, 8, 60);
+    private static final Color STARLIGHT = Color.fromRGB(235, 215, 255);
 
     private final LegendaryPlugin plugin;
     private final Map<UUID, Rend> rends = new HashMap<>();
@@ -59,15 +60,17 @@ final class Riftblade implements Kit, Listener {
         final Player player;
         final Location center;
         final long snap;
-        final Visuals.Effect rift;
+        final long opened;
+        final Vector facing;
         final Set<UUID> allowed = new HashSet<>();
         final Set<UUID> refused = new HashSet<>();
 
-        Rend(Player player, Location center, long snap, Visuals.Effect rift) {
+        Rend(Player player, Location center, long opened, long snap, Vector facing) {
             this.player = player;
             this.center = center;
+            this.opened = opened;
             this.snap = snap;
-            this.rift = rift;
+            this.facing = facing;
         }
     }
 
@@ -75,13 +78,11 @@ final class Riftblade implements Kit, Listener {
         final Player player;
         final Location at;
         final long until;
-        final Visuals.Effect effect;
 
-        Echo(Player player, Location at, long until, Visuals.Effect effect) {
+        Echo(Player player, Location at, long until) {
             this.player = player;
             this.at = at;
             this.until = until;
-            this.effect = effect;
         }
     }
 
@@ -101,10 +102,8 @@ final class Riftblade implements Kit, Listener {
         if (result != Result.FIRED || echo <= 0) {
             return result;
         }
-        Location at = from.clone().add(0, 1.0, 0);
-        Visuals.Effect effect = plugin.visuals().spawn("void_portal", at).billboard().size(0.2).send(0)
-                .animate(1, 4, e -> e.size(2.0));
-        echoes.put(weapon.id(), new Echo(player, from, plugin.tick() + echo, effect));
+        echoes.put(weapon.id(), new Echo(player, from, plugin.tick() + echo));
+        echoFx(from, plugin.tick());
         return Result.HANDLED; // The cooldown starts once the echo is used or fades.
     }
 
@@ -116,7 +115,6 @@ final class Riftblade implements Kit, Listener {
         }
         echoes.remove(weapon.id());
         plugin.abilities().startCooldown(weapon.id(), Ability.RIFT_SWAP);
-        echo.effect.animate(1, 3, e -> e.size(0.01)).life(5);
         Location from = player.getLocation();
         Location back = echo.at.clone();
         back.setYaw(from.getYaw());
@@ -154,7 +152,6 @@ final class Riftblade implements Kit, Listener {
             Map.Entry<UUID, Echo> echo = it.next();
             if (echo.getValue().player.equals(player)) {
                 it.remove();
-                echo.getValue().effect.remove();
                 plugin.abilities().startCooldown(echo.getKey(), Ability.RIFT_SWAP);
             }
         }
@@ -167,12 +164,11 @@ final class Riftblade implements Kit, Listener {
             Echo echo = entry.getValue();
             if (now >= echo.until) {
                 it.remove();
-                echo.effect.animate(1, 4, e -> e.size(0.01)).life(6);
-                plugin.abilities().startCooldown(entry.getKey(), Ability.RIFT_SWAP);
-            } else if (now % 4 == 0) {
-                echo.effect.turn(now * 9.0).send(4);
                 Location at = echo.at.clone().add(0, 1.0, 0);
-                plugin.fx().view(at).particle(Fx.REVERSE_PORTAL, at, 6, 0.3, 0.6, 0.3, 0.02);
+                plugin.fx().view(at).particle(Fx.REVERSE_PORTAL, at, 30, 0.2, 0.6, 0.2, 0.15); // It closes.
+                plugin.abilities().startCooldown(entry.getKey(), Ability.RIFT_SWAP);
+            } else if (now % 3 == 0) {
+                echoFx(echo.at, now);
             }
         }
         for (Iterator<Rend> it = rends.values().iterator(); it.hasNext(); ) {
@@ -194,14 +190,10 @@ final class Riftblade implements Kit, Listener {
         Vector direction = Geo.flat(start);
         Location end = Geo.dash(start, direction, settings.num("distance"));
         Location center = end.clone().add(0, 1.2, 0);
-        Visuals.Effect rift = plugin.visuals().spawn("rift", center).facing(direction).size(0.1, 3.6, 1.0).send(0)
-                .animate(1, 4, e -> e.size(2.4, 4.4, 1.0));
-        plugin.visuals().spawn("void_portal", center.clone().add(direction.clone().multiply(-0.05)))
-                .facing(direction).size(0.2).send(0)
-                .animate(1, 5, e -> e.size(3.2))
-                .vanish(6 + settings.ticks("pull-time"), 4);
-        long snap = plugin.tick() + settings.ticks("pull-time");
-        rends.put(player.getUniqueId(), new Rend(player, center, snap, rift));
+        long now = plugin.tick();
+        Rend rend = new Rend(player, center, now, now + settings.ticks("pull-time"), direction);
+        rends.put(player.getUniqueId(), rend);
+        riftFx(rend, now);
         plugin.fx().sound(center, "void-rend");
         return Result.FIRED;
     }
@@ -209,9 +201,7 @@ final class Riftblade implements Kit, Listener {
     private void pull(Rend rend, long now) {
         AbilitySettings settings = plugin.settings().ability(Ability.VOID_REND);
         Fx.View view = plugin.fx().view(rend.center);
-        view.particle(Fx.REVERSE_PORTAL, rend.center, 14, 0.4, 1.4, 0.4, 0.05);
-        view.particle(Fx.PORTAL, rend.center, 20, 1.6, 1.2, 1.6, 0.6);
-        view.dust(rend.center, VOID, 2.0f, 4, 0.5);
+        riftFx(rend, now);
         if (!rend.player.isOnline()) {
             return;
         }
@@ -236,22 +226,26 @@ final class Riftblade implements Kit, Listener {
             Vector velocity = target.getVelocity().multiply(0.6).add(in.normalize().multiply(pull));
             velocity.setY(Math.max(-0.4, Math.min(0.4, velocity.getY())));
             target.setVelocity(velocity);
-            if (now % 4 == 0) {
-                view.dust(Geo.middle(target), VIOLET, 1.0f, 3, 0.3);
+            if (now % 3 == 0) {
+                // A thread of void dragging them in.
+                view.fade(Shapes.line(Geo.middle(target), rend.center, 0.35), VIOLET, VOID, 0.8f);
             }
         }
     }
 
     private void snap(Rend rend) {
         AbilitySettings settings = plugin.settings().ability(Ability.VOID_REND);
-        rend.rift.animate(1, 3, e -> e.size(0.02, 4.2, 1.0)).life(5);
-        plugin.visuals().spawn("void_burst", rend.center).billboard().size(0.4).send(0)
-                .animate(1, 3, e -> e.size(settings.num("radius") * 2.2))
-                .vanish(8, 6);
         plugin.fx().sound(rend.center, "void-rend-snap");
         Fx.View view = plugin.fx().view(rend.center);
-        view.particle(Fx.FLASH, rend.center, 1, 0, 0, 0, 0);
-        view.particle(Fx.REVERSE_PORTAL, rend.center, 60, 0.8, 1.2, 0.8, 0.3);
+        // It snaps shut: a sonic shockwave, a shell of void bursting out to the edge of the blast.
+        view.particle(Fx.SONIC_BOOM, rend.center, 1, 0, 0, 0, 0);
+        view.particle(Fx.REVERSE_PORTAL, rend.center, 70, 0.6, 1.0, 0.6, 0.35);
+        view.particle(Fx.WITCH, rend.center, 25, 0.8, 0.8, 0.8, 0.1);
+        double radius = settings.num("radius");
+        for (int k = 1; k <= 3; k++) {
+            double r = radius * k / 3.0;
+            plugin.visuals().later(k - 1, () -> view.fade(Shapes.sphere(rend.center, r, (int) (14 + r * 10)), VIOLET, VOID, 1.3f));
+        }
         if (!rend.player.isOnline()) {
             return;
         }
@@ -328,16 +322,47 @@ final class Riftblade implements Kit, Listener {
         return Result.FIRED;
     }
 
-    /** A portal swirling open and shut where someone went through. */
+    /** A rift swirling open and shut where someone went through: a twisting column of void. */
     private void portal(Location at) {
         Location middle = at.clone().add(0, 1.0, 0);
-        plugin.visuals().spawn("void_portal", middle).billboard().size(0.2).send(0)
-                .animate(1, 3, e -> e.size(3.0))
-                .vanish(12, 7);
         Fx.View view = plugin.fx().view(middle);
-        view.particle(Fx.REVERSE_PORTAL, middle, 40, 0.4, 0.9, 0.4, 0.1);
-        view.dust(middle, VOID, 1.8f, 20, 0.5);
-        view.dust(middle, VIOLET, 1.2f, 15, 0.6);
+        view.fade(Shapes.spiral(at.clone().add(0, 0.05, 0), 0.65, 2.1, 2.0, 36, 0), VIOLET, VOID, 1.2f);
+        view.fade(Shapes.spiral(at.clone().add(0, 0.05, 0), 0.65, 2.1, 2.0, 36, Math.PI), STARLIGHT, VIOLET, 0.8f);
+        view.particle(Fx.REVERSE_PORTAL, middle, 40, 0.3, 0.8, 0.3, 0.12);
+        plugin.visuals().later(2, () -> view.fade(Shapes.ring(at.clone().add(0, 0.1, 0), 1.1, 22, 0), VIOLET, VOID, 1.0f));
+    }
+
+    /** The void tear of Void Rend: a jagged crack standing in the air, growing as it opens. */
+    private void riftFx(Rend rend, long now) {
+        double open = Math.min(1.0, (now - rend.opened + 1) / 5.0);
+        double half = 1.9 * open;
+        Vector right = Geo.right(rend.facing);
+        Fx.View view = plugin.fx().view(rend.center);
+        Random jitter = new Random(rend.opened); // The same jagged shape every tick.
+        Location last = null;
+        for (double y = -half; y <= half + 1.0E-6; y += 0.25) {
+            double zig = (jitter.nextDouble() - 0.5) * 0.45 * (1 - Math.abs(y) / 2.2);
+            Location point = rend.center.clone().add(right.clone().multiply(zig)).add(0, y, 0);
+            if (last != null) {
+                view.dust(Shapes.line(last, point, 0.12), VOID, 1.4f);
+            }
+            view.dust(point, VIOLET, 0.9f, 1, 0.05);
+            last = point;
+        }
+        if (now % 2 == 0) {
+            view.fade(Shapes.standingRing(rend.center, rend.facing, 1.5 * open, 26, now * 0.15), VIOLET, VOID, 1.0f);
+        }
+        view.particle(Fx.REVERSE_PORTAL, rend.center, 10, 0.3, half * 0.6, 0.3, 0.06);
+        view.particle(Fx.PORTAL, rend.center, 14, 1.4, 1.1, 1.4, 0.6);
+    }
+
+    /** Rift Swap's echo: a small turning rift where you were, waiting for you to come back. */
+    private void echoFx(Location at, long now) {
+        Location middle = at.clone().add(0, 1.0, 0);
+        Fx.View view = plugin.fx().view(middle);
+        view.fade(Shapes.standingRing(middle, new Vector(Math.cos(now * 0.1), 0, Math.sin(now * 0.1)), 0.7, 18, now * 0.2),
+                VIOLET, VOID, 0.9f);
+        view.particle(Fx.REVERSE_PORTAL, middle, 4, 0.2, 0.5, 0.2, 0.02);
     }
 
     /** The first player (or monster) in the line of sight, up to the first wall. */

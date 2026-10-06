@@ -678,3 +678,76 @@ v1_3_3:
           nova-damage: 7
         starstruck:
           damage: 4
+
+# 1.4.0 and 1.4.1: the lore before Sugar High gave Speed while held, Candy Hook's damage, and
+# the sounds before they were vanilla sounds (all older versions' sounds too).
+v1_4_1:
+  weapons:
+    sugarcrash:
+      lore:
+        - "&8Legendary Candy Scythe"
+        - ""
+        - "&#FF7AC3Passive &8» &f{sugar-high.name}"
+        - "&7Hits build sugar and speed. Full: a candy blast."
+        - ""
+        - "&#FF7AC3{key} &8» &f{candy-hook.name} &8({candy-hook.cooldown})"
+        - "&7Hook a player to you, or a wall to fly to it."
+        - ""
+        - "&#FF7AC3{sneak-key} &8» &f{candy-barrage.name} &8({candy-barrage.cooldown})"
+        - "&7Candy canes float over you. Swing to fire them."
+        - ""
+        - "{attack}"
+      abilities:
+        candy-hook:
+          damage: 6
+  sounds:
+    crimson-flash: ["legendary:kurogane.flash 1 1", "entity.player.attack.sweep 0.3 1.5"]
+    crimson-flash-end: ["legendary:kurogane.sheathe 0.9 1"]
+    crimson-cut: ["legendary:kurogane.cut 1 1", "entity.player.attack.crit 0.3 1.2"]
+    crimson-edge: ["legendary:kurogane.edge 0.9 1", "entity.player.attack.crit 0.3 1.3"]
+    iaido: ["legendary:kurogane.iaido 1 1", "item.trident.return 0.3 0.8"]
+    iaido-parry: ["legendary:kurogane.parry 1 1", "item.shield.block 0.4 1.4"]
+    iaido-counter: ["legendary:kurogane.counter 1 1", "entity.player.attack.crit 0.3 0.9"]
+    kurogane-hit: ["legendary:kurogane.hit 0.9 1"]
+    kurogane-equip: ["legendary:kurogane.draw 0.7 1"]
+    kurogane-melee: ["legendary:kurogane.hit 0.45 1.15"]
+    bleed: ["legendary:kurogane.bleed 0.5 1"]
+    candy-barrage: ["legendary:sugarcrash.full 1 1.15", "block.amethyst_block.chime 0.4 1.4"]
+    candy-barrage-shot: ["legendary:sugarcrash.hook 0.8 1.35", "entity.snowball.throw 0.4 1.2"]
+    candy-barrage-hit: ["legendary:sugarcrash.pop 1 1", "entity.player.attack.crit 0.3 1.4"]
+    candy-hook: ["legendary:sugarcrash.hook 1 1", "entity.fishing_bobber.throw 0.4 1.2"]
+    candy-hook-catch: ["legendary:sugarcrash.catch 1 1", "entity.fishing_bobber.retrieve 0.4 1.3"]
+    sugar-high-full: ["legendary:sugarcrash.full 0.7 1", "block.amethyst_block.chime 0.4 1.6"]
+    sugar-crash: ["legendary:sugarcrash.crash 1 1", "entity.firework_rocket.large_blast 0.35 1.2"]
+    sugar-high-stack: ["legendary:sugarcrash.pop 0.5 1"]
+    sugarcrash-equip: ["legendary:sugarcrash.equip 0.7 1"]
+    sugarcrash-melee: ["legendary:sugarcrash.pop 0.45 0.9"]
+    void-rend: ["legendary:riftblade.rend 1 1", "entity.enderman.teleport 0.3 0.6"]
+    void-rend-snap: ["legendary:riftblade.snap 1 1", "entity.evoker.cast_spell 0.25 0.6"]
+    riftblade-hit: ["legendary:riftblade.hit 0.9 1"]
+    riftblade-equip: ["legendary:riftblade.equip 0.7 1"]
+    riftblade-melee: ["legendary:riftblade.hit 0.45 1.15"]
+    rift-swap: ["legendary:riftblade.swap 1 1", "entity.enderman.teleport 0.3 1.3"]
+    rift-return: ["legendary:riftblade.return 1 1", "entity.enderman.teleport 0.3 0.9"]
+    phase-shift: ["legendary:riftblade.phase 1 1", "entity.enderman.teleport 0.3 1.6"]
+    executioners-leap: ["legendary:gravebreaker.leap 1 1", "entity.breeze.jump 0.25 0.7"]
+    executioners-slam: ["legendary:gravebreaker.slam 1 1", "entity.generic.explode 0.3 0.6"]
+    executioners-dive: ["legendary:gravebreaker.dive 1 1", "entity.breeze.wind_burst 0.3 0.6"]
+    last-rites: ["legendary:gravebreaker.rites 0.9 1", "block.bell.resonate 0.25 0.6"]
+    gravebreaker-hit: ["legendary:gravebreaker.hit 0.9 1"]
+    gravebreaker-equip: ["legendary:gravebreaker.equip 0.7 1"]
+    gravebreaker-melee: ["legendary:gravebreaker.hit 0.45 1.1"]
+    grave-rise: ["legendary:gravebreaker.rumble 1 1"]
+    grave-rise-stone: ["legendary:gravebreaker.stone 0.9 1", "block.deepslate.break 0.35 0.7"]
+    starfall: ["legendary:starforged.call 1 1", "block.beacon.activate 0.3 1.6"]
+    starfall-star: ["legendary:starforged.fall 0.8 1"]
+    starfall-impact: ["legendary:starforged.impact 1 1", "entity.firework_rocket.twinkle 0.3 1.2"]
+    starforged-hit: ["legendary:starforged.hit 0.9 1"]
+    starforged-equip: ["legendary:starforged.equip 0.7 1"]
+    starforged-melee: ["legendary:starforged.hit 0.45 1.15"]
+    starstruck: ["legendary:starforged.starstruck 0.9 1", "entity.firework_rocket.twinkle 0.3 1.5"]
+    singularity: ["legendary:starforged.singularity 0.8 1", "block.portal.trigger 0.12 1.4"]
+    singularity-nova: ["legendary:starforged.nova 1 1", "entity.generic.explode 0.3 1.3"]
+v1_2_sounds:
+  sounds:
+    singularity: ["legendary:starforged.singularity 1 1", "block.portal.trigger 0.12 1.4"]

@@ -80,8 +80,13 @@ def blade_height(s):
 def blade_colour(s):
     d, e, r = blade_parts(s)
     swirl = fbm(s.x * 1.4 + fbm(s.x, s.y * 0.6, 32) * 2, s.y * 0.45, 33)
-    c = VOID(0.25 + 0.6 * swirl)
-    c = mix(c, hexrgb('#d7c6ff'), 0.85 * stars(s.x, s.y))
+    c = VOID(0.3 + 0.7 * swirl)
+    # nebula clouds of violet and deep blue drifting through the void steel
+    cloud = fbm(s.x * 0.9 + 3.0, s.y * 0.5, 34)
+    c = mix(c, hexrgb('#3b1670'), 0.55 * smooth(0.45, 0.8, cloud))
+    c = mix(c, hexrgb('#16245a'), 0.4 * smooth(0.5, 0.85, 1 - cloud))
+    c = mix(c, hexrgb('#ffffff'), 0.95 * stars(s.x, s.y, 12.0, 31))
+    c = mix(c, hexrgb('#d7c6ff'), 0.7 * stars(s.x, s.y, 6.0, 35))
     bevel = smooth(0.3, 0.24, e)
     c = mix(c, BEVEL(0.2 + 0.75 * smooth(0.26, 0.0, e) + (0.1 if d < 0 else -0.12)), bevel)
     c = mix(c, hexrgb('#8a4dff'), 0.45 * smooth(0.18, 0.0, r))     # the rift's light on its walls

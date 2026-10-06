@@ -6,8 +6,8 @@ walnut haft with iron bands, a leather-wrapped grip and a spiked iron pommel.
 import math
 
 from forge import Weapon, shape
-from looks import dent, hammered, wood, wrap
-from paint import bezier, hexrgb, line_dist, line_pos, mix, noise, ramp, smooth
+from looks import hammered, wood, wrap
+from paint import bezier, fbm, hexrgb, line_dist, line_pos, mix, noise, ramp, smooth
 
 STEEL = ramp('#2a2e36', '#4c525e', '#7c8492', '#b9c0cc', '#eef2f6')
 IRON = hexrgb('#3a3d44')
@@ -26,21 +26,36 @@ TOP_SPIKE = [(7.5, 14.5), (8.0, 16.0), (8.5, 14.5)]
 RIVETS = [(6.6, 13.65), (6.6, 11.3), (4.85, 13.95), (4.75, 11.0)]
 
 
+def forged(s, seed=5):
+    """Forged steel: broad, shallow hammer facets (not grit), a fine brushed grain, and a little
+    blue-black temper colour."""
+    facets = fbm(s.x * 1.4, s.y * 1.4, seed)
+    grain = noise(s.x * 2.0 + s.y * 0.3, s.y * 60, seed + 3)
+    return facets, grain
+
+
 def head_height(s):
     de = line_dist(EDGE, s.x, s.y)
     h = 0.03 + 0.15 * smooth(0.0, 0.6, de)          # the ground bevel of the cutting edge
-    return h + dent(s.x, s.y, 5) * smooth(0.5, 0.9, de) - 0.02 * smooth(0.05, 0.0, s.d)
+    facets, _ = forged(s)
+    h += 0.018 * facets * smooth(0.5, 0.9, de)       # shallow hammer facets on the flat
+    return h - 0.02 * smooth(0.05, 0.0, s.d)
 
 
 def head_colour(s):
     de, along = line_pos(EDGE, s.x, s.y)
     if de < 0.62:
-        # freshly ground edge: bright, with grind lines running across it
-        grind = 0.9 + 0.1 * noise(along * 140, de * 3, 11)
-        c = STEEL(0.62 + 0.3 * smooth(0.6, 0.0, de))
+        # freshly ground edge: mirror bright, with fine grind lines running across it
+        grind = 0.94 + 0.06 * noise(along * 140, de * 3, 11)
+        c = STEEL(0.7 + 0.28 * smooth(0.62, 0.0, de))
         return tuple(v * grind for v in c)
-    base = mix(STEEL(0.32), IRON, smooth(1.0, 3.5, de))
-    return hammered(s.x, s.y, base, 5, 0.35)
+    facets, grain = forged(s)
+    # dark blued steel, a little lighter towards the edge, with the brushed grain and facets
+    base = mix(STEEL(0.36), hexrgb('#1f2430'), smooth(0.8, 3.6, de))
+    base = mix(base, hexrgb('#2c3550'), 0.25 * facets)
+    shade = 0.9 + 0.12 * facets + 0.05 * grain
+    c = tuple(v * shade for v in base)
+    return mix(c, STEEL(0.55), 0.35 * smooth(0.9, 0.62, de))     # the bevel line catches the light
 
 
 def head_sheen(s):
@@ -49,8 +64,9 @@ def head_sheen(s):
 
 
 def plate_colour(s):
-    c = hammered(s.x, s.y, hexrgb('#2c2e34'), 8, 0.5)
-    c = mix(c, hexrgb('#6a6f7a'), smooth(0.08, 0.0, s.d))                 # worn bright rim
+    facets, grain = forged(s, 8)
+    c = tuple(v * (0.88 + 0.16 * facets + 0.04 * grain) for v in hexrgb('#24262d'))
+    c = mix(c, hexrgb('#8a909c'), smooth(0.1, 0.0, s.d))                 # worn bright rim
     glow = smooth(0.35, 0.0, line_dist(CRACK, s.x, s.y))
     return mix(c, hexrgb('#5a1a08'), 0.6 * glow)                          # scorched round the crack
 
@@ -79,9 +95,10 @@ def build():
     w = Weapon('gravebreaker', grip=2.6)
     head = shape(HEAD)
     w.sheet('head', head, 0.42, head_colour,
-            height=head_height, relief=2.5, metal=0.85, gloss=0.6, spec=0.8, sheen=head_sheen)
-    w.sheet('plate', shape(FORGE), 0.74, plate_colour, height=lambda s: 0.08 * smooth(0.0, 0.15, s.d) + dent(s.x, s.y, 8),
-            relief=2.5, metal=0.6, gloss=0.35, spec=0.5)
+            height=head_height, relief=2.5, metal=0.9, gloss=0.7, spec=0.9, sheen=head_sheen)
+    w.sheet('plate', shape(FORGE), 0.74, plate_colour,
+            height=lambda s: 0.08 * smooth(0.0, 0.15, s.d) + 0.015 * forged(s, 8)[0],
+            relief=2.5, metal=0.7, gloss=0.45, spec=0.6)
     w.sheet('crack', lambda x, y: line_dist(CRACK, x, y) < 0.085, None, '#2a0800', box=(4.4, 10.4, 6.0, 14.35),
             glow=ember_glow, glow_colours=EMBER, glow_strength=1.5)
     for cx, cy in RIVETS:
@@ -93,7 +110,7 @@ def build():
     w.sheet('top spike', shape(TOP_SPIKE), 0.44, lambda s: STEEL(0.42 + 0.15 * smooth(0.0, 0.2, s.d)),
             height=spike_height('y'), relief=3.0, metal=0.85, gloss=0.65, spec=0.9)
     # socket, haft, bands, grip, pommel
-    w.rod('socket', 8.0, 10.6, 14.55, 0.68, lambda s: hammered(s.u, s.y, IRON, 9, 0.4), caps=(False, True),
+    w.rod('socket', 8.0, 10.6, 14.55, 0.68, lambda s: hammered(s.u, s.y, IRON, 9, 0.22), caps=(False, True),
           metal=0.7, gloss=0.4, spec=0.6)
     for y0, y1 in ((10.45, 10.8), (14.3, 14.65)):
         w.rod('socket band', 8.0, y0, y1, 0.75, lambda s: STEEL(0.5), caps=(True, True), metal=0.9, gloss=0.6,

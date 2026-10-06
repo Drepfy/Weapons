@@ -937,7 +937,7 @@ class LegendaryTest {
         tick(2);
         assertEquals(20.0, alex.getHealth(), "the hook takes a moment to fly");
         tick(5);
-        assertEquals(14.0, alex.getHealth(), 1.0E-6, "caught: 3 hearts");
+        assertEquals(17.0, alex.getHealth(), 1.0E-6, "caught: 1.5 hearts");
         assertTrue(alex.getVelocity().getZ() < -0.5 && alex.getVelocity().getY() > 0.2, "yanked towards Steve");
         tick(8);
         assertTrue(alex.hasPotionEffect(PotionEffectType.SLOWNESS), "stunned");
@@ -967,9 +967,9 @@ class LegendaryTest {
         PlayerMock steve = player("Steve", 0, 0);
         PlayerMock alex = player("Alex", 0, 10);
         ItemStack scythe = give(steve, WeaponType.SUGARCRASH);
-        int before = plugin.visuals().count();
         sneakUseKey(steve);
-        assertEquals(before + 5, plugin.visuals().count(), "five candy canes over Steve's head");
+        assertTrue(plugin.abilities().active(steve, plugin.items().read(scythe), Ability.CANDY_BARRAGE, plugin.tick()) > 0,
+                "five candy canes over Steve's head");
         assertEquals(0, cooldown(scythe, Ability.CANDY_BARRAGE), "no cooldown while they float");
         tick(4);
         assertEquals(20.0, alex.getHealth(), "nothing until Steve swings");
@@ -1001,24 +1001,24 @@ class LegendaryTest {
         swing(steve);
         tick(6);
         assertEquals(5.0, alex.getHealth(), 1.0E-6, "none left");
-        tick(10); // The last hit's candy burst fades.
-        assertEquals(before, plugin.visuals().count(), "all the canes are gone");
+        assertEquals(0, plugin.visuals().count(), "drawn with particles: nothing pops in or is left behind");
     }
 
     @Test
     void candyBarrageCanesFadeAfterAWhile() {
         PlayerMock steve = player("Steve", 0, 0);
         ItemStack scythe = give(steve, WeaponType.SUGARCRASH);
-        int before = plugin.visuals().count();
+        WeaponItems.Tag tag = plugin.items().read(scythe);
         sneakUseKey(steve);
         tick(7 * 20);
         assertEquals(0, cooldown(scythe, Ability.CANDY_BARRAGE));
-        assertEquals(before + 5, plugin.visuals().count());
+        assertTrue(plugin.abilities().active(steve, tag, Ability.CANDY_BARRAGE, plugin.tick()) > 0, "still floating");
         tick(30);
-        assertTrue(cooldown(scythe, Ability.CANDY_BARRAGE) > 21 * 20, "8s later the rest fade and the cooldown starts");
-        assertEquals(before, plugin.visuals().count());
+        assertTrue(cooldown(scythe, Ability.CANDY_BARRAGE) > 21 * 20, "8s later the rest crumble and the cooldown starts");
+        assertEquals(0, plugin.abilities().active(steve, tag, Ability.CANDY_BARRAGE, plugin.tick()));
         sneakUseKey(steve);
-        assertEquals(before, plugin.visuals().count(), "not again until it recharges");
+        assertEquals(0, plugin.abilities().active(steve, tag, Ability.CANDY_BARRAGE, plugin.tick()),
+                "not again until it recharges");
     }
 
     @Test
@@ -1479,25 +1479,71 @@ class LegendaryTest {
     }
 
     @Test
-    void abilitiesShowTheirEffectsAndCleanThemUp() {
+    void abilityEffectsAreParticlesAndRealBlocksThatCleanUp() {
         PlayerMock steve = player("Steve", 0, 0);
-        give(steve, WeaponType.KUROGANE);
-        useKey(steve);
-        List<String> models = new ArrayList<>();
-        for (ItemDisplay display : world.getEntitiesByClass(ItemDisplay.class)) {
-            assertFalse(display.isPersistent(), "never saved with the world");
-            ItemMeta meta = display.getItemStack().getItemMeta();
-            models.add(String.valueOf(modern(meta::getItemModel)));
+        player("Alex", 0, 5);
+        for (WeaponType type : List.of(WeaponType.KUROGANE, WeaponType.SUGARCRASH, WeaponType.RIFTBLADE, WeaponType.STARFORGED)) {
+            give(steve, type);
+            stand(steve, 0, 0, 15f);
+            useKey(steve);
+            tick(2);
+            sneakUseKey(steve);
+            tick(2);
+            assertTrue(world.getEntitiesByClass(ItemDisplay.class).isEmpty(), type + ": no painted pictures popping in");
+            tick(80);
         }
-        assertTrue(models.size() >= 2, "the streak and the slash: " + models);
-        if (!models.contains("null")) {
-            assertTrue(models.contains("legendary:fx/crimson_streak") && models.contains("legendary:fx/crimson_slash"),
-                    String.valueOf(models));
+        // Grave Rise's gravestones are real deepslate blocks rising out of the ground.
+        give(steve, WeaponType.GRAVEBREAKER);
+        stand(steve, 0, 0, 0f);
+        sneakUseKey(steve);
+        tick(4);
+        List<org.bukkit.entity.BlockDisplay> stones = new ArrayList<>(world.getEntitiesByClass(org.bukkit.entity.BlockDisplay.class));
+        assertFalse(stones.isEmpty(), "gravestones");
+        for (org.bukkit.entity.BlockDisplay stone : stones) {
+            assertFalse(stone.isPersistent(), "never saved with the world");
+            assertTrue(stone.getBlock().getMaterial().name().contains("DEEPSLATE"), stone.getBlock().getMaterial().name());
         }
-        assertEquals(models.size(), plugin.visuals().count());
-        tick(40);
-        assertEquals(0, plugin.visuals().count(), "all gone again");
         assertTrue(world.getEntitiesByClass(ItemDisplay.class).isEmpty());
+        tick(80);
+        assertEquals(0, plugin.visuals().count(), "all gone again");
+        assertTrue(world.getEntitiesByClass(org.bukkit.entity.BlockDisplay.class).isEmpty());
+    }
+
+    @Test
+    void sugarcrashGivesSpeedWhileHeld() {
+        PlayerMock steve = player("Steve", 0, 0);
+        give(steve, WeaponType.SUGARCRASH);
+        tick(6);
+        org.bukkit.potion.PotionEffect speed = steve.getPotionEffect(PotionEffectType.SPEED);
+        assertNotNull(speed, "Speed I while held");
+        assertEquals(0, speed.getAmplifier());
+        assertTrue(speed.isAmbient() && !speed.hasParticles(), "quiet, like a beacon's");
+        steve.getInventory().setHeldItemSlot(8);
+        tick(6);
+        assertFalse(steve.hasPotionEffect(PotionEffectType.SPEED), "gone when put away");
+        plugin.getConfig().set("weapons.sugarcrash.abilities.sugar-high.speed-level", 0);
+        plugin.saveConfig();
+        assertEquals(List.of(), plugin.reload());
+        steve.getInventory().setHeldItemSlot(0);
+        tick(6);
+        assertFalse(steve.hasPotionEffect(PotionEffectType.SPEED), "speed-level 0: none");
+    }
+
+    @Test
+    void everySoundIsARealMinecraftSound() {
+        for (Map.Entry<String, List<io.github.drepfy.legendary.config.Settings.SoundSpec>> entry
+                : plugin.settings().sounds().entrySet()) {
+            for (io.github.drepfy.legendary.config.Settings.SoundSpec spec : entry.getValue()) {
+                String key = spec.key();
+                assertFalse(key.contains(":") && !key.startsWith("minecraft:"), entry.getKey() + ": a vanilla sound, " + key);
+                String field = key.replace("minecraft:", "").replace('.', '_').toUpperCase(java.util.Locale.ROOT);
+                try {
+                    org.bukkit.Sound.class.getField(field);
+                } catch (NoSuchFieldException e) {
+                    throw new AssertionError(entry.getKey() + ": no such sound " + key);
+                }
+            }
+        }
     }
 
     @Test

@@ -20,9 +20,11 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.util.Vector;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
@@ -134,9 +136,11 @@ final class Gravebreaker implements Kit, Listener {
         leaps.put(player.getUniqueId(), new Leap(plugin.tick()));
         plugin.abilities().softLanding(player, 80);
         plugin.fx().sound(player.getLocation(), "executioners-leap");
-        plugin.visuals().spawn("shockwave", player.getLocation().add(0, 0.06, 0)).size(0.8).send(0)
-                .animate(1, 4, e -> e.size(2.8))
-                .vanish(9, 5);
+        Location feet = player.getLocation().add(0, 0.1, 0);
+        Fx.View view = plugin.fx().view(feet);
+        view.particle(Fx.GUST, feet, 1, 0, 0, 0, 0);
+        view.debris(feet, groundBlock(feet), 30, 0.6);
+        view.particle(Fx.CLOUD, feet, 16, 0.5, 0.05, 0.5, 0.06);
         return Result.FIRED;
     }
 
@@ -161,9 +165,20 @@ final class Gravebreaker implements Kit, Listener {
         plugin.abilities().softLanding(player, 60);
         plugin.fx().sound(player.getLocation(), "executioners-dive");
         Location at = player.getLocation().add(0, 1.0, 0);
-        plugin.visuals().spawn("ember_ring", at).billboard().size(0.6).send(0)
-                .animate(1, 3, e -> e.size(3.0))
-                .vanish(8, 5);
+        Fx.View view = plugin.fx().view(at);
+        view.particle(Fx.GUST, at, 1, 0, 0, 0, 0);
+        view.particle(Fx.FLAME, at, 24, 0.4, 0.6, 0.4, 0.08);
+        // A trail of fire behind the plunge, for as long as it falls.
+        for (int t = 1; t <= 12; t += 1) {
+            plugin.visuals().later(t, () -> {
+                if (player.isOnline() && leaps.containsKey(player.getUniqueId())) {
+                    Location body = player.getLocation().add(0, 0.9, 0);
+                    Fx.View trail = plugin.fx().view(body);
+                    trail.particle(Fx.FLAME, body, 6, 0.25, 0.4, 0.25, 0.02);
+                    trail.particle(Fx.SMOKE, body, 2, 0.2, 0.3, 0.2, 0.01);
+                }
+            });
+        }
     }
 
     private void slam(Player player, boolean dived) {
@@ -174,18 +189,11 @@ final class Gravebreaker implements Kit, Listener {
         double bonus = dived ? settings.num("dive-bonus") : 0;
         double radius = settings.num("radius") * (dived ? 1.3 : 1.0);
         plugin.fx().sound(center, "executioners-slam");
-        Visuals visuals = plugin.visuals();
-        visuals.spawn("shockwave", center.clone().add(0, 0.06, 0)).size(1.0).turn(random.nextInt(360)).send(0)
-                .animate(1, 6, e -> e.size(radius * 2.2))
-                .vanish(24, 10);
-        visuals.spawn("ember_ring", center.clone().add(0, 0.1, 0)).size(0.6).send(0)
-                .animate(1, 4, e -> e.size(radius * 1.4))
-                .vanish(9, 6);
         rocks(center, dived ? 11 : 7);
         Fx.View view = plugin.fx().view(center);
         view.particle(Fx.EXPLOSION, center.clone().add(0, 0.5, 0), dived ? 4 : 2, 0.6, 0.2, 0.6, 0);
-        view.debris(center.clone().add(0, 0.2, 0), groundBlock(center), 80, radius / 2);
-        view.particle(Fx.CLOUD, center.clone().add(0, 0.2, 0), 30, radius / 2.5, 0.1, radius / 2.5, 0.05);
+        view.debris(center.clone().add(0, 0.2, 0), groundBlock(center), 60, 0.8);
+        shockwave(center, radius, true);
         for (LivingEntity target : plugin.hits().around(player, center.clone().add(0, 0.6, 0), radius)) {
             double distance = target.getLocation().distance(center);
             double falloff = Math.min(1.0, distance / radius);
@@ -196,6 +204,60 @@ final class Gravebreaker implements Kit, Listener {
                 Hits.effect(target, "slowness", settings.whole("slow-level"), settings.ticks("slow-duration"));
                 plugin.fx().sound(target.getLocation(), "gravebreaker-hit");
             }
+        }
+    }
+
+    /**
+     * A shockwave rolling out over the ground: a ring of the ground's own debris (with embers when
+     * it is the slam) growing to the edge, cracks on the blocks it passes, dust and smoke.
+     */
+    private void shockwave(Location center, double radius, boolean embers) {
+        BlockData ground = groundBlock(center);
+        Location level = center.clone().add(0, 0.15, 0);
+        int steps = 5;
+        for (int k = 1; k <= steps; k++) {
+            double r = radius * k / steps;
+            plugin.visuals().later(k - 1, () -> {
+                Fx.View view = plugin.fx().view(level);
+                for (Location point : Shapes.ring(level, r, (int) (8 + r * 7), r)) {
+                    view.debris(point, ground, 3, 0.15);
+                    if (embers) {
+                        view.particle(Fx.FLAME, point, 1, 0.1, 0.05, 0.1, 0.02);
+                    }
+                }
+                view.particle(Fx.CLOUD, level, (int) (4 + r * 2), r * 0.6, 0.05, r * 0.6, 0.02);
+            });
+        }
+        // Cracks across the ground blocks it reached (only shown), mending after a moment.
+        Fx.View view = plugin.fx().view(center);
+        List<Location> cracked = new ArrayList<>();
+        int r = (int) Math.ceil(radius);
+        for (int dx = -r; dx <= r; dx++) {
+            for (int dz = -r; dz <= r; dz++) {
+                if (dx * dx + dz * dz > radius * radius) {
+                    continue;
+                }
+                Location block = center.clone().add(dx, -0.5, dz).getBlock().getLocation();
+                if (block.getBlock().getType().isSolid()) {
+                    cracked.add(block);
+                }
+            }
+        }
+        List<Integer> ids = new ArrayList<>();
+        for (Location block : cracked) {
+            double far = block.clone().add(0.5, 0, 0.5).distance(center) / Math.max(1.0, radius);
+            int id = plugin.fx().crackId();
+            ids.add(id);
+            view.crack(block, (float) Math.max(0.1, 0.8 - 0.6 * far + random.nextDouble() * 0.2), id);
+        }
+        plugin.visuals().later(40, () -> {
+            for (int i = 0; i < cracked.size(); i++) {
+                view.crack(cracked.get(i), 0f, ids.get(i));
+            }
+        });
+        if (embers) {
+            view.particle(Fx.LAVA, level, 10, radius / 3, 0.1, radius / 3, 0);
+            view.particle(Fx.EMBER_SMOKE, level, 6, radius / 3, 0.1, radius / 3, 0.02);
         }
     }
 
@@ -260,15 +322,12 @@ final class Gravebreaker implements Kit, Listener {
             return;
         }
         AbilitySettings settings = plugin.settings().ability(Ability.GRAVE_RISE);
-        plugin.visuals().spawn("gravestone", stone.clone().add(0, 0.7, 0)).facing(direction.clone().multiply(-1))
-                .turn(random.nextInt(21) - 10).size(1.5).offset(0, -1.6, 0).send(0)
-                .animate(1, 3, e -> e.offset(0, 0.05, 0))
-                .animate(30, 8, e -> e.offset(0, -1.7, 0))
-                .life(39);
+        gravestone(stone, direction);
         plugin.fx().sound(stone, "grave-rise-stone");
         Fx.View view = plugin.fx().view(stone);
         view.debris(stone.clone().add(0, 0.1, 0), groundBlock(stone), 30, 0.5);
         view.particle(Fx.SOUL, stone.clone().add(0, 0.6, 0), 4, 0.3, 0.3, 0.3, 0.02);
+        view.particle(Fx.SMOKE, stone.clone().add(0, 0.2, 0), 3, 0.3, 0.1, 0.3, 0.01);
         double width = settings.num("width");
         for (LivingEntity target : plugin.hits().around(player, stone.clone().add(0, 1.0, 0), width + 0.6)) {
             double dy = target.getLocation().getY() - stone.getY();
@@ -285,6 +344,35 @@ final class Gravebreaker implements Kit, Listener {
         }
     }
 
+    /**
+     * A gravestone of real deepslate rising out of the ground: a polished slab with a tiled cap,
+     * turned across the line, sinking back after a moment.
+     */
+    private void gravestone(Location stone, Vector direction) {
+        boolean alongX = Math.abs(direction.getX()) > Math.abs(direction.getZ());
+        double[][] parts = {
+                // width, height, depth, bottom
+                {0.8, 1.05, 0.24, 0.0},
+                {0.92, 0.16, 0.32, 1.05},
+                {0.5, 0.14, 0.26, 1.21},
+        };
+        Material[] blocks = {Material.POLISHED_DEEPSLATE, Material.DEEPSLATE_TILES, Material.CHISELED_DEEPSLATE};
+        Location base = stone.getBlock().getLocation().add(0.5, 0, 0.5);
+        for (int i = 0; i < parts.length; i++) {
+            double[] p = parts[i];
+            float sx = (float) (alongX ? p[2] : p[0]);
+            float sz = (float) (alongX ? p[0] : p[2]);
+            float sy = (float) p[1];
+            float y = (float) p[3];
+            // Starts below the ground, rises smoothly, and sinks back later.
+            Visuals.Effect part = plugin.visuals().block(blocks[i].createBlockData(), base)
+                    .size(sx, sy, sz).offset(-sx / 2, y - 1.45f, -sz / 2).send(0);
+            part.animate(1, 4, e -> e.offset(-sx / 2, y, -sz / 2));
+            part.animate(30, 8, e -> e.offset(-sx / 2, y - 1.5f, -sz / 2));
+            part.life(39);
+        }
+    }
+
     /** The last gravestone bursts as a tomb: a ring of force round it. */
     private void tomb(Player player, Location at) {
         AbilitySettings settings = plugin.settings().ability(Ability.GRAVE_RISE);
@@ -292,12 +380,13 @@ final class Gravebreaker implements Kit, Listener {
         if (!player.isOnline() || radius <= 0) {
             return;
         }
-        plugin.fx().sound(at, "executioners-slam");
-        plugin.visuals().spawn("shockwave", at.clone().add(0, 0.06, 0)).size(0.6).send(0)
-                .animate(1, 4, e -> e.size(radius * 2.2))
-                .vanish(16, 8);
+        plugin.fx().sound(at, "grave-tomb");
         rocks(at, 6);
-        plugin.fx().view(at).particle(Fx.SOUL, at.clone().add(0, 0.5, 0), 20, radius / 2, 0.3, radius / 2, 0.04);
+        shockwave(at, radius, false);
+        Fx.View view = plugin.fx().view(at);
+        view.particle(Fx.SOUL, at.clone().add(0, 0.5, 0), 20, radius / 2, 0.3, radius / 2, 0.04);
+        view.particle(Fx.SCULK_SOUL, at.clone().add(0, 0.8, 0), 12, 0.4, 0.5, 0.4, 0.05);
+        view.along(Fx.SOUL_FIRE, Shapes.ring(at.clone().add(0, 0.15, 0), radius, (int) (10 + radius * 6), 0), 0.02);
         if (settings.num("tomb-damage") <= 0) {
             return;
         }
@@ -339,8 +428,8 @@ final class Gravebreaker implements Kit, Listener {
         plugin.abilities().cooldowns().start(weapon.id(), Ability.EXECUTIONERS_LEAP, plugin.tick(), 0);
         plugin.fx().sound(killer.getLocation(), "last-rites");
         Location at = killer.getLocation().add(0, 0.1, 0);
-        plugin.visuals().spawn("ember_ring", at).size(0.5).send(0)
-                .animate(1, 4, e -> e.size(3.6))
-                .vanish(9, 6);
+        Fx.View view = plugin.fx().view(at);
+        view.along(Fx.SOUL_FIRE, Shapes.ring(at, 1.4, 22, 0), 0.01);
+        view.particle(Fx.SOUL, at.clone().add(0, 1.0, 0), 12, 0.4, 0.6, 0.4, 0.03);
     }
 }

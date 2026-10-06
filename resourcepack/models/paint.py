@@ -80,16 +80,19 @@ FILL = norm((0.75, -0.25, 0.45))
 HALF = norm((LIGHT[0], LIGHT[1], LIGHT[2] + 1.0))
 BOX = norm((-0.55, 0.55, 0.63))
 RIM = norm((0.62, 0.45, 0.64))
-AMBIENT, KEY, FILL_K = 0.16, 1.0, 0.24
+AMBIENT, KEY, FILL_K = 0.13, 1.12, 0.26
 
 
 def env(r):
-    """How bright the studio is in the direction r (what polished metal reflects)."""
+    """How bright the studio is in the direction r (what polished metal reflects): a dark floor,
+    a crisp horizon, a bright sky, a softbox and a rim strip. The sharp horizon is what makes
+    polished steel read as mirror-bright rather than grey."""
     y = r[1]
-    sky = 0.06 + 0.7 * smooth(-0.45, 0.95, y) + 0.12 * smooth(-0.2, 0.2, -r[0])
+    sky = 0.03 + 0.12 * smooth(-0.7, -0.05, y) + 0.62 * smooth(-0.04, 0.22, y) + 0.1 * smooth(0.4, 0.95, y)
+    sky += 0.12 * smooth(-0.2, 0.2, -r[0])
     box = r[0] * BOX[0] + r[1] * BOX[1] + r[2] * BOX[2]
     rim = r[0] * RIM[0] + r[1] * RIM[1] + r[2] * RIM[2]
-    return sky + 2.4 * smooth(0.8, 0.95, box) + 0.9 * smooth(0.86, 0.96, rim)
+    return sky + 2.6 * smooth(0.82, 0.95, box) + 1.0 * smooth(0.87, 0.96, rim)
 
 
 def shade(albedo, n, metal=0.0, gloss=0.3, spec=0.5, sheen=0.0, occl=1.0):

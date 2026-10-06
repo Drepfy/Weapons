@@ -32,9 +32,6 @@ WEAPONS = {
     'kurogane': kurogane.build, 'sugarcrash': sugarcrash.build, 'riftblade': riftblade.build,
     'gravebreaker': gravebreaker.build, 'starforged': starforged.build,
 }
-# how each is held in first person (models/common.py)
-HOLDS = {'kurogane': 'sword', 'sugarcrash': 'scythe', 'riftblade': 'sword', 'gravebreaker': 'axe',
-         'starforged': 'axe'}
 FRAME_TIME = 3          # ticks per frame of the glow animation (blended smoothly between frames)
 
 
@@ -43,7 +40,7 @@ def weapon(name):
     """(the baked weapon, its display settings)."""
     w = WEAPONS[name]()
     baked = w.bake()
-    return baked, common.display(w.grip, baked.points(), hold=HOLDS[name])
+    return baked, common.display(w.grip, baked.points())
 
 
 def model(name):

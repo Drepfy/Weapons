@@ -10,10 +10,10 @@ from forge import Weapon
 from paint import clamp, fbm, hexrgb, mix, noise, ramp, smooth
 
 Y_BLADE, Y_KISSAKI, Y_TIP = 6.25, 14.3, 15.9
-STEEL = hexrgb('#c4ccd7')
-FROST = hexrgb('#eef2f7')
-BACK = hexrgb('#8a93a3')
-SPINE = hexrgb('#4d535f')
+STEEL = hexrgb('#cfd6e0')
+FROST = hexrgb('#f6f8fb')
+BACK = hexrgb('#59616f')
+SPINE = hexrgb('#2e333d')
 LACQUER = hexrgb('#5c0a14')
 GOLD = ramp('#6e4210', '#c08a2c', '#f0c860', '#fff2c0')
 IRON = hexrgb('#24262c')
@@ -56,8 +56,9 @@ def in_blade(x, y):
 
 
 def hamon(y):
-    """Where the temper line runs (fraction of the way from edge to back)."""
-    return 0.31 + 0.055 * math.sin(y * 2.3) + 0.025 * math.sin(y * 5.9 + 1.0)
+    """Where the temper line runs (fraction of the way from edge to back): rolling waves with
+    smaller ripples on them, like a real gunome hamon."""
+    return 0.32 + 0.06 * abs(math.sin(y * 2.6)) + 0.03 * math.sin(y * 7.3 + 1.0) + 0.012 * math.sin(y * 19.0)
 
 
 RIDGE = 0.68
@@ -97,16 +98,23 @@ def blade_colour(s):
     brushed = 0.95 + 0.05 * noise(x * 46, y * 1.4, 3)
     if u < RIDGE:
         hm = hamon(y)
-        # frosted hardened edge, misty where it meets the polished steel
-        c = mix(FROST, STEEL, smooth(hm - 0.05, hm + 0.03, u))
-        mist = math.exp(-abs(u - hm) / 0.06)
-        c = mix(c, hexrgb('#ff8c9a'), 0.22 * mist)
-        if u < 0.06:
-            c = mix(c, (1.0, 1.0, 1.0), 0.6)
+        # frosted hardened edge (with sparkling nie crystals), misty where it meets the polished
+        # steel, which darkens a little towards the ridge
+        c = mix(FROST, STEEL, smooth(hm - 0.04, hm + 0.02, u))
+        c = mix(c, hexrgb('#9aa3b2'), 0.35 * smooth(hm + 0.05, RIDGE, u))
+        mist = math.exp(-abs(u - hm) / 0.05)
+        c = mix(c, hexrgb('#ff7a8c'), 0.3 * mist)
+        nie = noise(x * 60, y * 60, 17)
+        if u < hm and nie > 0.78:
+            c = mix(c, (1.0, 1.0, 1.0), 0.8)
+        if u < 0.07:
+            c = mix(c, (1.0, 1.0, 1.0), 0.75)             # the honed edge
     elif y > Y_KISSAKI:
-        c = mix(STEEL, BACK, 0.5)                         # the back of the point, polished
+        c = mix(STEEL, BACK, 0.4)                         # the back of the point, polished
     else:
-        c = mix(BACK, SPINE, smooth(0.86, 0.95, u))
+        # the burnished flat above the ridge: dark blue-black steel, a bright ridge line
+        c = mix(BACK, SPINE, smooth(0.8, 0.95, u))
+        c = mix(c, hexrgb('#e8ecf2'), smooth(0.03, 0.0, abs(u - RIDGE - 0.012)))
         if in_groove(x, y):
             c = LACQUER
     c = tuple(v * brushed for v in c)
@@ -134,7 +142,7 @@ def in_temper(x, y):
     if not (Y_BLADE + 0.3 <= y <= Y_KISSAKI - 0.06) or not in_blade(x, y):
         return False
     hx = edge(y) + hamon(y) * (spine(y) - edge(y))
-    return abs(x - hx) < 0.07
+    return abs(x - hx) < 0.085
 
 
 def cord_pattern(s):
