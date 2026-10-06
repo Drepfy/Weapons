@@ -89,8 +89,6 @@ weapons:
       - "&7Your hits cut twice and heal you."
       - ""
       - "{enchantments}"
-      - ""
-      - "<gradient:#FFD36B:#FF8A3D>&lLEGENDARY</gradient>"
     abilities:
       crimson-flash:
         cooldown: 20s
@@ -137,8 +135,6 @@ weapons:
       - "&7Spin a candy tornado that shreds."
       - ""
       - "{enchantments}"
-      - ""
-      - "<gradient:#FFD36B:#FF8A3D>&lLEGENDARY</gradient>"
     abilities:
       sugar-rush:
         cooldown: 18s
@@ -191,8 +187,6 @@ weapons:
       - "&7Swap places with who you look at."
       - ""
       - "{enchantments}"
-      - ""
-      - "<gradient:#FFD36B:#FF8A3D>&lLEGENDARY</gradient>"
     abilities:
       void-rend:
         cooldown: 22s
@@ -239,8 +233,6 @@ weapons:
       - "&7Gravestones burst out of the ground."
       - ""
       - "{enchantments}"
-      - ""
-      - "<gradient:#FFD36B:#FF8A3D>&lLEGENDARY</gradient>"
     abilities:
       executioners-leap:
         cooldown: 20s
@@ -293,8 +285,6 @@ weapons:
       - "&7A black hole pulls, then explodes."
       - ""
       - "{enchantments}"
-      - ""
-      - "<gradient:#FFD36B:#FF8A3D>&lLEGENDARY</gradient>"
     abilities:
       starfall:
         cooldown: 25s

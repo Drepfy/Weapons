@@ -298,3 +298,71 @@ v1_1_0:
         - ""
         - "&6&lLEGENDARY &8#{id}"
       item-model: ""
+
+v1_2_0:
+  weapons:
+    kurogane:
+      lore:
+        - "&8Legendary Katana"
+        - ""
+        - "&#FF4D6A{key} &8» &f{crimson-flash.name} &8({crimson-flash.cooldown})"
+        - "&7Dash through enemies. They bleed."
+        - ""
+        - "&#FF4D6A{sneak-key} &8» &f{blood-moon.name} &8({blood-moon.cooldown})"
+        - "&7Your hits cut twice and heal you."
+        - ""
+        - "{enchantments}"
+        - ""
+        - "<gradient:#FFD36B:#FF8A3D>&lLEGENDARY</gradient>"
+    sugarcrash:
+      lore:
+        - "&8Legendary Candy Scythe"
+        - ""
+        - "&#FF7AC3{key} &8» &f{sugar-rush.name} &8({sugar-rush.cooldown})"
+        - "&7Dash through players, then speed up."
+        - ""
+        - "&#FF7AC3{sneak-key} &8» &f{candy-cyclone.name} &8({candy-cyclone.cooldown})"
+        - "&7Spin a candy tornado that shreds."
+        - ""
+        - "{enchantments}"
+        - ""
+        - "<gradient:#FFD36B:#FF8A3D>&lLEGENDARY</gradient>"
+    riftblade:
+      lore:
+        - "&8Legendary Void Sword"
+        - ""
+        - "&#B76BFF{key} &8» &f{void-rend.name} &8({void-rend.cooldown})"
+        - "&7Tear a rift that pulls and blinds."
+        - ""
+        - "&#B76BFF{sneak-key} &8» &f{rift-swap.name} &8({rift-swap.cooldown})"
+        - "&7Swap places with who you look at."
+        - ""
+        - "{enchantments}"
+        - ""
+        - "<gradient:#FFD36B:#FF8A3D>&lLEGENDARY</gradient>"
+    gravebreaker:
+      lore:
+        - "&8Legendary Battle Axe"
+        - ""
+        - "&#FF8A3D{key} &8» &f{executioners-leap.name} &8({executioners-leap.cooldown})"
+        - "&7Leap up and slam the ground."
+        - ""
+        - "&#FF8A3D{sneak-key} &8» &f{grave-rise.name} &8({grave-rise.cooldown})"
+        - "&7Gravestones burst out of the ground."
+        - ""
+        - "{enchantments}"
+        - ""
+        - "<gradient:#FFD36B:#FF8A3D>&lLEGENDARY</gradient>"
+    starforged:
+      lore:
+        - "&8Legendary Celestial Axe"
+        - ""
+        - "&#6FD6FF{key} &8» &f{starfall.name} &8({starfall.cooldown})"
+        - "&7Call down a rain of stars."
+        - ""
+        - "&#6FD6FF{sneak-key} &8» &f{singularity.name} &8({singularity.cooldown})"
+        - "&7A black hole pulls, then explodes."
+        - ""
+        - "{enchantments}"
+        - ""
+        - "<gradient:#FFD36B:#FF8A3D>&lLEGENDARY</gradient>"

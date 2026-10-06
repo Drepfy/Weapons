@@ -342,6 +342,7 @@ class LegendaryTest {
             assertTrue(lore.contains("Sharpness VII") && lore.contains("Unbreakable"), lore);
             assertTrue(lore.contains(axe ? "Efficiency V" : "Sweeping Edge III"), lore);
             assertFalse(lore.contains(WeaponItems.shortId(id(item))), "no tracking number in the lore");
+            assertFalse(lore.contains("LEGENDARY"), "no LEGENDARY line at the bottom");
             assertEquals(WeaponRecord.State.HELD, record(item).state());
             assertEquals(steve.getUniqueId(), record(item).holder());
             ids.add(id(item));
@@ -1269,6 +1270,8 @@ class LegendaryTest {
         // ...and one written by 1.1.0, before the abilities changed.
         plugin.getConfig().set("weapons.riftblade.lore", old.getStringList("v1_1_0.weapons.riftblade.lore"));
         plugin.getConfig().set("weapons.riftblade.name", old.getString("v1_1_0.weapons.riftblade.name"));
+        // ...and one written by 1.2.0, with LEGENDARY at the bottom.
+        plugin.getConfig().set("weapons.gravebreaker.lore", old.getStringList("v1_2_0.weapons.gravebreaker.lore"));
         // But this server wrote its own Starforged lore and alt message.
         plugin.getConfig().set("weapons.starforged.lore", List.of("&bMy own lore"));
         plugin.getConfig().set("messages.alt-blocked", "&cNo alts!");
@@ -1277,7 +1280,7 @@ class LegendaryTest {
 
         plugin.reload();
         List<String> lore = plugin.getConfig().getStringList("weapons.kurogane.lore");
-        assertEquals(11, lore.size(), "the new lore");
+        assertEquals(9, lore.size(), "the new lore");
         assertTrue(String.join("\n", lore).contains("{crimson-flash.name}"));
         assertEquals("&cLegendaries can't go in containers.", plugin.getConfig().getString("messages.storage-blocked"));
         assertTrue(plugin.getConfig().getStringList("weapons.sugarcrash.lore").contains(
@@ -1286,17 +1289,20 @@ class LegendaryTest {
                 "&#B76BFF{key} &8» &f{void-rend.name} &8({void-rend.cooldown})"));
         assertEquals("<gradient:#E9C6FF:#A855F7>&lRiftblade</gradient>", plugin.getConfig().getString("weapons.riftblade.name"),
                 "brighter on the dark tooltip");
+        assertEquals(9, plugin.getConfig().getStringList("weapons.gravebreaker.lore").size());
+        assertFalse(String.join("\n", plugin.getConfig().getStringList("weapons.gravebreaker.lore")).contains("LEGENDARY"));
         assertEquals(List.of("&bMy own lore"), plugin.getConfig().getStringList("weapons.starforged.lore"));
         assertEquals("&cNo alts!", plugin.getConfig().getString("messages.alt-blocked"));
         // It is saved, so it sticks after the next restart.
         org.bukkit.configuration.file.YamlConfiguration saved = org.bukkit.configuration.file.YamlConfiguration
                 .loadConfiguration(new java.io.File(plugin.getDataFolder(), "config.yml"));
-        assertEquals(11, saved.getStringList("weapons.kurogane.lore").size());
+        assertEquals(9, saved.getStringList("weapons.kurogane.lore").size());
         // Weapons already out get the new lore too, the enchantments listed two to a line.
         PlayerMock steve = player("Steve", 0, 0);
         ItemStack sword = give(steve, WeaponType.KUROGANE);
         List<String> itemLore = sword.getItemMeta().getLore().stream().map(ChatColor::stripColor).toList();
-        assertEquals(13, itemLore.size(), String.join("\n", itemLore));
+        assertEquals(11, itemLore.size(), String.join("\n", itemLore));
+        assertEquals("Unbreakable", itemLore.get(itemLore.size() - 1), "the enchantments are the last lines");
         assertTrue(itemLore.contains("F » Crimson Flash (20s)"), String.join("\n", itemLore));
         assertTrue(itemLore.contains("Sharpness VII  ✦  Fire Aspect II"), String.join("\n", itemLore));
         assertTrue(itemLore.contains("Unbreakable"), String.join("\n", itemLore));
