@@ -63,7 +63,7 @@ shown, and `models/render.py` draws the showcase. `python3 textures.py --preview
 `release/Weapons-Showcase.png`, and `python3 textures.py --obj folder` writes every weapon as
 `.obj` + `.mtl` + `.png` to open in Blender or Blockbench (`release/Weapons-3D-Models.zip`).
 
-## 1.21 item look, tooltips, effects and sounds (Legendary 1.2)
+## 1.21 item look, tooltips, effects and sounds (Legendary 1.2 and 1.3)
 
 - **Item models** (`assets/legendary/items/<weapon>.json`, 1.21.4+): Legendary sets each
   weapon's `item_model` to `legendary:<weapon>`, so the model no longer depends on custom model
@@ -74,15 +74,16 @@ shown, and `models/render.py` draws the showcase. `python3 textures.py --preview
   in the corners. Nine-sliced like the vanilla one, so it fits any length of lore. Drawn by
   `tooltips.py`.
 - **Ability effects** (`items/fx/*.json`, `models/fx`, `textures/fx`): 19 glowing effects the
-  abilities show with display entities: Kurogane's crimson streak, slash, cut, blood moon and
-  rune circle; Sugarcrash's sprinkles, candy burst and candy ring; Riftblade's rift, void portal
-  and void burst; Gravebreaker's shockwave, ember ring and a 3D gravestone; Starforged's rune
-  circle, star, nova, black hole and accretion disk. Each is painted with soft edges at
-  64 to 256 pixels by `fx.py` (flat ones lie on the ground, upright ones stand facing the
-  viewer), lit at full brightness so they glow at night. Without the pack they show as paper.
-- **Sounds** (`sounds/legendary/<weapon>/*.ogg`, `sounds.json`): 28 sounds, a cast sound for
-  every ability and a hit sound for every weapon (`legendary:kurogane.flash`,
+  abilities show with display entities: Kurogane's crimson streak, slash, cut and rune circle;
+  Sugarcrash's candy-cane hook, candy burst, candy ring and the dizzy candy stars over a stunned
+  player; Riftblade's rift, void portal and void burst; Gravebreaker's shockwave, ember ring and
+  a 3D gravestone; Starforged's rune circle, star, nova, black hole and accretion disk. Each is
+  painted with soft edges at 64 to 256 pixels by `fx.py` (flat ones lie on the ground, upright
+  ones stand facing the viewer), lit at full brightness so they glow at night. Without the pack
+  they show as paper.
+- **Sounds** (`sounds/legendary/<weapon>/*.ogg`, `sounds.json`): 36 sounds, for every ability,
+  passive and hit (`legendary:kurogane.parry`, `legendary:sugarcrash.hook`,
   `legendary:starforged.nova`...), with subtitles. They are made from scratch by
-  `sounds/make_sounds.py` (`pip install numpy soundfile`): blade swishes, whooshes, sparkles,
-  void hums, rumbles, chimes and impacts built from noise and tones. The `.ogg` files are kept
-  in the repository, so `build.py` only copies them.
+  `sounds/make_sounds.py` (`pip install numpy soundfile`): blade swishes and clangs, whooshes,
+  sparkles, void hums, rumbles, bells and impacts built from noise and tones. The `.ogg` files
+  are kept in the repository, so `build.py` only copies them.

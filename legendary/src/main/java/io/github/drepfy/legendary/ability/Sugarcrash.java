@@ -7,54 +7,65 @@ import io.github.drepfy.legendary.config.AbilitySettings;
 import io.github.drepfy.legendary.item.WeaponItems;
 import org.bukkit.Color;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Projectile;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 /**
- * Sugarcrash, the candy war-scythe: mobility and burst tempo.
+ * Sugarcrash, the candy war-scythe: reach, mobility and burst tempo.
  * <ul>
- *   <li><b>Sugar Rush</b>: a candy-streaked dash that bowls through players, then a burst of
- *   speed and faster swings.</li>
+ *   <li><b>Candy Hook</b>: throws a candy-cane hook on a candy rope. A player (or monster) it
+ *   catches is yanked to you and stunned for a moment; a wall or the ground it catches pulls you
+ *   to it instead (no fall damage).</li>
  *   <li><b>Candy Cyclone</b>: the scythe spins into a candy-striped tornado around the player,
- *   dragging nearby players in and shredding them, then bursts outwards.</li>
+ *   who can keep moving (faster). It drags nearby players in and shreds them, deflects arrows,
+ *   then bursts outwards.</li>
+ *   <li><b>Sugar High</b> (passive): each hit adds a sugar stack and speeds you up; at full
+ *   stacks the next hit is a Sugar Crash, a candy explosion round the target.</li>
  * </ul>
  */
-final class Sugarcrash implements Kit {
+final class Sugarcrash implements Kit, Listener {
 
     private static final Color PINK = Color.fromRGB(255, 92, 165);
     private static final Color CANDY_RED = Color.fromRGB(225, 30, 60);
     private static final Color SUGAR = Color.fromRGB(255, 245, 250);
 
     private final LegendaryPlugin plugin;
-    private final Map<UUID, Rush> rushes = new HashMap<>();
-    /** Caster → the tick their speed burst ends (for the boss bar). */
-    private final Map<UUID, Long> buffs = new HashMap<>();
+    private final List<Hook> hooks = new ArrayList<>();
     private final Map<UUID, Cyclone> cyclones = new HashMap<>();
+    private final Map<UUID, Sugar> sugar = new HashMap<>();
+    /** Attacker → the target their Sugar Crash is landing on. */
+    private final Map<UUID, UUID> crashing = new HashMap<>();
 
     Sugarcrash(LegendaryPlugin plugin) {
         this.plugin = plugin;
     }
 
-    private static final class Rush {
+    private static final class Hook {
         final Player player;
-        final long until;
         final Vector direction;
-        final Set<UUID> hit = new HashSet<>();
+        final Visuals.Effect effect;
+        Location position;
+        double travelled;
 
-        Rush(Player player, long until, Vector direction) {
+        Hook(Player player, Location position, Vector direction, Visuals.Effect effect) {
             this.player = player;
-            this.until = until;
+            this.position = position;
             this.direction = direction;
+            this.effect = effect;
         }
     }
 
@@ -72,6 +83,12 @@ final class Sugarcrash implements Kit {
         }
     }
 
+    private static final class Sugar {
+        int stacks;
+        long until;
+        long last = Long.MIN_VALUE / 2;
+    }
+
     @Override
     public WeaponType type() {
         return WeaponType.SUGARCRASH;
@@ -79,51 +96,52 @@ final class Sugarcrash implements Kit {
 
     @Override
     public Result use(Player player, WeaponItems.Tag weapon, Ability ability) {
-        return ability == Ability.SUGAR_RUSH ? rush(player) : cyclone(player);
+        return ability == Ability.CANDY_HOOK ? hook(player) : cyclone(player);
     }
 
     @Override
     public long active(Player player, WeaponItems.Tag weapon, Ability ability, long now) {
-        Long until;
-        if (ability == Ability.SUGAR_RUSH) {
-            until = buffs.get(player.getUniqueId());
-        } else {
-            Cyclone cyclone = cyclones.get(player.getUniqueId());
-            until = cyclone == null ? null : cyclone.until;
+        if (ability != Ability.CANDY_CYCLONE) {
+            return 0;
         }
-        return until == null ? 0 : Math.max(0, until - now);
+        Cyclone cyclone = cyclones.get(player.getUniqueId());
+        return cyclone == null ? 0 : Math.max(0, cyclone.until - now);
     }
 
     @Override
     public long activeLength(Ability ability) {
-        AbilitySettings settings = plugin.settings().ability(ability);
-        return ability == Ability.SUGAR_RUSH ? settings.ticks("dash-time") + settings.ticks("buff-duration")
-                : settings.ticks("duration");
+        return ability == Ability.CANDY_CYCLONE ? plugin.settings().ability(ability).ticks("duration") : 0;
+    }
+
+    /** Sugar stacks a player has (for tests). */
+    int stacks(Player player) {
+        Sugar state = sugar.get(player.getUniqueId());
+        return state == null ? 0 : state.stacks;
     }
 
     @Override
     public void forget(Player player) {
-        rushes.remove(player.getUniqueId());
-        buffs.remove(player.getUniqueId());
+        hooks.removeIf(hook -> {
+            if (hook.player.equals(player)) {
+                hook.effect.remove();
+                return true;
+            }
+            return false;
+        });
         Cyclone cyclone = cyclones.remove(player.getUniqueId());
         if (cyclone != null) {
             cyclone.rings.forEach(Visuals.Effect::remove);
         }
+        sugar.remove(player.getUniqueId());
+        crashing.remove(player.getUniqueId());
     }
 
     @Override
     public void tick(long now) {
-        buffs.values().removeIf(until -> until <= now);
-        for (Iterator<Rush> it = rushes.values().iterator(); it.hasNext(); ) {
-            Rush rush = it.next();
-            if (!rush.player.isOnline() || rush.player.isDead()) {
+        for (Iterator<Hook> it = hooks.iterator(); it.hasNext(); ) {
+            Hook hook = it.next();
+            if (!hook.player.isOnline() || hook.player.isDead() || hookTick(hook)) {
                 it.remove();
-                continue;
-            }
-            rushTick(rush, now);
-            if (now >= rush.until) {
-                it.remove();
-                rushEnd(rush.player);
             }
         }
         for (Iterator<Cyclone> it = cyclones.values().iterator(); it.hasNext(); ) {
@@ -139,68 +157,143 @@ final class Sugarcrash implements Kit {
                 burst(cyclone);
             }
         }
+        sugar.values().removeIf(state -> now >= state.until);
     }
 
-    // ---- Sugar Rush --------------------------------------------------------------------------------------
+    // ---- Candy Hook --------------------------------------------------------------------------------------
 
-    private Result rush(Player player) {
-        AbilitySettings settings = plugin.settings().ability(Ability.SUGAR_RUSH);
-        Vector direction = player.getLocation().getDirection();
-        direction.setY(Math.max(-0.15, Math.min(0.3, direction.getY())));
-        if (direction.lengthSquared() < 1.0E-6) {
-            direction = Geo.flat(player.getLocation());
-        }
-        direction.normalize();
-        Vector velocity = direction.clone().multiply(settings.num("dash-speed"));
-        velocity.setY(velocity.getY() + 0.18);
-        player.setVelocity(velocity);
-        player.setFallDistance(0f);
-        long now = plugin.tick();
-        rushes.put(player.getUniqueId(), new Rush(player, now + settings.ticks("dash-time"), direction));
-        buffs.put(player.getUniqueId(), now + settings.ticks("dash-time") + settings.ticks("buff-duration"));
-        plugin.fx().sound(player.getLocation(), "sugar-rush");
-        plugin.visuals().spawn("candy_burst", player.getLocation().add(0, 0.08, 0)).size(0.5).send(0)
-                .animate(1, 5, e -> e.size(3.5).turn(90))
-                .vanish(6, 4);
+    private Result hook(Player player) {
+        Location eye = player.getEyeLocation();
+        Vector direction = eye.getDirection().normalize();
+        Location start = eye.clone().add(direction.clone().multiply(0.6)).subtract(0, 0.25, 0);
+        Visuals.Effect effect = plugin.visuals().spawn("candy_hook", start).billboard().size(0.9).send(0);
+        hooks.add(new Hook(player, start, direction, effect));
+        plugin.fx().sound(player.getLocation(), "candy-hook");
         return Result.FIRED;
     }
 
-    private void rushTick(Rush rush, long now) {
-        Player player = rush.player;
-        Location at = player.getLocation().add(0, 0.9, 0);
-        Fx.View view = plugin.fx().view(at);
-        view.dust(at, now % 2 == 0 ? PINK : SUGAR, 1.4f, 6, 0.35);
-        view.dust(at, CANDY_RED, 1.0f, 3, 0.3);
-        view.particle(Fx.FIREWORK, at, 2, 0.2, 0.2, 0.2, 0.02);
-        if (now % 2 == 0) {
-            plugin.visuals().spawn("sprinkles", at).billboard().size(0.9).send(0)
-                    .animate(1, 6, e -> e.size(0.2).offset(0, -0.4, 0))
-                    .life(8);
+    /** Moves a hook on; true when it is done. */
+    private boolean hookTick(Hook hook) {
+        AbilitySettings settings = plugin.settings().ability(Ability.CANDY_HOOK);
+        Player player = hook.player;
+        World world = hook.position.getWorld();
+        if (world == null || !world.equals(player.getWorld())) {
+            hook.effect.remove();
+            return true;
         }
-        AbilitySettings settings = plugin.settings().ability(Ability.SUGAR_RUSH);
-        for (LivingEntity target : plugin.hits().around(player, at, 1.4)) {
-            if (!rush.hit.add(target.getUniqueId())) {
-                continue;
+        double step = settings.num("speed");
+        Location from = hook.position.clone();
+        Location to = from.clone().add(hook.direction.clone().multiply(step));
+        // A wall or the ground on the way: the hook bites into it.
+        Location wall = null;
+        Location last = from.clone();
+        for (double d = 0.25; d <= step + 1.0E-6; d += 0.25) {
+            Location point = from.clone().add(hook.direction.clone().multiply(d));
+            if (Geo.solid(point)) {
+                wall = last;
+                break;
             }
-            if (plugin.hits().hurt(player, target, settings.num("damage"))) {
-                // Bowled aside: away from the dash line, and a little forward.
-                Vector away = Geo.away(player.getLocation(), target.getLocation(), Geo.right(Geo.flat(player.getLocation())));
-                Vector push = away.multiply(0.8).add(rush.direction.clone().setY(0).multiply(0.4));
-                Hits.knock(target, push, settings.num("knockback"), settings.num("lift"));
-                plugin.fx().sound(target.getLocation(), "sugarcrash-hit");
-                plugin.visuals().spawn("candy_burst", Geo.middle(target)).billboard().size(0.3).send(0)
-                        .animate(1, 3, e -> e.size(1.6))
-                        .vanish(4, 3);
-            }
+            last = point;
+        }
+        Location reached = wall != null ? wall : to;
+        List<LivingEntity> caught = plugin.hits().along(player, from, reached, 0.6);
+        rope(player, reached);
+        if (!caught.isEmpty()) {
+            yank(hook, caught.get(0));
+            return true;
+        }
+        if (wall != null) {
+            grapple(hook, wall);
+            return true;
+        }
+        hook.position = to;
+        hook.travelled += step;
+        hook.effect.moveTo(to, 1);
+        if (hook.travelled >= settings.num("range")) {
+            hook.effect.moveTo(player.getEyeLocation().subtract(0, 0.4, 0), 4).vanish(3, 2);
+            return true;
+        }
+        return false;
+    }
+
+    /** The candy rope from the hand to the hook. */
+    private void rope(Player player, Location to) {
+        Location from = player.getEyeLocation().subtract(0, 0.4, 0);
+        Vector way = to.toVector().subtract(from.toVector());
+        double length = way.length();
+        if (length < 0.1) {
+            return;
+        }
+        way.multiply(1.0 / length);
+        Fx.View view = plugin.fx().view(from);
+        int i = 0;
+        for (double d = 0.5; d < length; d += 0.5, i++) {
+            view.dust(from.clone().add(way.clone().multiply(d)), i % 2 == 0 ? CANDY_RED : SUGAR, 0.8f, 1, 0.0);
         }
     }
 
-    private void rushEnd(Player player) {
-        AbilitySettings settings = plugin.settings().ability(Ability.SUGAR_RUSH);
-        int ticks = settings.ticks("buff-duration");
-        Hits.effect(player, "speed", settings.whole("speed-level"), ticks);
-        Hits.effect(player, "haste", settings.whole("haste-level"), ticks);
-        plugin.fx().sound(player.getLocation(), "sugar-rush-end");
+    private void yank(Hook hook, LivingEntity target) {
+        AbilitySettings settings = plugin.settings().ability(Ability.CANDY_HOOK);
+        Player player = hook.player;
+        Location at = Geo.middle(target);
+        hook.effect.moveTo(at, 1);
+        if (!plugin.hits().hurt(player, target, Math.max(0.01, settings.num("damage")))) {
+            hook.effect.vanish(2, 2);
+            return; // Protected: not pulled.
+        }
+        Vector way = player.getLocation().toVector().subtract(target.getLocation().toVector()).setY(0);
+        double distance = way.length();
+        if (distance > 1.5) {
+            double speed = Math.min(2.2, 0.35 + distance * 0.11) * settings.num("yank");
+            Vector velocity = way.normalize().multiply(speed);
+            velocity.setY(0.3 + Math.min(0.4, distance * 0.02));
+            target.setVelocity(velocity);
+        }
+        int stun = settings.ticks("stun");
+        if (stun > 0) {
+            plugin.visuals().later(6, () -> {
+                if (target.isValid() && !target.isDead()) {
+                    stun(target, stun);
+                }
+            });
+        }
+        hook.effect.moveTo(player.getEyeLocation().subtract(0, 0.4, 0), 5).vanish(5, 2);
+        plugin.fx().sound(target.getLocation(), "candy-hook-catch");
+        plugin.visuals().spawn("candy_burst", at).billboard().size(0.3).send(0)
+                .animate(1, 3, e -> e.size(1.5))
+                .vanish(4, 3);
+    }
+
+    /** Stunned: candy stars circle their head. */
+    private void stun(LivingEntity target, int ticks) {
+        Hits.stun(target, ticks);
+        Vector above = new Vector(0, target.getHeight() + 0.25, 0);
+        Visuals.Effect ring = plugin.visuals().spawn("stun_ring", target.getLocation().add(above)).billboard().size(0.2).send(0)
+                .animate(1, 3, e -> e.size(1.1))
+                .follow(target, above, ticks);
+        for (int t = 4; t < ticks; t += 4) {
+            double size = (t / 4) % 2 == 0 ? 1.1 : 1.0;
+            ring.animate(t, 4, e -> e.size(size));
+        }
+        ring.vanish(ticks, 3);
+    }
+
+    private void grapple(Hook hook, Location point) {
+        AbilitySettings settings = plugin.settings().ability(Ability.CANDY_HOOK);
+        Player player = hook.player;
+        hook.effect.moveTo(point, 1).vanish(10, 3);
+        Vector way = point.toVector().subtract(player.getLocation().toVector());
+        double distance = way.length();
+        if (distance < 1.5 || settings.num("grapple") <= 0) {
+            return;
+        }
+        Vector velocity = way.normalize().multiply(Math.min(2.4, 0.5 + distance * 0.09) * settings.num("grapple"));
+        velocity.setY(velocity.getY() + 0.35);
+        player.setVelocity(velocity);
+        player.setFallDistance(0f);
+        plugin.abilities().softLanding(player, 60);
+        plugin.fx().sound(point, "candy-hook-catch");
+        plugin.fx().view(point).particle(Fx.CRIT, point, 12, 0.2, 0.2, 0.2, 0.2);
     }
 
     // ---- Candy Cyclone -------------------------------------------------------------------------------------
@@ -222,6 +315,7 @@ final class Sugarcrash implements Kit {
             cyclone.rings.add(effect);
         }
         cyclones.put(player.getUniqueId(), cyclone);
+        Hits.effect(player, "speed", settings.whole("speed-level"), duration);
         plugin.fx().sound(player.getLocation(), "candy-cyclone");
         return Result.FIRED;
     }
@@ -263,6 +357,18 @@ final class Sugarcrash implements Kit {
         }
     }
 
+    /** Arrows and other shots bounce off the cyclone. */
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void onShot(EntityDamageByEntityEvent event) {
+        if (event.getDamager() instanceof Projectile projectile && event.getEntity() instanceof Player player
+                && cyclones.containsKey(player.getUniqueId()) && !plugin.hits().probing()) {
+            event.setCancelled(true);
+            projectile.setVelocity(projectile.getVelocity().multiply(-0.6));
+            plugin.fx().sound(player.getLocation(), "candy-cyclone-hit");
+            plugin.fx().view(projectile.getLocation()).particle(Fx.CRIT, projectile.getLocation(), 8, 0.1, 0.1, 0.1, 0.2);
+        }
+    }
+
     private void burst(Cyclone cyclone) {
         Player player = cyclone.player;
         AbilitySettings settings = plugin.settings().ability(Ability.CANDY_CYCLONE);
@@ -285,6 +391,65 @@ final class Sugarcrash implements Kit {
             if (plugin.hits().hurt(player, target, settings.num("burst-damage"))) {
                 Vector away = Geo.away(player.getLocation(), target.getLocation(), Geo.flat(player.getLocation()));
                 Hits.knock(target, away, settings.num("burst-knockback"), settings.num("burst-lift"));
+            }
+        }
+    }
+
+    // ---- Sugar High (passive) --------------------------------------------------------------------------------
+
+    @Override
+    public void melee(EntityDamageByEntityEvent event, Player attacker, LivingEntity target, WeaponItems.Tag weapon) {
+        AbilitySettings settings = plugin.settings().ability(Ability.SUGAR_HIGH);
+        long now = plugin.tick();
+        Sugar state = sugar.computeIfAbsent(attacker.getUniqueId(), id -> new Sugar());
+        if (now - state.last < settings.ticks("min-hit-gap")) {
+            return; // Spam clicks do not count.
+        }
+        state.last = now;
+        state.until = now + settings.ticks("stack-duration");
+        int max = settings.whole("stacks");
+        if (state.stacks >= max) {
+            // Full: this hit is the Sugar Crash.
+            state.stacks = 0;
+            event.setDamage(event.getDamage() + settings.num("crash-damage"));
+            crashing.put(attacker.getUniqueId(), target.getUniqueId());
+            return;
+        }
+        state.stacks++;
+        // Faster with the sugar: Speed I from a third of the stacks, Speed II from two thirds.
+        int level = state.stacks * 3 >= max * 2 ? 2 : state.stacks * 3 >= max ? 1 : 0;
+        Hits.effect(attacker, "speed", level, settings.ticks("stack-duration"));
+        Location at = Geo.middle(attacker);
+        plugin.fx().view(at).dust(at, state.stacks == max ? CANDY_RED : PINK, 1.0f, 2 + state.stacks, 0.35);
+        if (state.stacks == max) {
+            plugin.fx().sound(attacker.getLocation(), "sugar-high-full");
+        }
+    }
+
+    @Override
+    public void landed(Player attacker, LivingEntity target, WeaponItems.Tag weapon) {
+        UUID crash = crashing.remove(attacker.getUniqueId());
+        if (crash == null || !crash.equals(target.getUniqueId())) {
+            return;
+        }
+        AbilitySettings settings = plugin.settings().ability(Ability.SUGAR_HIGH);
+        Location at = Geo.middle(target);
+        plugin.fx().sound(at, "sugar-crash");
+        plugin.visuals().spawn("candy_burst", at).billboard().size(0.4).send(0)
+                .animate(1, 3, e -> e.size(settings.num("splash-radius") * 2.0))
+                .vanish(4, 3);
+        Fx.View view = plugin.fx().view(at);
+        view.particle(Fx.FIREWORK, at, 25, 0.4, 0.4, 0.4, 0.2);
+        view.dust(at, PINK, 1.8f, 20, 0.8);
+        Hits.knock(target, Geo.away(attacker.getLocation(), target.getLocation(), Geo.flat(attacker.getLocation())),
+                settings.num("knockback"), 0.35);
+        if (settings.num("splash-damage") <= 0) {
+            return;
+        }
+        for (LivingEntity other : plugin.hits().around(attacker, at, settings.num("splash-radius"))) {
+            if (!other.equals(target) && plugin.hits().hurt(attacker, other, settings.num("splash-damage"))) {
+                Hits.knock(other, Geo.away(at, other.getLocation(), Geo.flat(attacker.getLocation())),
+                        settings.num("knockback"), 0.35);
             }
         }
     }

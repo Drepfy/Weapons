@@ -11,7 +11,8 @@ right-click and sneak + right-click (or `both`), and the lore always shows the r
 **Cooldowns are boss bars.** While you hold a legendary, a boss bar for each of its abilities
 sits at the top of the screen, in the weapon's colour: just the ability's name when it is
 ready (a full bar), `Crimson Flash » 11s` while it recharges (the bar fills up), and the time
-left while it lasts, such as Blood Moon (the bar runs down). Nothing is said in chat or above
+left while it lasts or can be pressed again, such as Crimson Flash's second dash or Rift Swap's
+echo (the bar runs down). Nothing is said in chat or above
 the hotbar when you press too early: the bar flashes white. The action bar is left to the
 Combat plugin's timer. `display.boss-bars: false` turns them off.
 
@@ -21,8 +22,9 @@ Combat plugin's timer. `display.boss-bars: false` turns them off.
 
 The swords (Kurogane, Sugarcrash, Riftblade) have **Sharpness VII, Fire Aspect II, Looting III
 and Sweeping Edge III**; the axes (Gravebreaker, Starforged) **Sharpness VII, Efficiency V and
-Fortune III**. All five are unbreakable netherite with a custom name and short lore: each
-ability with its key and cooldown, and the enchantments listed in the weapon's own colours.
+Fortune III**. All five are unbreakable netherite with a custom name and short lore: the
+passive, each ability with its key and cooldown, and the enchantments listed in the weapon's own
+colours.
 
 They look like 1.21.11 items: with the server resource pack each has its own 3D model
 (`item-model`), its own tooltip frame and background in its colours (`tooltip-style`, 1.21.2+),
@@ -35,53 +37,74 @@ entities: the server says where an effect starts and ends, and the players' game
 smoothly in between. Effects are never saved with the world. Every ability and hit also has its
 own sound from the pack, with a quiet vanilla sound under it for players without the pack.
 
-### Kurogane (katana): precision and sustained combat
+Every weapon has a **passive** that works on its own, and two abilities. Several abilities can
+be **pressed again** while they are still going: a second dash, a return, a dive. The boss bar
+shows how long you have to press again.
 
-- **Crimson Flash** (F, 20s): an iaido dash. You vanish in a crimson streak and reappear up
-  to 8 blocks ahead (stopping before walls, never inside them). Half a second later everyone
-  you passed through is cut for 7 damage and bleeds for 1 damage a second for 3 seconds.
-- **Blood Moon** (Shift + F, 35s): a crimson moon rises over your head for 6 seconds. Every
-  sword hit cuts a second time for +3 damage and heals you half a heart. Spam clicks (hits less
-  than 0.5s apart) do not cut twice.
+### Kurogane (katana): precision, counters and bleeding
 
-### Sugarcrash (candy scythe): mobility and burst tempo
+- **Crimson Edge** (passive): every 3rd sword hit in a row on the same target cuts deep: +4
+  damage and bleeding (1 a second for 3 seconds). Spam clicks do not count.
+- **Crimson Flash** (F, 16s): an iaido dash. You vanish in a crimson streak and reappear up to
+  8 blocks ahead (stopping before walls, never inside them). A moment later everyone you passed
+  through is cut for 6 damage and bleeds. **Two charges:** press F again within 3 seconds to
+  dash a second time.
+- **Iaido** (Shift + F, 22s): a counter stance for 1.5 seconds. The first attack on you (a
+  hit or an arrow) is blocked, and you vanish and reappear behind the attacker with a 9 damage
+  cut that makes them bleed and heals you 2 hearts. If nothing comes, the stance is released as
+  a crimson crescent in front of you (6 damage).
 
-- **Sugar Rush** (F, 18s): a candy-streaked dash forward. Players you dash through take 4
-  damage and are bowled aside. Then Speed II and Haste II for 5 seconds.
-- **Candy Cyclone** (Shift + F, 30s): a candy-striped tornado spins around you for 3 seconds.
-  Every half second, everyone within 4 blocks takes 1.5 damage and is dragged in. Then it
-  bursts: 3 damage and everyone is thrown out.
+### Sugarcrash (candy scythe): reach, mobility and burst tempo
+
+- **Sugar High** (passive): each scythe hit adds a sugar stack (up to 5) and speeds you up
+  (Speed I, then Speed II). At full stacks the next hit is a **Sugar Crash**: +4 damage, and a
+  candy blast hurts (3) and throws everyone round the target.
+- **Candy Hook** (F, 14s): throws a candy-cane hook on a candy rope (22 blocks). A player or
+  monster it catches takes 3 damage, is yanked to you and stunned for a moment (too slow to
+  walk away). A wall or the ground it catches pulls you to it instead, with no fall damage.
+- **Candy Cyclone** (Shift + F, 28s): you become a candy-striped tornado for 4 seconds and can
+  keep moving (with Speed II). Every 0.4s everyone within 4.5 blocks takes 1.5 damage and is
+  dragged in, and arrows bounce off you. Then it bursts: 4 damage and everyone is thrown out.
 
 ### Riftblade (void sword): space and positioning
 
-- **Void Rend** (F, 22s): tears a rift open 5 blocks ahead (or at a wall). For a second it
-  drags everyone within 5 blocks towards it, then snaps shut: 7 damage and 2 seconds of
-  Darkness for everyone within 3 blocks.
-- **Rift Swap** (Shift + F, 30s): swap places with the first player (or monster) you look at
-  within 18 blocks, through the void: they take 2 damage and 3 seconds of Nausea. With nobody
-  in sight, it blinks you 10 blocks forward instead. It is a normal teleport, so safe zones and
-  region plugins can refuse it; then nothing happens and the cooldown is not spent.
+- **Phase Shift** (passive): while you hold the Riftblade, an attack on you has a 20% chance
+  to pass straight through, and you slip 3 blocks aside through a small rift (at most once
+  every 10 seconds).
+- **Void Rend** (F, 20s): tears a rift open 5 blocks ahead (or at a wall). For 1.25 seconds it
+  drags everyone within 5.5 blocks towards it, then snaps shut: 7 damage, 3 seconds of
+  Darkness, and a second of Levitation (lifted helplessly) for everyone within 3 blocks.
+- **Rift Swap** (Shift + F, 28s): swap places with the first player (or monster) you look at
+  within 20 blocks: they take 3 damage and Nausea. With nobody in sight, you blink 10 blocks
+  forward instead. A **void echo** stays where you were for 4 seconds: press Shift + F again
+  to go back to it. It is a normal teleport, so safe zones and region plugins can refuse it;
+  then nothing happens and the cooldown is not spent.
 
-### Gravebreaker (battle axe): ground control and heavy hits
+### Gravebreaker (battle axe): ground control and finishing blows
 
-- **Executioner's Leap** (F, 20s): leap high and forward, then slam the ground where you land
+- **Last Rites** (passive): axe hits on players below 40% health do 25% more damage, and
+  killing a player with the axe in hand makes Executioner's Leap ready again.
+- **Executioner's Leap** (F, 18s): leap high and forward, then slam the ground where you land
   (no fall damage from it). Everyone within 5 blocks takes 8 damage at the centre down to 4 at
-  the edge, is thrown up and gets Slowness II for 2 seconds. Rocks fly out of the crater, but
-  no block is ever changed.
-- **Grave Rise** (Shift + F, 30s): six gravestones burst out of the ground one after another
-  in a 12-block line in front of you. Whoever stands on one takes 6 damage, is launched and gets
-  Mining Fatigue II for 3 seconds (once per use). The line climbs single steps and stops at walls
-  and drops.
+  the edge, is thrown up and gets Slowness II. **Press F again in the air to dive** at where
+  you look (up to 18 blocks): a 30% bigger slam with 3 more damage. Rocks fly out of the crater,
+  but no block is ever changed.
+- **Grave Rise** (Shift + F, 28s): six gravestones burst out of the ground one after another
+  in a 12-block line. Whoever stands on one takes 6 damage, is launched, and gets Slowness III
+  and Mining Fatigue II. The last one bursts as a tomb: 5 damage to everyone within 3 blocks.
+  The line climbs single steps and stops at walls and drops.
 
 ### Starforged (celestial axe): area control and gravity
 
-- **Starfall** (F, 25s): a rune circle opens where you look (up to 24 blocks) and turns for
-  1.25s (never less than 0.5s), then six stars rain down inside it one after another. Each
-  star hits everyone within 2 blocks of where it lands for 4 damage and launches them; one
-  player is hit by at most 3 stars.
+- **Starstruck** (passive): every 4th axe hit in a row on the same target calls a small star
+  down on it half a second later: 4 damage round it and a launch.
+- **Starfall** (F, 24s): a rune circle opens where you look (up to 28 blocks), then seven
+  stars rain down inside it one after another. **The circle follows your aim** while the stars
+  fall, so it can chase whoever runs. Each star hits everyone within 2 blocks for 4 damage and
+  launches them; one player is hit by at most 3 stars.
 - **Singularity** (Shift + F, 35s): a black hole opens where you look. For 3 seconds it drags
-  everyone within 7 blocks towards its heart (they can still walk out slowly; the first touch
-  does 1 damage), then collapses into a nova: 6 damage and everyone is thrown away.
+  everyone within 8 blocks towards its heart (the first touch does 1 damage), then collapses
+  into a nova: 7 damage, everyone thrown away and slowed.
 - While stars are falling no black hole can open and the other way round (plus 1.5s), so
   nobody can be held in place under the stars.
 
@@ -156,11 +179,12 @@ A wrong value falls back to its default and the console says what to fix.
 pack required (`require-resource-pack=true` in `server.properties`) or set `tooltip-style: ""`
 for each weapon.
 
-**Updating from 1.1 or older:** nothing to do. On start the old abilities' settings, the action
-bar settings and messages that no longer exist are removed, enchantments still at the old
-default (Sharpness VI) become the new ones, and lore and names still worded exactly as an older
-version shipped them are switched to the new text (and saved in `config.yml`). Anything you
-changed yourself, such as your own enchantments or lore, is kept.
+**Updating from an older version:** nothing to do. On start the settings of abilities that
+were replaced (Blood Moon, Sugar Rush, and everything from 1.1 and older), the action bar
+settings and messages that no longer exist are removed. Settings, lore and names still at an
+older version's default (for example Crimson Flash's 20s cooldown from 1.2) become the new
+defaults, and enchantments still at the old Sharpness VI become the new ones. Anything you
+changed yourself is kept. Everything is saved in `config.yml`.
 
 ## Building and testing
 
@@ -169,12 +193,15 @@ cd legendary
 mvn -B package   # runs the tests, writes target/Legendary-<version>.jar
 ```
 
-`mvn test` runs 45 tests on a simulated server:
-- **Every ability:** what it hits and when (Crimson Flash's delayed cut and bleeding, Blood
-  Moon's spam-click gap and healing, the dash, tornado and burst, the rift's pull and snap,
-  swapping and blinking, the slam's falloff and no fall damage, the gravestone line, the star
-  warning and hit cap, the black hole and nova), walls, cooldowns and the Starforged lockout.
-- **Protection:** protected players are never hurt, pulled or swapped; creative and PvP-off.
+`mvn test` runs 56 tests on a simulated server:
+- **Every ability and passive:** what it hits and when (Crimson Flash's two charges and
+  bleeding, Iaido's counter and crescent, Crimson Edge's count, the hook's yank, stun and
+  grapple, the cyclone deflecting arrows, Sugar High's crash, the rift's pull, snap and lift,
+  Rift Swap's echo and blink, Phase Shift, the leap, dive and tomb, Last Rites, the star warning,
+  hit cap and the circle following your aim, the black hole and nova, Starstruck), walls,
+  cooldowns and the Starforged lockout.
+- **Protection:** protected players are never hurt, pulled, yanked or swapped; creative and PvP-off;
+  counters and dodges ignore protection checks.
 - **Look:** enchantments, item model, tooltip style, no glint, the lore's enchantment lines,
   the boss bars (names, times, progress, flashing, hidden when put away), and the 3D effects
   being cleaned up.
@@ -186,5 +213,5 @@ mvn -B package   # runs the tests, writes target/Legendary-<version>.jar
   deaths), and staff /invsee.
 - **Controls:** F and Shift + F (the weapon stays in hand), the right-click and both settings,
   offhand food and shields, and the keys shown in the lore.
-- **Other:** the registry across restarts, commands, config checking, upgrading a 1.1
-  config, and updating old default texts while keeping your own.
+- **Other:** the registry across restarts, commands, config checking, upgrading 1.1 and 1.2
+  configs, and updating old default texts while keeping your own.

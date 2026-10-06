@@ -366,3 +366,142 @@ v1_2_0:
         - "{enchantments}"
         - ""
         - "<gradient:#FFD36B:#FF8A3D>&lLEGENDARY</gradient>"
+
+v1_2_1:
+  weapons:
+    kurogane:
+      lore:
+        - "&8Legendary Katana"
+        - ""
+        - "&#FF4D6A{key} &8» &f{crimson-flash.name} &8({crimson-flash.cooldown})"
+        - "&7Dash through enemies. They bleed."
+        - ""
+        - "&#FF4D6A{sneak-key} &8» &f{blood-moon.name} &8({blood-moon.cooldown})"
+        - "&7Your hits cut twice and heal you."
+        - ""
+        - "{enchantments}"
+      abilities:
+        crimson-flash:
+          cooldown: "20s"
+          range: 8
+          width: 1.6
+          damage: 7
+          delay: "0.5s"
+          bleed-damage: 1
+          bleed-duration: "3s"
+    sugarcrash:
+      lore:
+        - "&8Legendary Candy Scythe"
+        - ""
+        - "&#FF7AC3{key} &8» &f{sugar-rush.name} &8({sugar-rush.cooldown})"
+        - "&7Dash through players, then speed up."
+        - ""
+        - "&#FF7AC3{sneak-key} &8» &f{candy-cyclone.name} &8({candy-cyclone.cooldown})"
+        - "&7Spin a candy tornado that shreds."
+        - ""
+        - "{enchantments}"
+      abilities:
+        candy-cyclone:
+          cooldown: "30s"
+          duration: "3s"
+          radius: 4
+          damage: 1.5
+          interval: "0.5s"
+          pull: 0.22
+          burst-damage: 3
+          burst-knockback: 1.1
+          burst-lift: 0.45
+    riftblade:
+      lore:
+        - "&8Legendary Void Sword"
+        - ""
+        - "&#B76BFF{key} &8» &f{void-rend.name} &8({void-rend.cooldown})"
+        - "&7Tear a rift that pulls and blinds."
+        - ""
+        - "&#B76BFF{sneak-key} &8» &f{rift-swap.name} &8({rift-swap.cooldown})"
+        - "&7Swap places with who you look at."
+        - ""
+        - "{enchantments}"
+      abilities:
+        void-rend:
+          cooldown: "22s"
+          distance: 5
+          pull-radius: 5
+          pull: 0.25
+          pull-time: "1s"
+          radius: 3
+          damage: 7
+          darkness: "2s"
+        rift-swap:
+          cooldown: "30s"
+          range: 18
+          damage: 2
+          nausea: "3s"
+          blink: 10
+    gravebreaker:
+      lore:
+        - "&8Legendary Battle Axe"
+        - ""
+        - "&#FF8A3D{key} &8» &f{executioners-leap.name} &8({executioners-leap.cooldown})"
+        - "&7Leap up and slam the ground."
+        - ""
+        - "&#FF8A3D{sneak-key} &8» &f{grave-rise.name} &8({grave-rise.cooldown})"
+        - "&7Gravestones burst out of the ground."
+        - ""
+        - "{enchantments}"
+      abilities:
+        executioners-leap:
+          cooldown: "20s"
+          leap-up: 1.1
+          leap-forward: 0.9
+          radius: 5
+          damage: 8
+          edge-damage: 4
+          launch: 0.7
+          push: 0.6
+          slow-level: 2
+          slow-duration: "2s"
+        grave-rise:
+          cooldown: "30s"
+          range: 12
+          stones: 6
+          interval: "0.2s"
+          width: 1.4
+          damage: 6
+          launch: 0.9
+          fatigue-level: 2
+          fatigue-duration: "3s"
+    starforged:
+      lore:
+        - "&8Legendary Celestial Axe"
+        - ""
+        - "&#6FD6FF{key} &8» &f{starfall.name} &8({starfall.cooldown})"
+        - "&7Call down a rain of stars."
+        - ""
+        - "&#6FD6FF{sneak-key} &8» &f{singularity.name} &8({singularity.cooldown})"
+        - "&7A black hole pulls, then explodes."
+        - ""
+        - "{enchantments}"
+      abilities:
+        starfall:
+          cooldown: "25s"
+          range: 24
+          warning: "1.25s"
+          radius: 4.5
+          stars: 6
+          interval: "0.2s"
+          star-radius: 2
+          damage: 4
+          max-hits: 3
+          launch: 0.6
+        singularity:
+          cooldown: "35s"
+          range: 20
+          radius: 7
+          duration: "3s"
+          pull: 0.16
+          grip-damage: 1
+          nova-damage: 6
+          nova-knockback: 1.3
+          nova-lift: 0.5
+          lockout: "1.5s"

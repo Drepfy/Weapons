@@ -39,6 +39,7 @@ public final class Fx {
     public static final Particle WITCH = Compat.particle("WITCH", "SPELL_WITCH");
     public static final Particle SOUL = Compat.particle("SOUL");
     public static final Particle CLOUD = Compat.particle("CLOUD");
+    public static final Particle FLAME = Compat.particle("FLAME");
     public static final Particle SONIC_BOOM = Compat.particle("SONIC_BOOM", "EXPLOSION", "EXPLOSION_LARGE");
 
     private final Supplier<Settings> settings;

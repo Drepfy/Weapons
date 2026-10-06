@@ -32,8 +32,8 @@ import java.util.UUID;
 
 /**
  * F (the swap-offhand key) uses a weapon's first ability and Shift + F its second; or
- * right-click and sneak + right-click, as config.yml's controls say. Also passes sword and axe
- * hits on to the passives.
+ * right-click and sneak + right-click, as config.yml's controls say (pressing again while an
+ * ability is still going can recast it). Also passes sword and axe hits on to the passives.
  */
 public final class Abilities implements Listener {
 
@@ -44,6 +44,7 @@ public final class Abilities implements Listener {
     private final Cooldowns cooldowns = new Cooldowns();
     private final Map<WeaponType, Kit> kits = new EnumMap<>(WeaponType.class);
     private final Map<UUID, Long> lastUse = new HashMap<>();
+    private final Map<UUID, Long> softLandings = new HashMap<>();
 
     public Abilities(LegendaryPlugin plugin) {
         this.plugin = plugin;
@@ -156,6 +157,9 @@ public final class Abilities implements Listener {
 
     private void use(Player player, WeaponItems.Tag tag, Ability ability, boolean complain) {
         long now = plugin.tick();
+        if (kits.get(tag.type()).recast(player, tag, ability)) {
+            return;
+        }
         long left = cooldowns.remaining(tag.id(), ability, now);
         if (left > 0) {
             if (complain) {
@@ -166,6 +170,26 @@ public final class Abilities implements Listener {
         Kit.Result result = kits.get(tag.type()).use(player, tag, ability);
         if (result == Kit.Result.FIRED) {
             cooldowns.start(tag.id(), ability, now, plugin.settings().ability(ability).ticks("cooldown"));
+        }
+    }
+
+    /** Starts an ability's cooldown now (for abilities that wait for a recast first). */
+    public void startCooldown(java.util.UUID weapon, Ability ability) {
+        cooldowns.start(weapon, ability, plugin.tick(), plugin.settings().ability(ability).ticks("cooldown"));
+    }
+
+    /** No fall damage for this long (a leap, a grapple, a dash off a ledge). */
+    public void softLanding(Player player, int ticks) {
+        softLandings.merge(player.getUniqueId(), plugin.tick() + ticks, Math::max);
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onFall(EntityDamageEvent event) {
+        if (event.getCause() == EntityDamageEvent.DamageCause.FALL && event.getEntity() instanceof Player player) {
+            Long until = softLandings.get(player.getUniqueId());
+            if (until != null && plugin.tick() <= until) {
+                event.setCancelled(true);
+            }
         }
     }
 
@@ -187,6 +211,9 @@ public final class Abilities implements Listener {
     public void tick(long now) {
         for (Kit kit : kits.values()) {
             kit.tick(now);
+        }
+        if (now % 20 == 0) {
+            softLandings.values().removeIf(until -> until < now);
         }
         if (now % 1200 == 0) {
             cooldowns.prune(now);

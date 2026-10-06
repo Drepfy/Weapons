@@ -49,6 +49,7 @@ public final class Hits implements Listener {
     private final Supplier<Settings> settings;
     private Damager damager = (target, amount, attacker) -> target.damage(amount, attacker);
     private Hit pending;
+    private boolean probing;
 
     public Hits(Supplier<Settings> settings) {
         this.settings = settings;
@@ -67,6 +68,14 @@ public final class Hits implements Listener {
             this.attacker = attacker;
             this.target = target;
         }
+    }
+
+    /**
+     * True while protection plugins are only being asked whether an attack would be allowed: the
+     * attack event then is not a real attack, and counters and dodges must ignore it.
+     */
+    public boolean probing() {
+        return probing;
     }
 
     /** True while an ability hit is being dealt (so it is not mistaken for a sword hit). */
@@ -186,7 +195,9 @@ public final class Hits implements Listener {
             return false;
         }
         Hit outer = pending;
+        boolean outerProbing = probing;
         pending = new Hit(attacker, target);
+        probing = true;
         try {
             EntityDamageByEntityEvent probe = probe(attacker, target);
             Bukkit.getPluginManager().callEvent(probe);
@@ -195,6 +206,7 @@ public final class Hits implements Listener {
             return true;
         } finally {
             pending = outer;
+            probing = outerProbing;
         }
     }
 
@@ -222,6 +234,14 @@ public final class Hits implements Listener {
         PotionEffectType type = Compat.effect(id);
         if (type != null) {
             target.addPotionEffect(new PotionEffect(type, ticks, level - 1, false, true, true));
+        }
+    }
+
+    /** Stunned: too slow to walk anywhere for a moment (they can still turn and swing). */
+    public static void stun(LivingEntity target, int ticks) {
+        effect(target, "slowness", 7, ticks);
+        if (target instanceof Player player) {
+            player.setSprinting(false);
         }
     }
 

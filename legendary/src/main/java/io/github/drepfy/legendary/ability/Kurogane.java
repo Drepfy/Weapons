@@ -10,8 +10,13 @@ import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Projectile;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.util.Vector;
@@ -23,25 +28,30 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Kurogane, the katana: precision and sustained combat.
+ * Kurogane, the katana: precision, counters and bleeding.
  * <ul>
  *   <li><b>Crimson Flash</b>: an iaido dash. The player vanishes in a crimson streak and appears
- *   up to 8 blocks ahead; everyone they passed through is cut a moment later and bleeds.</li>
- *   <li><b>Blood Moon</b>: a crimson moon rises over the player. For a few seconds every sword
- *   hit cuts a second time and heals them.</li>
+ *   up to 8 blocks ahead; everyone they passed through is cut a moment later and bleeds. It has
+ *   two charges: press again within a few seconds to flash a second time.</li>
+ *   <li><b>Iaido</b>: a counter stance. The first attack that would hit the player is blocked,
+ *   and they vanish and reappear behind the attacker with a deep cut that heals them. If nothing
+ *   comes, the stance is released as a crimson crescent.</li>
+ *   <li><b>Crimson Edge</b> (passive): every third hit in a row on the same target cuts deep:
+ *   extra damage and bleeding.</li>
  * </ul>
  */
-final class Kurogane implements Kit {
+final class Kurogane implements Kit, Listener {
 
     private static final Color CRIMSON = Color.fromRGB(215, 25, 55);
     private static final Color STEEL = Color.fromRGB(240, 240, 248);
 
     private final LegendaryPlugin plugin;
-    /** Caster → the tick their Blood Moon sets. */
-    private final Map<UUID, Long> moons = new HashMap<>();
-    /** Caster → the tick of their last extra cut (no spam clicking). */
-    private final Map<UUID, Long> lastCut = new HashMap<>();
-    /** Casters whose hit this tick got the extra cut (healed once it lands). */
+    /** Weapon → its open Crimson Flash chain (charges left). */
+    private final Map<UUID, Chain> chains = new HashMap<>();
+    /** Player → their Iaido stance. */
+    private final Map<UUID, Stance> stances = new HashMap<>();
+    private final Combos combos = new Combos();
+    /** Attacker → the target their Crimson Edge cut is landing on. */
     private final Map<UUID, UUID> cutting = new HashMap<>();
     /** Bleeding target → who cut it and how long. */
     private final Map<UUID, Bleed> bleeds = new HashMap<>();
@@ -50,11 +60,35 @@ final class Kurogane implements Kit {
         this.plugin = plugin;
     }
 
+    private static final class Chain {
+        final Player player;
+        int left;
+        long until;
+
+        Chain(Player player, int left, long until) {
+            this.player = player;
+            this.left = left;
+            this.until = until;
+        }
+    }
+
+    private static final class Stance {
+        final Player player;
+        final long until;
+        final Visuals.Effect ring;
+
+        Stance(Player player, long until, Visuals.Effect ring) {
+            this.player = player;
+            this.until = until;
+            this.ring = ring;
+        }
+    }
+
     private static final class Bleed {
         final UUID attacker;
         final LivingEntity target;
         final double damage;
-        long until;
+        final long until;
         long next;
 
         Bleed(UUID attacker, LivingEntity target, double damage, long until, long next) {
@@ -73,39 +107,99 @@ final class Kurogane implements Kit {
 
     @Override
     public Result use(Player player, WeaponItems.Tag weapon, Ability ability) {
-        return ability == Ability.CRIMSON_FLASH ? flash(player) : moon(player);
+        if (ability == Ability.IAIDO) {
+            return stance(player);
+        }
+        if (!flash(player)) {
+            return Result.FAILED; // A wall right in front, or a refused teleport: nothing spent.
+        }
+        AbilitySettings settings = plugin.settings().ability(Ability.CRIMSON_FLASH);
+        int charges = settings.whole("charges");
+        if (charges <= 1) {
+            return Result.FIRED;
+        }
+        chains.put(weapon.id(), new Chain(player, charges - 1, plugin.tick() + settings.ticks("recast-window")));
+        return Result.HANDLED; // The cooldown starts once the charges are used or the window closes.
+    }
+
+    @Override
+    public boolean recast(Player player, WeaponItems.Tag weapon, Ability ability) {
+        Chain chain = ability == Ability.CRIMSON_FLASH ? chains.get(weapon.id()) : null;
+        if (chain == null || !chain.player.equals(player)) {
+            return false;
+        }
+        if (flash(player)) {
+            chain.left--;
+            chain.until = plugin.tick() + plugin.settings().ability(Ability.CRIMSON_FLASH).ticks("recast-window");
+            if (chain.left <= 0) {
+                chains.remove(weapon.id());
+                plugin.abilities().startCooldown(weapon.id(), Ability.CRIMSON_FLASH);
+            }
+        }
+        return true;
     }
 
     @Override
     public long active(Player player, WeaponItems.Tag weapon, Ability ability, long now) {
-        if (ability != Ability.BLOOD_MOON) {
-            return 0;
+        if (ability == Ability.CRIMSON_FLASH) {
+            Chain chain = chains.get(weapon.id());
+            return chain == null ? 0 : Math.max(0, chain.until - now);
         }
-        Long until = moons.get(player.getUniqueId());
-        return until == null ? 0 : Math.max(0, until - now);
+        Stance stance = stances.get(player.getUniqueId());
+        return stance == null ? 0 : Math.max(0, stance.until - now);
     }
 
     @Override
     public long activeLength(Ability ability) {
-        return ability == Ability.BLOOD_MOON ? plugin.settings().ability(Ability.BLOOD_MOON).ticks("duration") : 0;
+        AbilitySettings settings = plugin.settings().ability(ability);
+        return ability == Ability.CRIMSON_FLASH ? settings.ticks("recast-window") : settings.ticks("stance");
     }
 
-    /** Whether a target is bleeding (for tests and the inspect command). */
+    /** Whether a target is bleeding (for tests). */
     boolean bleeding(LivingEntity target) {
         return bleeds.containsKey(target.getUniqueId());
     }
 
     @Override
     public void forget(Player player) {
-        moons.remove(player.getUniqueId());
-        lastCut.remove(player.getUniqueId());
+        for (Iterator<Map.Entry<UUID, Chain>> it = chains.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<UUID, Chain> chain = it.next();
+            if (chain.getValue().player.equals(player)) {
+                it.remove();
+                plugin.abilities().startCooldown(chain.getKey(), Ability.CRIMSON_FLASH);
+            }
+        }
+        Stance stance = stances.remove(player.getUniqueId());
+        if (stance != null) {
+            stance.ring.remove();
+        }
+        combos.forget(player.getUniqueId());
         cutting.remove(player.getUniqueId());
         bleeds.remove(player.getUniqueId());
     }
 
     @Override
     public void tick(long now) {
-        moons.values().removeIf(until -> until <= now);
+        for (Iterator<Map.Entry<UUID, Chain>> it = chains.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<UUID, Chain> chain = it.next();
+            if (now >= chain.getValue().until) {
+                it.remove();
+                plugin.abilities().startCooldown(chain.getKey(), Ability.CRIMSON_FLASH);
+            }
+        }
+        for (Iterator<Stance> it = stances.values().iterator(); it.hasNext(); ) {
+            Stance stance = it.next();
+            if (!stance.player.isOnline() || stance.player.isDead()) {
+                stance.ring.remove();
+                it.remove();
+            } else if (now >= stance.until) {
+                it.remove();
+                release(stance);
+            } else if (now % 3 == 0) {
+                Location at = stance.player.getLocation().add(0, 1.0, 0);
+                plugin.fx().view(at).dust(at, CRIMSON, 1.0f, 3, 0.45);
+            }
+        }
         for (Iterator<Bleed> it = bleeds.values().iterator(); it.hasNext(); ) {
             Bleed bleed = it.next();
             if (now >= bleed.until || !bleed.target.isValid() || bleed.target.isDead()) {
@@ -131,18 +225,28 @@ final class Kurogane implements Kit {
                 plugin.fx().sound(bleed.target.getLocation(), "bleed");
             }
         }
+        if (now % 200 == 0) {
+            combos.prune(now, 400);
+        }
+    }
+
+    private void bleed(Player attacker, LivingEntity target, double damage, int ticks) {
+        if (damage > 0 && ticks > 0) {
+            long now = plugin.tick();
+            bleeds.put(target.getUniqueId(), new Bleed(attacker.getUniqueId(), target, damage, now + ticks + 1, now + 20));
+        }
     }
 
     // ---- Crimson Flash -----------------------------------------------------------------------------------
 
-    private Result flash(Player player) {
+    private boolean flash(Player player) {
         AbilitySettings settings = plugin.settings().ability(Ability.CRIMSON_FLASH);
         Location start = player.getLocation();
         Vector direction = Geo.flat(start);
         Location end = Geo.dash(start, direction, settings.num("range"));
         double length = Geo.flatDistance(start, end);
         if (length < 1.0) {
-            return Result.FAILED; // A wall right in front: nothing happens, no cooldown.
+            return false;
         }
         // Who stands in the way, before anyone moves.
         double reach = settings.num("width") / 2.0;
@@ -152,14 +256,13 @@ final class Kurogane implements Kit {
         destination.setYaw(start.getYaw());
         destination.setPitch(start.getPitch());
         if (!player.teleport(destination, PlayerTeleportEvent.TeleportCause.PLUGIN)) {
-            return Result.FAILED; // A safe zone or region refused it.
+            return false; // A safe zone or region refused it.
         }
         player.setFallDistance(0f);
         plugin.fx().sound(start, "crimson-flash");
         plugin.fx().sound(destination, "crimson-flash-end");
         drawFlash(start, destination, direction, length);
 
-        int delay = settings.ticks("delay");
         double damage = settings.num("damage");
         double bleedDamage = settings.num("bleed-damage");
         int bleedTicks = settings.ticks("bleed-duration");
@@ -171,23 +274,20 @@ final class Kurogane implements Kit {
                 if (plugin.hits().hurt(player, target, damage)) {
                     cutFx(target, 35);
                     plugin.fx().sound(target.getLocation(), "kurogane-hit");
-                    if (bleedDamage > 0 && bleedTicks > 0) {
-                        long now = plugin.tick();
-                        bleeds.put(target.getUniqueId(),
-                                new Bleed(player.getUniqueId(), target, bleedDamage, now + bleedTicks + 1, now + 20));
-                    }
+                    bleed(player, target, bleedDamage, bleedTicks);
                 }
             }
             if (!path.isEmpty()) {
                 plugin.fx().sound(destination, "crimson-cut");
             }
         };
+        int delay = settings.ticks("delay");
         if (delay <= 0) {
             cut.run();
         } else {
             plugin.visuals().later(delay, cut);
         }
-        return Result.FIRED;
+        return true;
     }
 
     /** A crimson streak along the path, after-images and sparks. */
@@ -222,47 +322,136 @@ final class Kurogane implements Kit {
         view.particle(Fx.CRIT, at, 10, 0.3, 0.4, 0.3, 0.3);
     }
 
-    // ---- Blood Moon ---------------------------------------------------------------------------------------
+    // ---- Iaido -------------------------------------------------------------------------------------------
 
-    private Result moon(Player player) {
-        AbilitySettings settings = plugin.settings().ability(Ability.BLOOD_MOON);
-        long now = plugin.tick();
-        int duration = settings.ticks("duration");
-        moons.put(player.getUniqueId(), now + duration);
-        lastCut.remove(player.getUniqueId());
-        plugin.fx().sound(player.getLocation(), "blood-moon");
-        Visuals visuals = plugin.visuals();
-        // The moon over their head for as long as it lasts.
-        Vector above = new Vector(0, 2.9, 0);
-        visuals.spawn("blood_moon", player.getLocation().add(above)).billboard().size(0.2).send(0)
-                .animate(1, 6, e -> e.size(1.6))
-                .follow(player, above, duration)
-                .vanish(duration, 6);
-        // A rune circle flares at their feet.
-        visuals.spawn("rune_crimson", player.getLocation().add(0, 0.06, 0)).size(0.5).send(0)
-                .animate(1, 6, e -> e.size(5.0).turn(60))
-                .animate(8, 10, e -> e.size(5.6).turn(120))
-                .vanish(18, 6);
-        Fx.View view = plugin.fx().view(player.getLocation());
-        view.dust(player.getLocation().add(0, 1, 0), CRIMSON, 1.6f, 30, 0.8);
+    private Result stance(Player player) {
+        AbilitySettings settings = plugin.settings().ability(Ability.IAIDO);
+        int ticks = settings.ticks("stance");
+        Visuals.Effect ring = plugin.visuals().spawn("rune_crimson", player.getLocation().add(0, 0.06, 0)).size(0.4).send(0)
+                .animate(1, 4, e -> e.size(3.2).turn(90))
+                .follow(player, new Vector(0, 0.06, 0), ticks);
+        for (int t = 6; t < ticks; t += 6) {
+            int step = t / 6;
+            ring.animate(t, 6, e -> e.turn(90 + step * 60));
+        }
+        ring.vanish(ticks + 1, 4);
+        stances.put(player.getUniqueId(), new Stance(player, plugin.tick() + ticks, ring));
+        Hits.effect(player, "slowness", 3, ticks);
+        plugin.fx().sound(player.getLocation(), "iaido");
         return Result.FIRED;
     }
 
-    @Override
-    public void melee(EntityDamageByEntityEvent event, Player attacker, LivingEntity target, WeaponItems.Tag weapon) {
-        long now = plugin.tick();
-        Long until = moons.get(attacker.getUniqueId());
-        if (until == null || until <= now) {
+    /** The first attack on a player in stance is blocked, and answered. */
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void onAttacked(EntityDamageByEntityEvent event) {
+        if (!(event.getEntity() instanceof Player player) || plugin.hits().probing()) {
             return;
         }
-        AbilitySettings settings = plugin.settings().ability(Ability.BLOOD_MOON);
-        Long last = lastCut.get(attacker.getUniqueId());
-        if (last != null && now - last < settings.ticks("min-hit-gap")) {
-            return; // Spam clicking does not cut twice.
+        Stance stance = stances.get(player.getUniqueId());
+        if (stance == null || plugin.tick() >= stance.until) {
+            return;
         }
-        lastCut.put(attacker.getUniqueId(), now);
-        event.setDamage(event.getDamage() + settings.num("bonus-damage"));
-        cutting.put(attacker.getUniqueId(), target.getUniqueId());
+        LivingEntity attacker = source(event.getDamager());
+        if (attacker == null || attacker.equals(player)) {
+            return;
+        }
+        event.setCancelled(true);
+        stances.remove(player.getUniqueId());
+        stance.ring.animate(1, 2, e -> e.size(4.5)).vanish(3, 3);
+        org.bukkit.potion.PotionEffectType slowness = Compat.effect("slowness");
+        if (slowness != null) {
+            player.removePotionEffect(slowness);
+        }
+        plugin.fx().sound(player.getLocation(), "iaido-parry");
+        Fx.View view = plugin.fx().view(player.getLocation());
+        view.particle(Fx.CRIT, player.getLocation().add(0, 1.2, 0), 25, 0.4, 0.5, 0.4, 0.4);
+        AbilitySettings settings = plugin.settings().ability(Ability.IAIDO);
+        if (attacker.getWorld() != player.getWorld()
+                || attacker.getLocation().distance(player.getLocation()) > settings.num("reach")
+                || !plugin.hits().allowed(player, attacker)) {
+            return; // Blocked, but no counter.
+        }
+        // Vanish and reappear behind them.
+        Location from = player.getLocation();
+        Location behind = behind(attacker);
+        if (behind != null && player.teleport(behind, PlayerTeleportEvent.TeleportCause.PLUGIN)) {
+            player.setFallDistance(0f);
+            Vector way = behind.toVector().subtract(from.toVector()).setY(0);
+            double length = way.length();
+            if (length > 0.5) {
+                plugin.visuals().spawn("crimson_streak", from.clone().add(behind).multiply(0.5).add(0, 1.0, 0))
+                        .facing(way).size(0.9, 1.5, length).send(0).vanish(6, 5);
+            }
+        }
+        if (plugin.hits().hurt(player, attacker, settings.num("damage"))) {
+            AbilitySettings edge = plugin.settings().ability(Ability.CRIMSON_EDGE);
+            bleed(player, attacker, edge.num("bleed-damage"), edge.ticks("bleed-duration"));
+            Compat.heal(player, settings.num("heal"));
+            Location at = Geo.middle(attacker);
+            plugin.visuals().spawn("crimson_slash", at).facing(Geo.flat(player.getLocation())).tilt(30).size(0.8).send(0)
+                    .animate(1, 2, e -> e.size(3.6))
+                    .vanish(4, 4);
+            cutFx(attacker, -40);
+            plugin.fx().sound(at, "iaido-counter");
+        }
+    }
+
+    /** Who is behind an attack: the attacker, or whoever shot the arrow. */
+    private static LivingEntity source(Entity damager) {
+        if (damager instanceof Projectile projectile && projectile.getShooter() instanceof LivingEntity shooter) {
+            return shooter;
+        }
+        return damager instanceof LivingEntity living ? living : null;
+    }
+
+    /** Standing room just behind an entity, facing its back; null when there is none. */
+    private static Location behind(LivingEntity target) {
+        Location at = target.getLocation();
+        Vector facing = Geo.flat(at);
+        for (double back : new double[]{1.3, 0.9}) {
+            Location spot = at.clone().subtract(facing.clone().multiply(back));
+            if (Geo.standable(spot)) {
+                spot.setYaw(at.getYaw());
+                spot.setPitch(0f);
+                return spot;
+            }
+        }
+        return null;
+    }
+
+    /** Nothing came: the stance is released as a crimson crescent. */
+    private void release(Stance stance) {
+        Player player = stance.player;
+        AbilitySettings settings = plugin.settings().ability(Ability.IAIDO);
+        Location start = player.getLocation().add(0, 0.9, 0);
+        Vector direction = Geo.flat(player.getLocation());
+        Location end = start.clone().add(direction.clone().multiply(settings.num("slash-range")));
+        plugin.visuals().spawn("crimson_slash", player.getLocation().add(direction.clone().multiply(2.0)).add(0, 1.1, 0))
+                .facing(direction).tilt(10).size(1.0).send(0)
+                .animate(1, 3, e -> e.size(5.0))
+                .vanish(5, 4);
+        plugin.fx().sound(player.getLocation(), "crimson-cut");
+        if (settings.num("slash-damage") <= 0) {
+            return;
+        }
+        for (LivingEntity target : plugin.hits().along(player, start, end, 1.4)) {
+            if (plugin.hits().hurt(player, target, settings.num("slash-damage"))) {
+                cutFx(target, 20);
+                plugin.fx().sound(target.getLocation(), "kurogane-hit");
+            }
+        }
+    }
+
+    // ---- Crimson Edge (passive) ------------------------------------------------------------------------------
+
+    @Override
+    public void melee(EntityDamageByEntityEvent event, Player attacker, LivingEntity target, WeaponItems.Tag weapon) {
+        AbilitySettings settings = plugin.settings().ability(Ability.CRIMSON_EDGE);
+        if (combos.hit(attacker.getUniqueId(), target.getUniqueId(), plugin.tick(), settings.whole("hits"),
+                settings.ticks("window"), settings.ticks("min-hit-gap"))) {
+            event.setDamage(event.getDamage() + settings.num("bonus-damage"));
+            cutting.put(attacker.getUniqueId(), target.getUniqueId());
+        }
     }
 
     @Override
@@ -271,9 +460,9 @@ final class Kurogane implements Kit {
         if (cut == null || !cut.equals(target.getUniqueId())) {
             return;
         }
-        Compat.heal(attacker, plugin.settings().ability(Ability.BLOOD_MOON).num("heal"));
+        AbilitySettings settings = plugin.settings().ability(Ability.CRIMSON_EDGE);
+        bleed(attacker, target, settings.num("bleed-damage"), settings.ticks("bleed-duration"));
         cutFx(target, plugin.tick() % 2 == 0 ? 30 : -30);
-        plugin.fx().sound(target.getLocation(), "blood-moon-cut");
-        plugin.fx().view(attacker.getLocation()).dust(attacker.getLocation().add(0, 1.2, 0), CRIMSON, 1.1f, 6, 0.3);
+        plugin.fx().sound(target.getLocation(), "crimson-edge");
     }
 }

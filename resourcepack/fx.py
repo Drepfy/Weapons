@@ -114,20 +114,6 @@ def crimson_cut(u, v):
     return c + (max(best, halo),)
 
 
-def blood_moon(u, v):
-    r, a = _polar(u, v)
-    if r < 0.6:
-        n = fbm(u * 4 + 7, v * 4 + 3, 5)
-        crater = smooth(0.62, 0.7, fbm(u * 7 + 1, v * 7 + 9, 3))
-        lit = clamp(0.55 + 0.6 * (-u * 0.6 - v * 0.6) / 0.6)
-        base = _ramp(0.35 + 0.4 * n - 0.25 * crater + 0.25 * lit,
-                     [(0, '#3a0006'), (0.5, '#a3081f'), (0.8, '#ff3b4f'), (1, '#ffb0b8')])
-        edge = smooth(0.5, 0.6, r)
-        return mix(base, hexrgb('#ff6a7a'), edge * 0.6) + (1.0,)
-    halo = _glow(r - 0.6, 0.18) * 0.85 + _glow(r - 0.6, 0.04) * 0.4
-    return hexrgb('#ff2236') + (halo,)
-
-
 def _rune_circle(u, v, colour, accent, seed):
     r, a = _polar(u, v)
     ring = _glow(r - 0.9, 0.025) + 0.8 * _glow(r - 0.82, 0.012) + 0.7 * _glow(r - 0.6, 0.012)
@@ -166,24 +152,6 @@ def rune_crimson(u, v):
 CANDY = ['#ff2d55', '#ffffff', '#ff7ac3', '#7af0ff', '#ffe066']
 
 
-def sprinkles(u, v):
-    best = (0.0, (1, 1, 1))
-    rnd = random.Random(11)
-    for k in range(14):
-        cx, cy = rnd.uniform(-0.75, 0.75), rnd.uniform(-0.75, 0.75)
-        ang = rnd.uniform(0, math.pi)
-        dx, dy = u - cx, v - cy
-        along = dx * math.cos(ang) + dy * math.sin(ang)
-        across = -dx * math.sin(ang) + dy * math.cos(ang)
-        d = math.hypot(max(0.0, abs(along) - 0.09), across)
-        a = smooth(0.06, 0.035, d)
-        if a > best[0]:
-            col = hexrgb(CANDY[k % len(CANDY)])
-            shine = smooth(0.0, 0.03, -across) * 0.5
-            best = (a, mix(col, (1, 1, 1), shine))
-    return best[1] + (best[0],)
-
-
 def candy_burst(u, v):
     r, a = _polar(u, v)
     rays = 12
@@ -199,6 +167,74 @@ def candy_burst(u, v):
     sparkle = (0.5 + 0.5 * math.cos(a * 4)) ** 12 * _glow(r - 0.3, 0.2)
     alpha = clamp(on * fade + core + sparkle * 0.6)
     return mix(col, (1, 1, 1), clamp(core + sparkle)) + (alpha,)
+
+
+def _hook_path():
+    """The candy cane: a shaft up, then the crook curling over to the left."""
+    pts = []
+    for k in range(24):
+        pts.append((0.18, 0.92 - k * (1.1 / 23)))                 # the shaft, bottom to top
+    cx, cy, r = -0.17, -0.18, 0.35
+    for k in range(1, 33):
+        ang = math.pi * k / 32                                    # over the top, right to left
+        pts.append((cx + r * math.cos(ang), cy - r * math.sin(ang)))
+    for k in range(1, 7):
+        pts.append((cx - r + 0.01 * k, cy + 0.035 * k))            # a little barb at the tip
+    return pts
+
+
+HOOK = _hook_path()
+HOOK_LENGTHS = [0.0]
+for _k in range(1, len(HOOK)):
+    HOOK_LENGTHS.append(HOOK_LENGTHS[-1] + math.dist(HOOK[_k - 1], HOOK[_k]))
+
+
+def candy_hook(u, v):
+    """A glossy red-and-white candy-cane hook with a pink glow."""
+    best, along, side = 9.0, 0.0, 0.0
+    for k in range(len(HOOK) - 1):
+        (x0, y0), (x1, y1) = HOOK[k], HOOK[k + 1]
+        dx, dy = x1 - x0, y1 - y0
+        seg = dx * dx + dy * dy
+        t = clamp(((u - x0) * dx + (v - y0) * dy) / seg) if seg > 0 else 0.0
+        px, py = x0 + dx * t, y0 + dy * t
+        d = math.hypot(u - px, v - py)
+        if d < best:
+            best = d
+            along = HOOK_LENGTHS[k] + math.sqrt(seg) * t
+            side = ((u - px) * -dy + (v - py) * dx) / max(1e-6, math.sqrt(seg))
+    width = 0.085 if along < HOOK_LENGTHS[-1] - 0.06 else 0.06
+    if best < width:
+        stripe = ((along * 5.5 + side * 2.5) % 1.0) < 0.5
+        col = hexrgb('#e8153c') if stripe else hexrgb('#fff4f7')
+        q = side / width                                           # -1..1 across the cane
+        col = mix(col, hexrgb('#5a0418'), clamp(-q) * 0.45)         # shaded side
+        col = mix(col, (1, 1, 1), _glow(q - 0.45, 0.18) * 0.7)       # gloss
+        return col + (smooth(width, width - 0.015, best),)
+    halo = _glow(best - width, 0.07) * 0.55
+    return hexrgb('#ff6fb5') + (halo,)
+
+
+def stun_ring(u, v):
+    """Dizzy candy stars circling a head, seen a little from above: an ellipse of five stars,
+    the ones in front brighter."""
+    ring = _glow(math.hypot(u / 0.86, v / 0.3) - 1.0, 0.05) * 0.35
+    best, col = 0.0, (1, 1, 1)
+    for k in range(5):
+        ang = TAU * k / 5 + 0.3
+        cx, cy = 0.86 * math.cos(ang), 0.3 * math.sin(ang)
+        front = 0.55 + 0.45 * math.sin(ang)                        # lower on the ellipse = in front
+        dx, dy = u - cx, v - cy
+        r, a = math.hypot(dx, dy), math.atan2(dy, dx)
+        size = 0.09 + 0.05 * front
+        spikes = size * (0.55 + 0.45 * math.cos(a * 5) ** 2)
+        star_a = smooth(spikes + 0.02, spikes - 0.01, r) * (0.55 + 0.45 * front)
+        glow = _glow(r, size * 1.6) * 0.35 * front
+        val = max(star_a, glow)
+        if val > best:
+            best = val
+            col = mix(hexrgb(CANDY[k % len(CANDY)]), (1, 1, 1), _glow(r, size * 0.45) * 0.8)
+    return col + (clamp(max(best, ring)),)
 
 
 def candy_ring(u, v):
@@ -390,9 +426,9 @@ EFFECTS = {
     'crimson_slash': (crimson_slash, 128, 'flat'),
     'crimson_streak': (crimson_streak, 128, 'streak'),
     'crimson_cut': (crimson_cut, 128, 'upright'),
-    'blood_moon': (blood_moon, 128, 'upright'),
     'rune_crimson': (rune_crimson, 256, 'flat'),
-    'sprinkles': (sprinkles, 64, 'upright'),
+    'candy_hook': (candy_hook, 128, 'upright'),
+    'stun_ring': (stun_ring, 128, 'upright'),
     'candy_burst': (candy_burst, 128, 'flat'),
     'candy_ring': (candy_ring, 256, 'flat'),
     'rift': (rift, 128, 'upright'),

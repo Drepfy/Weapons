@@ -1,8 +1,10 @@
 # Legendary Weapons. After editing, run /legendary reload.
 #
-# Controls: F (the swap-offhand key) uses a weapon's first ability, Shift + F its second.
+# Controls: F (the swap-offhand key) uses a weapon's first ability, Shift + F its second. Pressing
+# again while one is still going recasts it (Crimson Flash's second dash, Rift Swap's return,
+# Executioner's Leap's dive).
 # Times: 8s, 2.5s, 1m, 30d.
-config-version: 2
+config-version: 3
 prefix: "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ » &r"
 
 # Which keys use the abilities:
@@ -82,33 +84,53 @@ weapons:
     lore:
       - "&8Legendary Katana"
       - ""
-      - "&#FF4D6A{key} &8» &f{crimson-flash.name} &8({crimson-flash.cooldown})"
-      - "&7Dash through enemies. They bleed."
+      - "&#FF4D6APassive &8» &f{crimson-edge.name}"
+      - "&7Every 3rd hit in a row cuts deep and bleeds."
       - ""
-      - "&#FF4D6A{sneak-key} &8» &f{blood-moon.name} &8({blood-moon.cooldown})"
-      - "&7Your hits cut twice and heal you."
+      - "&#FF4D6A{key} &8» &f{crimson-flash.name} &8({crimson-flash.cooldown})"
+      - "&7Dash through enemies. Press again to dash twice."
+      - ""
+      - "&#FF4D6A{sneak-key} &8» &f{iaido.name} &8({iaido.cooldown})"
+      - "&7Block the next hit and strike back from behind."
       - ""
       - "{enchantments}"
     abilities:
       crimson-flash:
-        cooldown: 20s
-        # How far the dash goes (it stops at walls) and how wide its cut is.
+        cooldown: 16s
+        # How far each dash goes (it stops at walls) and how wide its cut is.
         range: 8
         width: 1.6
-        damage: 7
+        damage: 6
         # The cut lands this long after the dash.
-        delay: 0.5s
+        delay: 0.4s
         # Bleeding afterwards: this much damage every second, for this long (0 = none).
         bleed-damage: 1
         bleed-duration: 3s
-      blood-moon:
-        cooldown: 35s
-        duration: 6s
-        # Each sword hit while it lasts: extra damage, and health back (2 = one heart).
-        bonus-damage: 3
-        heal: 1
-        # Hits closer together than this do not cut twice (no spam clicking).
+        # Dashes per use: after the first, press again within recast-window for the next. The
+        # cooldown starts after the last one.
+        charges: 2
+        recast-window: 3s
+      iaido:
+        cooldown: 22s
+        # How long the counter stance is held. The first attack on you in that time (a hit or an
+        # arrow) is blocked, and if the attacker is within reach you appear behind them and cut.
+        stance: 1.5s
+        reach: 12
+        damage: 9
+        # Health back when the counter cut lands (2 = one heart).
+        heal: 4
+        # Nothing came: the stance is released as a crimson crescent this long in front of you.
+        slash-damage: 6
+        slash-range: 6
+      crimson-edge:
+        # Passive: every 3rd sword hit in a row on the same target (no more than window apart;
+        # hits less than min-hit-gap apart do not count) does extra damage and bleeds.
+        hits: 3
+        window: 3s
         min-hit-gap: 0.5s
+        bonus-damage: 4
+        bleed-damage: 1
+        bleed-duration: 3s
 
   sugarcrash:
     name: "<gradient:#FF3B5C:#FFFFFF:#FF3B5C>&lSugarcrash</gradient>"
@@ -128,39 +150,55 @@ weapons:
     lore:
       - "&8Legendary Candy Scythe"
       - ""
-      - "&#FF7AC3{key} &8» &f{sugar-rush.name} &8({sugar-rush.cooldown})"
-      - "&7Dash through players, then speed up."
+      - "&#FF7AC3Passive &8» &f{sugar-high.name}"
+      - "&7Hits build sugar and speed. Full: a candy blast."
+      - ""
+      - "&#FF7AC3{key} &8» &f{candy-hook.name} &8({candy-hook.cooldown})"
+      - "&7Hook a player to you, or a wall to fly to it."
       - ""
       - "&#FF7AC3{sneak-key} &8» &f{candy-cyclone.name} &8({candy-cyclone.cooldown})"
-      - "&7Spin a candy tornado that shreds."
+      - "&7Become a candy tornado. Arrows bounce off."
       - ""
       - "{enchantments}"
     abilities:
-      sugar-rush:
-        cooldown: 18s
-        # How fast and how long the dash is.
-        dash-speed: 1.6
-        dash-time: 0.4s
-        # Players you dash through.
-        damage: 4
-        knockback: 0.9
-        lift: 0.35
-        # Then: Speed and Haste (faster swings) for this long. Level 0 = none.
-        buff-duration: 5s
-        speed-level: 2
-        haste-level: 2
+      candy-hook:
+        cooldown: 14s
+        # How far the hook flies and how fast (blocks per tick).
+        range: 22
+        speed: 1.6
+        # A player (or monster) it catches: damage, how hard they are yanked to you, and how
+        # long they are stunned after (too slow to walk away).
+        damage: 3
+        yank: 1.0
+        stun: 0.75s
+        # A wall or the ground it catches: how hard you are pulled to it (0 = not at all).
+        # No fall damage after.
+        grapple: 1.0
       candy-cyclone:
-        cooldown: 30s
-        duration: 3s
-        radius: 4
+        cooldown: 28s
+        # You can keep moving while it spins (with Speed at speed-level). Arrows bounce off.
+        duration: 4s
+        radius: 4.5
         # Every interval, players in the tornado take this and are dragged in.
         damage: 1.5
-        interval: 0.5s
-        pull: 0.22
+        interval: 0.4s
+        pull: 0.25
+        speed-level: 2
         # When it ends it bursts, throwing everyone out.
-        burst-damage: 3
-        burst-knockback: 1.1
-        burst-lift: 0.45
+        burst-damage: 4
+        burst-knockback: 1.2
+        burst-lift: 0.5
+      sugar-high:
+        # Passive: each scythe hit adds a stack (they last stack-duration; hits less than
+        # min-hit-gap apart do not count) and speeds you up. At full stacks the next hit is a
+        # Sugar Crash: extra damage, and a candy blast hurts and throws everyone round the target.
+        stacks: 5
+        stack-duration: 4s
+        min-hit-gap: 0.5s
+        crash-damage: 4
+        splash-damage: 3
+        splash-radius: 3
+        knockback: 0.8
 
   riftblade:
     name: "<gradient:#E9C6FF:#A855F7>&lRiftblade</gradient>"
@@ -180,34 +218,48 @@ weapons:
     lore:
       - "&8Legendary Void Sword"
       - ""
+      - "&#B76BFFPassive &8» &f{phase-shift.name}"
+      - "&7Sometimes a hit passes through you."
+      - ""
       - "&#B76BFF{key} &8» &f{void-rend.name} &8({void-rend.cooldown})"
-      - "&7Tear a rift that pulls and blinds."
+      - "&7A rift pulls them in, blinds and lifts them."
       - ""
       - "&#B76BFF{sneak-key} &8» &f{rift-swap.name} &8({rift-swap.cooldown})"
-      - "&7Swap places with who you look at."
+      - "&7Swap places. Press again to go back."
       - ""
       - "{enchantments}"
     abilities:
       void-rend:
-        cooldown: 22s
+        cooldown: 20s
         # The rift opens this far ahead (or at a wall).
         distance: 5
         # For pull-time it drags in everyone within pull-radius...
-        pull-radius: 5
-        pull: 0.25
-        pull-time: 1s
-        # ...then snaps shut: damage and Darkness for everyone within radius.
-        radius: 3
+        pull-radius: 5.5
+        pull: 0.28
+        pull-time: 1.25s
+        # ...then snaps shut: damage, Darkness, and Levitation for lift (0 = none) for everyone
+        # within radius.
+        radius: 3.2
         damage: 7
-        darkness: 2s
+        darkness: 3s
+        lift: 1s
       rift-swap:
-        cooldown: 30s
+        cooldown: 28s
         # Swaps with the first player (or monster) in sight within range.
-        range: 18
-        damage: 2
+        range: 20
+        damage: 3
         nausea: 3s
         # With nobody in sight: blink this far forward instead.
         blink: 10
+        # A void echo stays where you were for this long: press again to return to it. The
+        # cooldown starts after that (0 = no echo).
+        echo: 4s
+      phase-shift:
+        # Passive, while holding the Riftblade: the chance (0.2 = 20%) that an attack on you
+        # passes through and you slip this many blocks aside. At most once per cooldown.
+        chance: 0.2
+        cooldown: 10s
+        distance: 3
 
   gravebreaker:
     name: "<gradient:#E2E2E2:#E0475A>&lGravebreaker</gradient>"
@@ -226,16 +278,19 @@ weapons:
     lore:
       - "&8Legendary Battle Axe"
       - ""
+      - "&#FF8A3DPassive &8» &f{last-rites.name}"
+      - "&7Hits finish weak players. Kills reset the leap."
+      - ""
       - "&#FF8A3D{key} &8» &f{executioners-leap.name} &8({executioners-leap.cooldown})"
-      - "&7Leap up and slam the ground."
+      - "&7Leap and slam. Press again to dive."
       - ""
       - "&#FF8A3D{sneak-key} &8» &f{grave-rise.name} &8({grave-rise.cooldown})"
-      - "&7Gravestones burst out of the ground."
+      - "&7Gravestones burst up and weigh them down."
       - ""
       - "{enchantments}"
     abilities:
       executioners-leap:
-        cooldown: 20s
+        cooldown: 18s
         # How high and how far forward the leap throws you (you take no fall damage from it).
         leap-up: 1.1
         leap-forward: 0.9
@@ -248,18 +303,33 @@ weapons:
         # Slowness level and how long it lasts (0 = none).
         slow-level: 2
         slow-duration: 2s
+        # Press again in the air to dive at where you look (up to dive-range blocks): a 30%
+        # bigger slam with dive-bonus extra damage.
+        dive-range: 18
+        dive-speed: 1.8
+        dive-bonus: 3
       grave-rise:
-        cooldown: 30s
+        cooldown: 28s
         # The line of gravestones: how far it reaches, how many, and the time between them.
         range: 12
         stones: 6
-        interval: 0.2s
-        width: 1.4
+        interval: 0.15s
+        width: 1.5
         damage: 6
         launch: 0.9
-        # Mining Fatigue level and how long it lasts (0 = none).
+        # Slowness and Mining Fatigue for whoever a stone hits (level 0 = none).
+        slow-level: 3
+        slow-duration: 2s
         fatigue-level: 2
         fatigue-duration: 3s
+        # The last stone bursts as a tomb: damage to everyone within tomb-radius (0 = no tomb).
+        tomb-radius: 3
+        tomb-damage: 5
+      last-rites:
+        # Passive: axe hits on players below threshold of their health (0.4 = 40%) do bonus
+        # more damage (0.25 = +25%). Killing a player with the axe in hand makes the leap ready.
+        threshold: 0.4
+        bonus: 0.25
 
   starforged:
     name: "<gradient:#FFE29A:#6FD6FF:#8A5CFF>&lStarforged</gradient>"
@@ -278,8 +348,11 @@ weapons:
     lore:
       - "&8Legendary Celestial Axe"
       - ""
+      - "&#6FD6FFPassive &8» &f{starstruck.name}"
+      - "&7Every 4th hit in a row calls a star down on them."
+      - ""
       - "&#6FD6FF{key} &8» &f{starfall.name} &8({starfall.cooldown})"
-      - "&7Call down a rain of stars."
+      - "&7Rain stars down. The circle follows your aim."
       - ""
       - "&#6FD6FF{sneak-key} &8» &f{singularity.name} &8({singularity.cooldown})"
       - "&7A black hole pulls, then explodes."
@@ -287,12 +360,12 @@ weapons:
       - "{enchantments}"
     abilities:
       starfall:
-        cooldown: 25s
-        range: 24
+        cooldown: 24s
+        range: 28
         # Time between the rune circle appearing and the first star (at least 0.5s).
-        warning: 1.25s
+        warning: 1s
         radius: 4.5
-        stars: 6
+        stars: 7
         interval: 0.2s
         # Each star: who is within star-radius of where it lands.
         star-radius: 2
@@ -300,22 +373,39 @@ weapons:
         # A player is hit by at most this many stars of one Starfall.
         max-hits: 3
         launch: 0.6
+        # While the stars fall, the circle moves towards where you look, this many blocks a
+        # tick (0 = it stays where it opened).
+        follow-speed: 0.6
       singularity:
         cooldown: 35s
-        range: 20
-        radius: 7
+        range: 22
+        radius: 8
         duration: 3s
         # How hard players are dragged to the centre (they can still walk out slowly).
-        pull: 0.16
+        pull: 0.2
         # A player caught by it takes this once (it is what lets protection plugins keep players
         # in no-PvP areas out of it).
         grip-damage: 1
-        nova-damage: 6
-        nova-knockback: 1.3
-        nova-lift: 0.5
+        nova-damage: 7
+        nova-knockback: 1.4
+        nova-lift: 0.55
+        # Slowness after the nova (level 0 = none).
+        slow-level: 2
+        slow-duration: 3s
         # Starfall cannot be used while a Singularity is open (plus this long), and Singularity
         # cannot be used while stars are falling (plus this long).
         lockout: 1.5s
+      starstruck:
+        # Passive: every 4th axe hit in a row on the same target (no more than window apart;
+        # hits less than min-hit-gap apart do not count) calls a small star down on it after
+        # delay: damage to everyone within radius, and a launch.
+        hits: 4
+        window: 4s
+        min-hit-gap: 0.5s
+        delay: 0.5s
+        damage: 4
+        radius: 1.8
+        launch: 0.5
 
 # Sounds: "<sound> [volume] [pitch]". The legendary:... sounds are in the server resource pack;
 # the quiet vanilla sound after them is for players without it.
@@ -323,22 +413,29 @@ sounds:
   crimson-flash: ["legendary:kurogane.flash 1 1", "entity.player.attack.sweep 0.3 1.5"]
   crimson-flash-end: ["legendary:kurogane.sheathe 0.9 1"]
   crimson-cut: ["legendary:kurogane.cut 1 1", "entity.player.attack.crit 0.3 1.2"]
+  crimson-edge: ["legendary:kurogane.edge 0.9 1", "entity.player.attack.crit 0.3 1.3"]
+  iaido: ["legendary:kurogane.iaido 1 1", "item.trident.return 0.3 0.8"]
+  iaido-parry: ["legendary:kurogane.parry 1 1", "item.shield.block 0.4 1.4"]
+  iaido-counter: ["legendary:kurogane.counter 1 1", "entity.player.attack.crit 0.3 0.9"]
   kurogane-hit: ["legendary:kurogane.hit 0.9 1"]
   bleed: ["legendary:kurogane.bleed 0.5 1"]
-  blood-moon: ["legendary:kurogane.blood_moon 1 1", "entity.wither.ambient 0.15 1.6"]
-  blood-moon-cut: ["legendary:kurogane.moon_cut 0.9 1", "entity.player.attack.sweep 0.25 1.7"]
-  sugar-rush: ["legendary:sugarcrash.rush 1 1", "entity.firework_rocket.launch 0.3 1.6"]
-  sugar-rush-end: ["legendary:sugarcrash.sparkle 0.6 1"]
-  sugarcrash-hit: ["legendary:sugarcrash.hit 0.9 1", "block.amethyst_cluster.break 0.3 1.5"]
   candy-cyclone: ["legendary:sugarcrash.cyclone 1 1", "entity.breeze.wind_burst 0.2 1.3"]
+  candy-hook: ["legendary:sugarcrash.hook 1 1", "entity.fishing_bobber.throw 0.4 1.2"]
+  candy-hook-catch: ["legendary:sugarcrash.catch 1 1", "entity.fishing_bobber.retrieve 0.4 1.3"]
+  sugar-high-full: ["legendary:sugarcrash.full 0.7 1", "block.amethyst_block.chime 0.4 1.6"]
+  sugar-crash: ["legendary:sugarcrash.crash 1 1", "entity.firework_rocket.large_blast 0.35 1.2"]
   candy-cyclone-hit: ["legendary:sugarcrash.pop 0.6 1"]
   candy-burst: ["legendary:sugarcrash.burst 1 1", "entity.firework_rocket.blast 0.35 1.3"]
   void-rend: ["legendary:riftblade.rend 1 1", "entity.enderman.teleport 0.3 0.6"]
   void-rend-snap: ["legendary:riftblade.snap 1 1", "entity.evoker.cast_spell 0.25 0.6"]
   riftblade-hit: ["legendary:riftblade.hit 0.9 1"]
   rift-swap: ["legendary:riftblade.swap 1 1", "entity.enderman.teleport 0.3 1.3"]
+  rift-return: ["legendary:riftblade.return 1 1", "entity.enderman.teleport 0.3 0.9"]
+  phase-shift: ["legendary:riftblade.phase 1 1", "entity.enderman.teleport 0.3 1.6"]
   executioners-leap: ["legendary:gravebreaker.leap 1 1", "entity.breeze.jump 0.25 0.7"]
   executioners-slam: ["legendary:gravebreaker.slam 1 1", "entity.generic.explode 0.3 0.6"]
+  executioners-dive: ["legendary:gravebreaker.dive 1 1", "entity.breeze.wind_burst 0.3 0.6"]
+  last-rites: ["legendary:gravebreaker.rites 0.9 1", "block.bell.resonate 0.25 0.6"]
   gravebreaker-hit: ["legendary:gravebreaker.hit 0.9 1"]
   grave-rise: ["legendary:gravebreaker.rumble 1 1"]
   grave-rise-stone: ["legendary:gravebreaker.stone 0.9 1", "block.deepslate.break 0.35 0.7"]
@@ -346,6 +443,7 @@ sounds:
   starfall-star: ["legendary:starforged.fall 0.8 1"]
   starfall-impact: ["legendary:starforged.impact 1 1", "entity.firework_rocket.twinkle 0.3 1.2"]
   starforged-hit: ["legendary:starforged.hit 0.9 1"]
+  starstruck: ["legendary:starforged.starstruck 0.9 1", "entity.firework_rocket.twinkle 0.3 1.5"]
   singularity: ["legendary:starforged.singularity 0.8 1", "block.portal.trigger 0.12 1.4"]
   singularity-nova: ["legendary:starforged.nova 1 1", "entity.generic.explode 0.3 1.3"]
   # Getting a legendary.

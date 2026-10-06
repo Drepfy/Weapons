@@ -7,19 +7,16 @@ import org.bukkit.configuration.ConfigurationSection;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
- * Brings a config.yml from before 1.2 up to date: the old abilities' settings, the action bar
- * settings and messages that no longer exist are removed, and enchantments still at the old
- * default (Sharpness 6) become the new ones. Texts are handled by {@link TextUpdate}.
+ * Brings an older config.yml up to date: settings of abilities that were replaced, the action
+ * bar settings and messages that no longer exist are removed, and enchantments still at the
+ * old default (Sharpness 6) become the new ones. Texts and settings still at an old default are
+ * handled by {@link TextUpdate}.
  */
 public final class ConfigUpgrade {
 
-    public static final int VERSION = 2;
-
-    /** Settings of the abilities 1.0 and 1.1 had, which 1.2 replaced. */
-    private static final Set<String> OLD_ABILITY_OPTIONS = Set.of("duration", "speed-level", "haste-level", "cooldown");
+    public static final int VERSION = 3;
 
     private ConfigUpgrade() {
     }
@@ -61,10 +58,9 @@ public final class ConfigUpgrade {
                             current = ability;
                         }
                     }
-                    ConfigurationSection section = abilities.getConfigurationSection(key);
-                    if (current == null || section != null && isOldSugarRush(current, section)) {
+                    if (current == null) {
                         abilities.set(key, null);
-                        changes.add("removed " + base + ".abilities." + key + " (the abilities changed in 1.2)");
+                        changes.add("removed " + base + ".abilities." + key + " (an ability this version no longer has)");
                     }
                 }
             }
@@ -83,12 +79,5 @@ public final class ConfigUpgrade {
         }
         config.set("config-version", VERSION);
         return changes;
-    }
-
-    /** 1.1's Sugar Rush (a speed boost) had a duration; 1.2's is a dash. */
-    private static boolean isOldSugarRush(Ability ability, ConfigurationSection section) {
-        // contains(path, true): only what the file says, not the defaults behind it.
-        return ability == Ability.SUGAR_RUSH && section.contains("duration", true) && !section.contains("dash-speed", true)
-                && OLD_ABILITY_OPTIONS.containsAll(section.getKeys(false));
     }
 }

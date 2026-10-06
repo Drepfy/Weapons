@@ -146,6 +146,14 @@ final class Geo {
         return last;
     }
 
+    /** Room for a player to stand: feet, body and head clear. */
+    static boolean standable(Location at) {
+        World world = at.getWorld();
+        return world != null && !solid(world, at.getX(), at.getY() + 0.1, at.getZ())
+                && !solid(world, at.getX(), at.getY() + 1.0, at.getZ())
+                && !solid(world, at.getX(), at.getY() + 1.7, at.getZ());
+    }
+
     /** A random spot within a radius of a centre, on the same level. */
     static Location scatter(Location center, double radius, java.util.Random random) {
         double angle = random.nextDouble() * Math.PI * 2;

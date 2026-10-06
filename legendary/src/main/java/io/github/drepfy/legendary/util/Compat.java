@@ -29,19 +29,23 @@ public final class Compat {
     private Compat() {
     }
 
-    /** Heals up to the entity's maximum health (Lifesteal hearts included). */
-    public static void heal(LivingEntity entity, double amount) {
-        double max = 20.0;
+    /** The entity's maximum health (Lifesteal hearts included); 20 if it cannot be read. */
+    public static double maxHealth(LivingEntity entity) {
         try {
             AttributeInstance instance = MAX_HEALTH == null ? null : entity.getAttribute(MAX_HEALTH);
             if (instance != null) {
-                max = instance.getValue();
+                return instance.getValue();
             }
         } catch (RuntimeException | LinkageError ignored) {
             // Default maximum.
         }
+        return 20.0;
+    }
+
+    /** Heals up to the entity's maximum health. */
+    public static void heal(LivingEntity entity, double amount) {
         if (!entity.isDead()) {
-            entity.setHealth(Math.max(0.0, Math.min(max, entity.getHealth() + amount)));
+            entity.setHealth(Math.max(0.0, Math.min(maxHealth(entity), entity.getHealth() + amount)));
         }
     }
 

@@ -205,18 +205,26 @@ def kurogane():
     drip = tone(0.25, 420, 170) * env(0.25, 0.004, 0.1) + 0.3 * band(noise(0.25, 6), 300, 1500) * env(0.25, 0.002, 0.04)
     s['bleed'] = finish(reverb(drip, 0.4, 0.2), peak=0.6)
 
-    drone = (tone(2.6, 55) + 0.6 * tone(2.6, 82.4) + 0.3 * tone(2.6, 58.3)) * np.minimum(1, time(2.6) / 1.0)
-    drone *= np.exp(-np.clip(time(2.6) - 1.2, 0, None) * 1.6)
-    shimmer = sum(tone(2.6, f, f * 1.06, vibrato=(5, 0.004)) for f in (660, 698, 990)) * swell(2.6, 1.05, 2.0)
-    rise = sweep_noise(1.05, 300, 3000, 0.7, 8) * swell(1.05, 1.05, 2.2)
-    boom = thump(1.4, 80, 32, 0.6) + 0.5 * lowpass(noise(1.4, 9), 400) * env(1.4, 0.005, 0.5)
-    s['blood_moon'] = finish(reverb(at(2.8, [(0, drone, 0.45), (0, shimmer, 0.12), (0, rise, 0.35), (1.05, boom, 1.0)]),
-                                    2.2, 0.4, 2500), peak=0.8)
+    scrape = band(noise(0.8, 13), 2500, 8000) * swell(0.8, 0.55, 1.6) * env(0.8, 0.0, 0.75, 0.5)
+    hum = tone(1.3, 110) * env(1.3, 0.15, 1.0, 0.2) + 0.4 * tone(1.3, 165) * env(1.3, 0.2, 0.9, 0.2)
+    ring = bell(1.3, 1480, 0.9, ((1, 1), (1.5, 0.4), (2.2, 0.2)))
+    s['iaido'] = finish(reverb(at(1.4, [(0, scrape, 0.5), (0, hum, 0.6), (0.5, norm(ring), 0.3)]), 1.2, 0.35, 3500), peak=0.75)
 
-    slash = sweep_noise(0.12, 1800, 7500, 0.45, 12) * env(0.12, 0.006, 0.08)
-    chime = bell(0.5, 880, 0.3, ((1, 1), (1.5, 0.6), (3.01, 0.3)))
-    s['moon_cut'] = finish(reverb(at(0.55, [(0, slash, 1.0), (0.03, norm(chime), 0.35), (0.02, thump(0.2, 180, 80, 0.08), 0.4)]),
-                                  0.6, 0.25))
+    clang = bell(0.9, 2200, 0.4, ((1, 1), (1.37, 0.8), (2.05, 0.55), (2.74, 0.35), (3.9, 0.2)))
+    clang += 0.6 * bell(0.9, 3150, 0.3, ((1, 1), (1.6, 0.5)))
+    tick = highpass(noise(0.03, 14), 3000) * env(0.03, 0.001, 0.015)
+    s['parry'] = finish(reverb(at(1.0, [(0, tick, 0.8), (0, norm(clang), 0.9), (0, thump(0.25, 220, 110, 0.06), 0.5)]),
+                               0.9, 0.3, 6000))
+
+    rush = sweep_noise(0.22, 1200, 8000, 0.5, 15) * env(0.22, 0.03, 0.15)
+    chop = sweep_noise(0.12, 2000, 9000, 0.4, 16) * env(0.12, 0.004, 0.08)
+    s['counter'] = finish(reverb(at(0.9, [(0, rush, 0.8), (0.12, chop, 1.0), (0.13, thump(0.4, 150, 55, 0.15), 0.9),
+                                          (0.14, norm(bell(0.6, 2600, 0.3)), 0.3),
+                                          (0.15, band(noise(0.25, 17), 800, 3000) * env(0.25, 0.003, 0.1), 0.5)]),
+                                  0.8, 0.25))
+
+    deep = sweep_noise(0.14, 1400, 7500, 0.45, 18) * env(0.14, 0.006, 0.09)
+    s['edge'] = finish(reverb(at(0.6, [(0, deep, 1.0), (0.05, wet, 0.6), (0.05, thump(0.3, 130, 55, 0.12), 0.8)]), 0.6, 0.2))
     return s
 
 
@@ -229,18 +237,24 @@ def _blip(f, seconds=0.12):
 
 def sugarcrash():
     s = {}
-    whoosh = sweep_noise(0.45, 600, 7000, 0.6, 21) * env(0.45, 0.08, 0.3)
-    notes = [(0.04 + k * 0.05, norm(_blip(f)), 0.35) for k, f in enumerate((1047, 1319, 1568, 2093))]
-    pop = tone(0.08, 900, 300) * env(0.08, 0.002, 0.05)
-    s['rush'] = finish(reverb(at(0.9, [(0, whoosh, 1.0), (0, pop, 0.5)] + notes), 0.8, 0.3))
-
     rng = np.random.default_rng(22)
-    twinkles = [(k * 0.06, norm(_blip(rng.uniform(1800, 3600), 0.2)), 0.5 * (1 - k / 10)) for k in range(10)]
-    s['sparkle'] = finish(reverb(at(0.9, twinkles), 0.8, 0.35), peak=0.7)
+    throw = sweep_noise(0.4, 900, 5500, 0.55, 21) * env(0.4, 0.04, 0.3)
+    whistle = tone(0.4, 700, 1500, vibrato=(9, 0.01)) * env(0.4, 0.05, 0.3)
+    rope = crackle(0.4, 120, 20, 2000, 7000) * env(0.4, 0.02, 0.3)
+    s['hook'] = finish(reverb(at(0.6, [(0, throw, 1.0), (0, whistle, 0.2), (0, rope, 0.25)]), 0.5, 0.2))
 
-    crunch = crackle(0.25, 260, 23, 1500, 8000) * env(0.25, 0.002, 0.12)
-    s['hit'] = finish(at(0.35, [(0, crunch, 1.0), (0, tone(0.1, 700, 220) * env(0.1, 0.002, 0.06), 0.7),
-                                (0, thump(0.2, 150, 80, 0.07), 0.5)]))
+    snap = band(noise(0.06, 23), 1500, 8000) * env(0.06, 0.001, 0.03)
+    s['catch'] = finish(reverb(at(0.6, [(0, snap, 0.8), (0, thump(0.25, 180, 80, 0.08), 0.8),
+                                        (0.01, tone(0.1, 1000, 330) * env(0.1, 0.002, 0.06), 0.6),
+                                        (0.03, norm(_blip(1568, 0.25)), 0.35)]), 0.5, 0.25))
+
+    arp = [(k * 0.055, norm(_blip(f, 0.3)), 0.45 + 0.1 * k) for k, f in enumerate((1047, 1319, 1568, 2093, 2637))]
+    s['full'] = finish(reverb(at(0.8, arp), 0.8, 0.35), peak=0.7)
+
+    crack = band(noise(0.25, 24), 900, 9000) * env(0.25, 0.001, 0.06)
+    bells = [(0.01 + rng.uniform(0, 0.25), norm(_blip(rng.uniform(1400, 3600), 0.25)), 0.3) for _ in range(10)]
+    s['crash'] = finish(reverb(at(0.9, [(0, crack, 1.0), (0, thump(0.4, 140, 50, 0.15), 0.9),
+                                        (0, tone(0.12, 900, 250) * env(0.12, 0.002, 0.08), 0.6)] + bells), 0.8, 0.3))
 
     t = time(3.2)
     spin_rate = 6 + 4 * t / 3.2
@@ -287,6 +301,17 @@ def riftblade():
     air = sweep_noise(0.8, 500, 5000, 0.8, 36) * env(0.8, 0.1, 0.5)
     s['swap'] = finish(reverb(at(1.0, [(0, up, 0.35), (0.18, down, 0.35), (0, air, 0.6),
                                        (0.2, thump(0.3, 200, 70, 0.1), 0.5)]), 1.0, 0.35, 3500))
+
+    t = time(0.5)
+    glitch = tone(0.5, 500, 2400, shape='tri') * (0.5 + 0.5 * np.sign(np.sin(2 * np.pi * 45 * t))) * env(0.5, 0.01, 0.35)
+    s['phase'] = finish(reverb(at(0.7, [(0, glitch, 0.4), (0, sweep_noise(0.4, 6000, 800, 0.6, 37) * env(0.4, 0.01, 0.3), 0.6),
+                                        (0.02, norm(bell(0.4, 1900, 0.2)), 0.2)]), 0.8, 0.35, 4000))
+
+    down2 = tone(0.35, 1500, 300, shape='tri') * env(0.35, 0.02, 0.25)
+    up2 = tone(0.4, 260, 1300, shape='tri') * env(0.4, 0.05, 0.3)
+    s['return'] = finish(reverb(at(0.9, [(0, down2, 0.35), (0.15, up2, 0.35),
+                                         (0, sweep_noise(0.7, 5000, 500, 0.8, 38) * env(0.7, 0.05, 0.5), 0.6),
+                                         (0.15, thump(0.3, 180, 70, 0.1), 0.5)]), 1.0, 0.35, 3500))
     return s
 
 
@@ -314,6 +339,15 @@ def gravebreaker():
     grind = band(noise(0.5, 48), 250, 1300) * (0.6 + 0.4 * np.sin(2 * np.pi * 23 * time(0.5))) * env(0.5, 0.01, 0.3)
     s['stone'] = finish(reverb(at(0.7, [(0, snap, 0.8), (0.01, grind, 0.8), (0, thump(0.35, 130, 50, 0.12), 0.9)]),
                                0.7, 0.2, 2000))
+
+    t = time(0.7)
+    roar = sweep_noise(0.7, 200, 2200, 0.7, 49) * np.minimum(1, (t / 0.6) ** 1.5) * env(0.7, 0.0, 0.7, 0.55)
+    s['dive'] = finish(reverb(at(0.8, [(0, roar, 1.0), (0, lowpass(noise(0.7, 50), 160) * np.minimum(1, t / 0.5), 0.6)]),
+                              0.6, 0.2, 1500))
+
+    toll = bell(2.2, 196, 2.0, ((1, 1), (2.0, 0.5), (2.4, 0.4), (3.0, 0.25), (4.2, 0.15)))
+    whisper = band(noise(1.2, 59), 1500, 5000) * swell(1.2, 0.3, 2.0) * env(1.2, 0.0, 1.0, 0.3)
+    s['rites'] = finish(reverb(at(2.2, [(0, norm(toll), 0.9), (0.05, whisper, 0.15)]), 2.0, 0.35, 2500), peak=0.8)
     return s
 
 
@@ -352,6 +386,11 @@ def starforged():
     s['nova'] = finish(drive(reverb(at(1.8, [(0, rev, 0.6), (0.2, boom, 1.0), (0.2, norm(glitter), 0.3),
                                               (0.2, band(noise(0.4, 58), 1500, 9000) * env(0.4, 0.001, 0.15), 0.5)]),
                                     1.6, 0.35, 5000), 1.4))
+
+    small = band(noise(0.2, 60), 1200, 9000) * env(0.2, 0.001, 0.05)
+    tinkle = sum(bell(0.7, f, 0.3) for f in (2349, 3136, 3951))
+    s['starstruck'] = finish(reverb(at(0.8, [(0, small, 0.7), (0, thump(0.4, 130, 55, 0.15), 0.8), (0.005, norm(tinkle), 0.45)]),
+                                    0.8, 0.3, 6000))
     return s
 
 

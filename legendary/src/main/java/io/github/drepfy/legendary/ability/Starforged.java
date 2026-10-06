@@ -10,6 +10,7 @@ import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.util.Vector;
 
 import java.util.HashMap;
@@ -24,12 +25,15 @@ import java.util.UUID;
  * Starforged, the celestial axe: area control and gravity.
  * <ul>
  *   <li><b>Starfall</b>: a rune circle opens where the player looks; after a warning, stars rain
- *   down inside it one after another, each bursting on impact.</li>
+ *   down inside it one after another, each bursting on impact. The circle follows the player's
+ *   aim while the stars fall, so it can chase whoever runs.</li>
  *   <li><b>Singularity</b>: a black hole opens where the player looks and drags everyone near it
- *   towards its heart, then collapses into a nova that throws them all away.</li>
+ *   towards its heart, then collapses into a nova that throws them all away and slows them.</li>
+ *   <li><b>Starstruck</b> (passive): every fourth hit in a row on the same target calls a small
+ *   star down on it.</li>
  * </ul>
- * The two never overlap: while stars are falling no black hole can open and the other way round,
- * so nobody can be held in place under the stars.
+ * Starfall and Singularity never overlap: while stars are falling no black hole can open and the
+ * other way round, so nobody can be held in place under the stars.
  */
 final class Starforged implements Kit {
 
@@ -39,13 +43,28 @@ final class Starforged implements Kit {
     private static final Color DEEP = Color.fromRGB(20, 10, 55);
 
     private final LegendaryPlugin plugin;
-    /** Caster → the tick their last star lands (for the boss bar). */
-    private final Map<UUID, Long> falls = new HashMap<>();
+    private final Map<UUID, Fall> falls = new HashMap<>();
     private final Map<UUID, Hole> holes = new HashMap<>();
+    private final Combos combos = new Combos();
     private final Random random = new Random();
 
     Starforged(LegendaryPlugin plugin) {
         this.plugin = plugin;
+    }
+
+    private static final class Fall {
+        final Player player;
+        final long until;
+        final Visuals.Effect circle;
+        final Map<UUID, Integer> hits = new HashMap<>();
+        Location center;
+
+        Fall(Player player, Location center, long until, Visuals.Effect circle) {
+            this.player = player;
+            this.center = center;
+            this.until = until;
+            this.circle = circle;
+        }
     }
 
     private static final class Hole {
@@ -81,7 +100,8 @@ final class Starforged implements Kit {
     public long active(Player player, WeaponItems.Tag weapon, Ability ability, long now) {
         Long until;
         if (ability == Ability.STARFALL) {
-            until = falls.get(player.getUniqueId());
+            Fall fall = falls.get(player.getUniqueId());
+            until = fall == null ? null : fall.until;
         } else {
             Hole hole = holes.get(player.getUniqueId());
             until = hole == null ? null : hole.until;
@@ -100,8 +120,24 @@ final class Starforged implements Kit {
     }
 
     @Override
+    public void forget(Player player) {
+        falls.remove(player.getUniqueId());
+        combos.forget(player.getUniqueId());
+    }
+
+    @Override
     public void tick(long now) {
-        falls.values().removeIf(until -> until <= now);
+        for (Iterator<Fall> it = falls.values().iterator(); it.hasNext(); ) {
+            Fall fall = it.next();
+            if (now >= fall.until) {
+                it.remove();
+            } else {
+                follow(fall);
+            }
+        }
+        if (now % 200 == 0) {
+            combos.prune(now, 400);
+        }
         for (Iterator<Hole> it = holes.values().iterator(); it.hasNext(); ) {
             Hole hole = it.next();
             if (now >= hole.until) {
@@ -133,7 +169,6 @@ final class Starforged implements Kit {
         long length = starfallLength(settings);
         AbilitySettings hole = plugin.settings().ability(Ability.SINGULARITY);
         plugin.abilities().cooldowns().atLeast(weapon.id(), Ability.SINGULARITY, now, length + hole.ticks("lockout"));
-        falls.put(player.getUniqueId(), now + length);
         double radius = settings.num("radius");
         int warning = settings.ticks("warning");
         plugin.fx().sound(center, "starfall");
@@ -145,16 +180,39 @@ final class Starforged implements Kit {
             circle.animate(t, 8, e -> e.turn(step * 45));
         }
         circle.vanish((int) length + 4, 6);
+        Fall fall = new Fall(player, center, now + length, circle);
+        falls.put(player.getUniqueId(), fall);
         int stars = settings.whole("stars");
         int interval = Math.max(1, settings.ticks("interval"));
-        Map<UUID, Integer> hits = new HashMap<>();
         for (int i = 0; i < stars; i++) {
-            Location landing = i == 0 ? center.clone() : Geo.scatter(center, radius * 0.8, random);
-            Location floor = Geo.floorBelow(center.getWorld(), landing.getX(), center.getY() + 2, landing.getZ(), 5);
-            Location spot = floor != null ? floor : landing;
-            plugin.visuals().later(warning + i * interval - 6, () -> star(player, spot, hits));
+            boolean first = i == 0;
+            plugin.visuals().later(warning + i * interval - 6, () -> {
+                // Where the circle is now: it follows the caster's aim.
+                Location landing = first ? fall.center.clone() : Geo.scatter(fall.center, radius * 0.8, random);
+                Location floor = Geo.floorBelow(landing.getWorld(), landing.getX(), fall.center.getY() + 2, landing.getZ(), 5);
+                star(player, floor != null ? floor : landing, fall.hits);
+            });
         }
         return Result.FIRED;
+    }
+
+    /** The circle glides towards where the caster is looking. */
+    private void follow(Fall fall) {
+        double speed = plugin.settings().ability(Ability.STARFALL).num("follow-speed");
+        if (speed <= 0 || !fall.player.isOnline()) {
+            return;
+        }
+        Location aim = Geo.target(fall.player, plugin.settings().ability(Ability.STARFALL).num("range"));
+        if (aim == null || aim.getWorld() != fall.center.getWorld()) {
+            return;
+        }
+        Vector way = aim.toVector().subtract(fall.center.toVector());
+        double distance = way.length();
+        if (distance < 0.05) {
+            return;
+        }
+        fall.center = distance <= speed ? aim : fall.center.clone().add(way.multiply(speed / distance));
+        fall.circle.moveTo(fall.center.clone().add(0, 0.06, 0), 1);
     }
 
     /** One star: it falls for 6 ticks, then bursts. */
@@ -299,7 +357,48 @@ final class Starforged implements Kit {
                 if (plugin.hits().hurt(hole.player, target, settings.num("nova-damage"))) {
                     Vector away = Geo.away(hole.center, target.getLocation(), Geo.flat(hole.player.getLocation()));
                     Hits.knock(target, away, settings.num("nova-knockback"), settings.num("nova-lift"));
+                    Hits.effect(target, "slowness", settings.whole("slow-level"), settings.ticks("slow-duration"));
                     plugin.fx().sound(target.getLocation(), "starforged-hit");
+                }
+            }
+        });
+    }
+
+    // ---- Starstruck (passive) ------------------------------------------------------------------------------
+
+    @Override
+    public void melee(EntityDamageByEntityEvent event, Player attacker, LivingEntity target, WeaponItems.Tag weapon) {
+        AbilitySettings settings = plugin.settings().ability(Ability.STARSTRUCK);
+        if (combos.hit(attacker.getUniqueId(), target.getUniqueId(), plugin.tick(), settings.whole("hits"),
+                settings.ticks("window"), settings.ticks("min-hit-gap"))) {
+            plugin.visuals().later(Math.max(0, settings.ticks("delay") - 5), () -> smallStar(attacker, target));
+        }
+    }
+
+    /** A small star falls on the target and bursts. */
+    private void smallStar(Player attacker, LivingEntity target) {
+        if (!target.isValid() || target.isDead() || !attacker.isOnline()) {
+            return;
+        }
+        Location sky = target.getLocation().add(random.nextDouble() - 0.5, 9, random.nextDouble() - 0.5);
+        Visuals.Effect star = plugin.visuals().spawn("star", sky).billboard().size(0.9).send(0);
+        plugin.visuals().later(1, () -> star.moveTo(Geo.middle(target), 4));
+        plugin.fx().sound(sky, "starfall-star");
+        plugin.visuals().later(5, () -> {
+            star.animate(1, 2, e -> e.size(2.0)).vanish(3, 2);
+            AbilitySettings settings = plugin.settings().ability(Ability.STARSTRUCK);
+            Location at = target.isValid() ? target.getLocation() : sky;
+            plugin.fx().sound(at, "starstruck");
+            Fx.View view = plugin.fx().view(at);
+            view.particle(Fx.FIREWORK, at.clone().add(0, 1, 0), 15, 0.3, 0.3, 0.3, 0.15);
+            view.dust(at.clone().add(0, 1, 0), GOLD, 1.4f, 10, 0.5);
+            if (!attacker.isOnline() || settings.num("damage") <= 0) {
+                return;
+            }
+            for (LivingEntity hit : plugin.hits().around(attacker, at.clone().add(0, 0.9, 0), settings.num("radius"))) {
+                if (plugin.hits().hurt(attacker, hit, settings.num("damage"))) {
+                    Hits.knock(hit, Geo.away(at, hit.getLocation(), Geo.flat(attacker.getLocation())), 0.2,
+                            settings.num("launch"));
                 }
             }
         });

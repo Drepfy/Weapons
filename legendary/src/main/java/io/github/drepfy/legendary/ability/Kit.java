@@ -23,6 +23,16 @@ interface Kit {
 
     Result use(Player player, WeaponItems.Tag weapon, Ability ability);
 
+    /**
+     * The key pressed again while an ability is still going: another charge, a return, a dive.
+     * Asked before the cooldown is checked.
+     *
+     * @return whether it was a recast (then nothing else happens)
+     */
+    default boolean recast(Player player, WeaponItems.Tag weapon, Ability ability) {
+        return false;
+    }
+
     /** A fully counted sword or axe hit, before damage is applied (may change it). */
     default void melee(EntityDamageByEntityEvent event, Player attacker, LivingEntity target, WeaponItems.Tag weapon) {
     }
