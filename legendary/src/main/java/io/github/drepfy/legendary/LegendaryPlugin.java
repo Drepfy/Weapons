@@ -3,7 +3,9 @@ package io.github.drepfy.legendary;
 import io.github.drepfy.legendary.ability.Abilities;
 import io.github.drepfy.legendary.ability.Fx;
 import io.github.drepfy.legendary.ability.Hits;
+import io.github.drepfy.legendary.ability.Visuals;
 import io.github.drepfy.legendary.command.LegendaryCommand;
+import io.github.drepfy.legendary.config.ConfigUpgrade;
 import io.github.drepfy.legendary.config.Settings;
 import io.github.drepfy.legendary.config.SettingsLoader;
 import io.github.drepfy.legendary.config.TextUpdate;
@@ -47,6 +49,7 @@ public class LegendaryPlugin extends JavaPlugin {
     private Abilities abilities;
     private Hits hits;
     private Fx fx;
+    private Visuals visuals;
     private Hud hud;
     private LongSupplier clock = System::currentTimeMillis;
     private long ticks;
@@ -61,6 +64,7 @@ public class LegendaryPlugin extends JavaPlugin {
         items = new WeaponItems(this, this::settings);
         registry = new WeaponRegistry(getLogger(), getDataFolder().toPath(), this::now);
         fx = new Fx(this::settings);
+        visuals = new Visuals();
         hits = new Hits(this::settings);
         hud = new Hud(this);
         tracker = new Tracker(this);
@@ -93,6 +97,9 @@ public class LegendaryPlugin extends JavaPlugin {
         if (hud != null) {
             hud.clearAll();
         }
+        if (visuals != null) {
+            visuals.clear();
+        }
         if (registry != null) {
             registry.close(ipCutoff());
         }
@@ -100,8 +107,9 @@ public class LegendaryPlugin extends JavaPlugin {
 
     private void onTick() {
         ticks++;
+        visuals.tick(ticks);
         abilities.tick(ticks);
-        if (ticks % 4 == 0) {
+        if (ticks % 2 == 0) {
             hud.update(ticks);
         }
         if (ticks % 10 == 0) {
@@ -154,6 +162,10 @@ public class LegendaryPlugin extends JavaPlugin {
      * new defaults (and saved); anything changed by hand stays as it is.
      */
     private void updateOldTexts() {
+        List<String> upgraded = ConfigUpgrade.apply(getConfig(), defaults);
+        for (String change : upgraded) {
+            getLogger().info("config.yml: " + change);
+        }
         YamlConfiguration previous = resource("previous-text.yml");
         int updated = 0;
         for (String version : previous.getKeys(false)) {
@@ -161,6 +173,9 @@ public class LegendaryPlugin extends JavaPlugin {
             if (texts != null) {
                 updated += TextUpdate.apply(getConfig(), texts, defaults);
             }
+        }
+        if (!upgraded.isEmpty() && updated == 0) {
+            saveConfig();
         }
         if (updated > 0) {
             saveConfig();
@@ -247,6 +262,10 @@ public class LegendaryPlugin extends JavaPlugin {
 
     public Hud hud() {
         return hud;
+    }
+
+    public Visuals visuals() {
+        return visuals;
     }
 
     /** Server ticks since the plugin started (abilities and cooldowns count in these). */

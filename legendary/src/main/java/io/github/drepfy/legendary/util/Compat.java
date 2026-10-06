@@ -23,7 +23,26 @@ public final class Compat {
     private static final Attribute KNOCKBACK_RESISTANCE = attribute("KNOCKBACK_RESISTANCE",
             "GENERIC_KNOCKBACK_RESISTANCE");
 
+    /** {@code MAX_HEALTH} since 1.21.3, {@code GENERIC_MAX_HEALTH} before. */
+    private static final Attribute MAX_HEALTH = attribute("MAX_HEALTH", "GENERIC_MAX_HEALTH");
+
     private Compat() {
+    }
+
+    /** Heals up to the entity's maximum health (Lifesteal hearts included). */
+    public static void heal(LivingEntity entity, double amount) {
+        double max = 20.0;
+        try {
+            AttributeInstance instance = MAX_HEALTH == null ? null : entity.getAttribute(MAX_HEALTH);
+            if (instance != null) {
+                max = instance.getValue();
+            }
+        } catch (RuntimeException | LinkageError ignored) {
+            // Default maximum.
+        }
+        if (!entity.isDead()) {
+            entity.setHealth(Math.max(0.0, Math.min(max, entity.getHealth() + amount)));
+        }
     }
 
     /** A particle by its current name or an older one ({@code DUST}/{@code REDSTONE}); null if none exists. */

@@ -53,8 +53,7 @@ public final class SettingsLoader {
         }
         Settings.Controls controls = in.choice("controls", Settings.Controls.class);
         Settings.HitMobs hitMobs = in.choice("hit-mobs", Settings.HitMobs.class);
-        boolean actionBar = in.bool("display.action-bar");
-        boolean readySound = in.bool("display.ready-sound");
+        boolean bossBars = in.bool("display.boss-bars");
 
         Map<WeaponType, Settings.Look> looks = new EnumMap<>(WeaponType.class);
         Map<Ability, AbilitySettings> abilities = new EnumMap<>(Ability.class);
@@ -98,8 +97,7 @@ public final class SettingsLoader {
                 messages.put(key, in.string("messages." + key));
             }
         }
-        return new Settings(prefix, oneOfEach, dropOnDeath, alts, List.copyOf(blocked), controls, hitMobs, actionBar,
-                readySound,
+        return new Settings(prefix, oneOfEach, dropOnDeath, alts, List.copyOf(blocked), controls, hitMobs, bossBars,
                 looks, abilities, sounds, messages, List.copyOf(warnings));
     }
 
@@ -112,6 +110,14 @@ public final class SettingsLoader {
             warnings.add(base + "item-model: \"" + itemModel + "\" should look like namespace:name (ignored)");
             itemModel = "";
         }
+        String tooltipStyle = in.string(base + "tooltip-style").trim().toLowerCase(Locale.ROOT);
+        if (!tooltipStyle.isEmpty() && !ITEM_MODEL.matcher(tooltipStyle).matches()) {
+            warnings.add(base + "tooltip-style: \"" + tooltipStyle + "\" should look like namespace:name (ignored)");
+            tooltipStyle = "";
+        }
+        boolean glint = in.bool(base + "glint");
+        org.bukkit.boss.BarColor barColor = in.choice(base + "boss-bar.color", org.bukkit.boss.BarColor.class);
+        String barText = in.string(base + "boss-bar.text");
         boolean unbreakable = in.bool(base + "unbreakable");
         Map<String, Integer> enchantments = new LinkedHashMap<>();
         ConfigurationSection section = in.section(base + "enchantments");
@@ -135,7 +141,8 @@ public final class SettingsLoader {
                 }
             }
         }
-        return new Settings.Look(name, List.copyOf(lore), model, itemModel, unbreakable, Map.copyOf(enchantments));
+        return new Settings.Look(name, List.copyOf(lore), model, itemModel, tooltipStyle, glint, unbreakable,
+                java.util.Collections.unmodifiableMap(new LinkedHashMap<>(enchantments)), barColor, barText);
     }
 
     private static AbilitySettings ability(Reader in, String base, Ability ability) {

@@ -118,6 +118,41 @@ final class Geo {
         return away.normalize();
     }
 
+    /**
+     * How far a player can dash along a flat direction: the last spot (up to {@code range}
+     * blocks) where both their feet and head are clear, stopping at the first wall.
+     */
+    static Location dash(Location start, Vector direction, double range) {
+        World world = start.getWorld();
+        Location last = start.clone();
+        if (world == null) {
+            return last;
+        }
+        Vector step = direction.clone().setY(0);
+        if (step.lengthSquared() < 1.0E-6) {
+            return last;
+        }
+        step.normalize().multiply(0.25);
+        Location point = start.clone();
+        for (double travelled = 0.25; travelled <= range + 1.0E-6; travelled += 0.25) {
+            point.add(step);
+            if (solid(world, point.getX(), point.getY() + 0.1, point.getZ())
+                    || solid(world, point.getX(), point.getY() + 1.0, point.getZ())
+                    || solid(world, point.getX(), point.getY() + 1.7, point.getZ())) {
+                break;
+            }
+            last = point.clone();
+        }
+        return last;
+    }
+
+    /** A random spot within a radius of a centre, on the same level. */
+    static Location scatter(Location center, double radius, java.util.Random random) {
+        double angle = random.nextDouble() * Math.PI * 2;
+        double distance = Math.sqrt(random.nextDouble()) * radius;
+        return center.clone().add(Math.cos(angle) * distance, 0, Math.sin(angle) * distance);
+    }
+
     static double flatDistance(Location a, Location b) {
         double dx = a.getX() - b.getX();
         double dz = a.getZ() - b.getZ();

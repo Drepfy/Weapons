@@ -234,3 +234,65 @@ v1_0_2:
     player-not-found: "&cPlayer not found: &f{player}"
     unknown-weapon: "&cUnknown weapon: &f{weapon}&c. Weapons: &f{weapons}"
     reloaded: "&aLegendary reloaded. &7({warnings} warning(s), see console)"
+v1_1_0:
+  weapons:
+    kurogane:
+      lore:
+        - "&8Legendary Katana"
+        - ""
+        - "&c{key} &8» &fCrescent Draw &8({crescent-draw.cooldown})"
+        - "&7Fires a slash that cuts and knocks back."
+        - ""
+        - "&cPassive &8» &fUnbroken Edge"
+        - "&7Keep hitting one target for more damage."
+        - ""
+        - "&6&lLEGENDARY &8#{id}"
+      item-model: ""
+    sugarcrash:
+      lore:
+        - "&8Legendary Candy Sickle"
+        - ""
+        - "&d{key} &8» &fSugar Rush &8({sugar-rush.cooldown})"
+        - "&7Run and swing faster for {sugar-rush.duration}."
+        - ""
+        - "&d{sneak-key} &8» &fSweet Shock &8({sweet-shock.cooldown})"
+        - "&7Knocks back and slows players near you."
+        - ""
+        - "&6&lLEGENDARY &8#{id}"
+      item-model: ""
+    riftblade:
+      lore:
+        - "&8Legendary Void Sword"
+        - ""
+        - "&#B76BFF{key} &8» &fRift Slash &8({rift-slash.cooldown})"
+        - "&7Sends a rift forward that throws players back."
+        - ""
+        - "&#B76BFF{sneak-key} &8» &fRift Recall &8({rift-recall.cooldown})"
+        - "&7Mark a spot, then use it again to return."
+        - ""
+        - "&6&lLEGENDARY &8#{id}"
+      item-model: ""
+    gravebreaker:
+      lore:
+        - "&8Legendary Battle Axe"
+        - ""
+        - "&#E5484D{key} &8» &fEarthsplitter &8({earthsplitter.cooldown})"
+        - "&7A shockwave that throws players into the air."
+        - ""
+        - "&#E5484DPassive &8» &fExecutioner's Mark"
+        - "&7{executioners-mark.hits} hits mark a player: they fly higher."
+        - ""
+        - "&6&lLEGENDARY &8#{id}"
+      item-model: ""
+    starforged:
+      lore:
+        - "&8Legendary Celestial Axe"
+        - ""
+        - "&b{key} &8» &fAstral Impact &8({astral-impact.cooldown})"
+        - "&7Calls down a star where you look."
+        - ""
+        - "&b{sneak-key} &8» &fGravity Well &8({gravity-well.cooldown})"
+        - "&7Pulls players in, then blasts them away."
+        - ""
+        - "&6&lLEGENDARY &8#{id}"
+      item-model: ""

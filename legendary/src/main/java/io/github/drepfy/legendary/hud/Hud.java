@@ -2,169 +2,161 @@ package io.github.drepfy.legendary.hud;
 
 import io.github.drepfy.legendary.Ability;
 import io.github.drepfy.legendary.LegendaryPlugin;
+import io.github.drepfy.legendary.WeaponType;
+import io.github.drepfy.legendary.config.AbilitySettings;
 import io.github.drepfy.legendary.config.Settings;
 import io.github.drepfy.legendary.item.WeaponItems;
 import io.github.drepfy.legendary.util.ActionBar;
 import io.github.drepfy.legendary.util.Text;
 import org.bukkit.Bukkit;
+import org.bukkit.boss.BarColor;
+import org.bukkit.boss.BarStyle;
+import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
-import org.bukkit.metadata.FixedMetadataValue;
-import org.bukkit.plugin.Plugin;
 
-import java.lang.reflect.Method;
-import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
+import java.util.Iterator;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 /**
- * The cooldowns above the hotbar while a legendary is held:
- * {@code Crescent Draw 4.2s | Edge ■■□□}. When the Combat plugin is installed, its combat
- * timer is shown in front, and Combat steps back while this bar is up (they would otherwise
- * keep replacing each other).
+ * While a legendary is held, a boss bar for each of its abilities at the top of the screen:
+ * the ability's name and how long until it can be used again, the bar filling up as it
+ * recharges (and running down while an ability lasts, such as Blood Moon). The action bar is
+ * left to other plugins (the Combat plugin's timer).
  */
 public final class Hud {
 
-    /**
-     * Player metadata other plugins can check: while its value (epoch milliseconds) is in the
-     * future, another plugin is drawing the action bar.
-     */
-    public static final String CLAIM = "vanillasmp:actionbar";
-    private static final long CLAIM_MS = 1500;
-    private static final int FLASH_TICKS = 30;
+    /** How long the bar flashes when an ability is used too early. */
+    private static final int SHAKE_TICKS = 6;
 
     private final LegendaryPlugin plugin;
-    private final Map<UUID, Flash> flashes = new HashMap<>();
-    private final Set<UUID> showing = new HashSet<>();
-    /** weapon:ability → the tick it was last seen cooling down (for the ready chime). */
-    private final Map<String, Long> cooling = new HashMap<>();
-    private Plugin combat;
-    private Method combatRemaining;
+    private final Map<UUID, Bars> bars = new HashMap<>();
+    /** player:ability → the tick its flash ends. */
+    private final Map<String, Long> shakes = new HashMap<>();
 
     public Hud(LegendaryPlugin plugin) {
         this.plugin = plugin;
     }
 
-    private record Flash(String text, long until) {
-    }
+    /** One player's bars, for the weapon they are holding. */
+    private static final class Bars {
+        final WeaponType type;
+        final Map<Ability, BossBar> byAbility = new EnumMap<>(Ability.class);
 
-    /** Shows a short message in place of the cooldowns (if the player is holding a legendary) or in chat. */
-    public void flash(Player player, String text) {
-        if (text == null || text.isEmpty()) {
-            return;
-        }
-        if (plugin.settings().actionBar() && plugin.items().isLegendary(player.getInventory().getItemInMainHand())) {
-            flashes.put(player.getUniqueId(), new Flash(text, plugin.tick() + FLASH_TICKS));
-            update(player, plugin.tick());
-        } else {
-            player.sendMessage(text);
+        Bars(WeaponType type) {
+            this.type = type;
         }
     }
 
-    /** Every few ticks. */
+    /** A short message above the hotbar (nothing to aim at, a swap refused...). */
+    public void notice(Player player, String text) {
+        if (text != null && !text.isEmpty()) {
+            ActionBar.send(player, text);
+        }
+    }
+
+    /** Flashes the ability's bar: it was used before it was ready. */
+    public void shake(Player player, Ability ability) {
+        shakes.put(player.getUniqueId() + ":" + ability.key(), plugin.tick() + SHAKE_TICKS);
+    }
+
+    /** The bars a player sees right now (for tests). */
+    public Map<Ability, BossBar> bars(Player player) {
+        Bars current = bars.get(player.getUniqueId());
+        return current == null ? Map.of() : Map.copyOf(current.byAbility);
+    }
+
+    /** Every couple of ticks. */
     public void update(long now) {
         for (Player player : Bukkit.getOnlinePlayers()) {
             update(player, now);
         }
-        showing.removeIf(uuid -> Bukkit.getPlayer(uuid) == null);
-        flashes.keySet().removeIf(uuid -> Bukkit.getPlayer(uuid) == null);
+        for (Iterator<Map.Entry<UUID, Bars>> it = bars.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<UUID, Bars> entry = it.next();
+            Player player = Bukkit.getPlayer(entry.getKey());
+            if (player == null || !player.isOnline()) {
+                entry.getValue().byAbility.values().forEach(BossBar::removeAll);
+                it.remove();
+            }
+        }
+        shakes.values().removeIf(until -> until <= now);
     }
 
     private void update(Player player, long now) {
         Settings settings = plugin.settings();
         WeaponItems.Tag tag = plugin.items().read(player.getInventory().getItemInMainHand());
-        if (tag == null || !settings.actionBar() || player.isDead()) {
-            if (showing.remove(player.getUniqueId())) {
-                release(player);
-            }
+        if (tag == null || !settings.bossBars() || player.isDead()) {
+            hide(player);
             return;
         }
-        List<String> parts = new ArrayList<>();
-        long combatMs = combatRemaining(player);
-        if (combatMs > 0) {
-            parts.add(combatText(combatMs));
+        Bars current = bars.get(player.getUniqueId());
+        if (current == null || current.type != tag.type()) {
+            hide(player);
+            current = new Bars(tag.type());
+            bars.put(player.getUniqueId(), current);
         }
-        Flash flash = flashes.get(player.getUniqueId());
-        if (flash != null && now < flash.until()) {
-            parts.add(flash.text());
-        } else {
-            flashes.remove(player.getUniqueId());
-            for (Ability ability : tag.type().actives()) {
-                parts.add(status(player, tag, ability, now));
+        Settings.Look look = settings.look(tag.type());
+        for (Ability ability : tag.type().actives()) {
+            BossBar bar = current.byAbility.get(ability);
+            if (bar == null) {
+                bar = Bukkit.createBossBar("", look.barColor(), BarStyle.SOLID);
+                bar.addPlayer(player);
+                current.byAbility.put(ability, bar);
             }
-            plugin.abilities().hudParts(player, tag, parts, now);
+            draw(player, tag, ability, bar, look, now);
         }
-        ActionBar.send(player, String.join(Text.color(settings.message("hud-separator")), parts));
-        player.setMetadata(CLAIM, new FixedMetadataValue(plugin, System.currentTimeMillis() + CLAIM_MS));
-        showing.add(player.getUniqueId());
     }
 
-    private String status(Player player, WeaponItems.Tag tag, Ability ability, long now) {
+    private void draw(Player player, WeaponItems.Tag tag, Ability ability, BossBar bar, Settings.Look look, long now) {
         Settings settings = plugin.settings();
-        String name = settings.ability(ability).name();
-        String key = tag.id() + ":" + ability.key();
+        AbilitySettings ability0 = settings.ability(ability);
+        String name = ability0.name();
+        String color = Text.color(look.barText());
         long active = plugin.abilities().active(player, tag, ability, now);
-        if (active > 0) {
-            return Text.format(settings.message("hud-active"), "ability", name, "time", Text.countdown(active));
-        }
         long left = plugin.abilities().cooldown(tag, ability, now);
-        if (left > 0) {
-            cooling.put(key, now);
-            return Text.format(settings.message("hud-cooldown"), "ability", name, "time", Text.countdown(left));
+        String title;
+        double progress;
+        if (active > 0) {
+            long length = Math.max(active, plugin.abilities().activeLength(tag, ability));
+            title = Text.format(settings.message("bar-active"), "color", color, "ability", name,
+                    "time", Text.countdown(active));
+            progress = (double) active / length;
+        } else if (left > 0) {
+            long total = Math.max(left, ability0.ticks("cooldown"));
+            title = Text.format(settings.message("bar-cooldown"), "color", color, "ability", name,
+                    "time", Text.countdown(left));
+            progress = 1.0 - (double) left / total;
+        } else {
+            title = Text.format(settings.message("bar-ready"), "color", color, "ability", name);
+            progress = 1.0;
         }
-        Long seen = cooling.remove(key);
-        // Only when it was cooling a moment ago, not on switching back to the weapon later.
-        if (seen != null && now - seen <= 8 && settings.readySound()) {
-            plugin.fx().soundTo(player, "ready");
+        Long shake = shakes.get(player.getUniqueId() + ":" + ability.key());
+        BarColor barColor = shake != null && now < shake ? BarColor.WHITE : look.barColor();
+        if (bar.getColor() != barColor) {
+            bar.setColor(barColor);
         }
-        return Text.format(settings.message("hud-ready"), "ability", name);
+        if (!title.equals(bar.getTitle())) {
+            bar.setTitle(title);
+        }
+        bar.setProgress(Math.max(0.0, Math.min(1.0, progress)));
+        if (!bar.isVisible()) {
+            bar.setVisible(true);
+        }
     }
 
-    /** Stops drawing for this player; Combat takes the bar back at once. */
-    private void release(Player player) {
-        player.removeMetadata(CLAIM, plugin);
-        if (combatRemaining(player) <= 0) {
-            ActionBar.clear(player);
+    private void hide(Player player) {
+        Bars current = bars.remove(player.getUniqueId());
+        if (current != null) {
+            current.byAbility.values().forEach(BossBar::removeAll);
         }
     }
 
     public void clearAll() {
-        for (UUID uuid : showing) {
-            Player player = Bukkit.getPlayer(uuid);
-            if (player != null) {
-                release(player);
-            }
+        for (Bars current : bars.values()) {
+            current.byAbility.values().forEach(BossBar::removeAll);
         }
-        showing.clear();
-    }
-
-    // ---- the Combat plugin (optional) ----------------------------------------------------------------------
-
-    private long combatRemaining(Player player) {
-        Plugin found = Bukkit.getPluginManager().getPlugin("Combat");
-        if (found == null || !found.isEnabled()) {
-            return 0;
-        }
-        try {
-            if (found != combat) {
-                combat = found;
-                combatRemaining = found.getClass().getMethod("combatRemaining", Player.class);
-            }
-            Object value = combatRemaining.invoke(found, player);
-            return value instanceof Long millis ? millis : 0;
-        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
-            return 0;
-        }
-    }
-
-    private String combatText(long millis) {
-        String format = combat == null ? null : combat.getConfig().getString("messages.action-bar");
-        if (format == null || format.isEmpty()) {
-            format = "&c⚔ Combat: &f{seconds}s";
-        }
-        return Text.format(format, "seconds", (millis + 999) / 1000);
+        bars.clear();
     }
 }

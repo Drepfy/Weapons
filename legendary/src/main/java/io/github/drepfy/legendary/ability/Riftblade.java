@@ -5,24 +5,19 @@ import io.github.drepfy.legendary.LegendaryPlugin;
 import io.github.drepfy.legendary.WeaponType;
 import io.github.drepfy.legendary.config.AbilitySettings;
 import io.github.drepfy.legendary.item.WeaponItems;
-import io.github.drepfy.legendary.util.Compat;
 import io.github.drepfy.legendary.util.Text;
-import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.Location;
-import org.bukkit.entity.Entity;
+import org.bukkit.World;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerTeleportEvent;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
-import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
 
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -30,25 +25,38 @@ import java.util.UUID;
 /**
  * Riftblade, the void sword: space and positioning.
  * <ul>
- *   <li><b>Rift Slash</b>: a rift travels forward along the ground, hurting, throwing back and
- *   briefly distorting the vision of whoever it passes through.</li>
- *   <li><b>Rift Recall</b>: mark a spot, then return to it within a few seconds. Everyone can
- *   see the mark, and blocking it collapses the rift.</li>
+ *   <li><b>Void Rend</b>: tears a rift open a few blocks ahead. It drags nearby players towards
+ *   it for a moment, then snaps shut, hurting and darkening everyone close to it.</li>
+ *   <li><b>Rift Swap</b>: swaps places with the player (or monster) you look at, through the
+ *   void. With nobody in sight, blinks forward instead.</li>
  * </ul>
  */
 final class Riftblade implements Kit {
 
-    private static final Color VOID = Color.fromRGB(20, 0, 30);
-    private static final Color VIOLET = Color.fromRGB(170, 60, 255);
+    private static final Color VIOLET = Color.fromRGB(165, 80, 255);
+    private static final Color VOID = Color.fromRGB(30, 8, 60);
 
     private final LegendaryPlugin plugin;
-    private final Map<UUID, Mark> marks = new HashMap<>();
+    private final Map<UUID, Rend> rends = new HashMap<>();
 
     Riftblade(LegendaryPlugin plugin) {
         this.plugin = plugin;
     }
 
-    private record Mark(UUID weapon, Location at, long expires) {
+    private static final class Rend {
+        final Player player;
+        final Location center;
+        final long snap;
+        final Visuals.Effect rift;
+        final Set<UUID> allowed = new HashSet<>();
+        final Set<UUID> refused = new HashSet<>();
+
+        Rend(Player player, Location center, long snap, Visuals.Effect rift) {
+            this.player = player;
+            this.center = center;
+            this.snap = snap;
+            this.rift = rift;
+        }
     }
 
     @Override
@@ -58,228 +66,207 @@ final class Riftblade implements Kit {
 
     @Override
     public Result use(Player player, WeaponItems.Tag weapon, Ability ability) {
-        return ability == Ability.RIFT_SLASH ? slash(player) : recall(player, weapon);
-    }
-
-    // ---- Rift Slash ----------------------------------------------------------------------------------------
-
-    private Result slash(Player player) {
-        AbilitySettings settings = plugin.settings().ability(Ability.RIFT_SLASH);
-        Vector direction = Geo.flat(player.getLocation());
-        Location origin = player.getLocation().add(direction.clone().multiply(0.5));
-        plugin.fx().sound(player.getLocation(), "rift-slash");
-        new Tear(player, origin, direction, settings).runTaskTimer(plugin, 0L, 1L);
-        return Result.FIRED;
-    }
-
-    /** The rift: a standing tear in space moving forward. */
-    private final class Tear extends BukkitRunnable {
-        private final Player player;
-        private final Location origin;
-        private final Vector direction;
-        private final Vector right;
-        private final AbilitySettings settings;
-        private final double halfWidth;
-        private final double height;
-        private final Set<UUID> hit = new HashSet<>();
-        private double travelled;
-
-        Tear(Player player, Location origin, Vector direction, AbilitySettings settings) {
-            this.player = player;
-            this.origin = origin;
-            this.direction = direction;
-            this.right = Geo.right(direction);
-            this.settings = settings;
-            this.halfWidth = settings.num("width") / 2.0;
-            this.height = settings.num("height");
-        }
-
-        @Override
-        public void run() {
-            if (!player.isOnline()) {
-                cancel();
-                return;
-            }
-            Location base = null;
-            for (int step = 0; step < 2; step++) {
-                travelled += settings.num("speed") / 2.0;
-                base = origin.clone().add(direction.clone().multiply(travelled));
-                if (travelled > settings.num("range") || Geo.solid(base.clone().add(0, 1.0, 0))) {
-                    collapse(base);
-                    cancel();
-                    return;
-                }
-                strike(base);
-            }
-            draw(base);
-        }
-
-        private void strike(Location base) {
-            Location middle = base.clone().add(0, height / 2.0, 0);
-            BoundingBox box = BoundingBox.of(middle, halfWidth, height / 2.0, halfWidth);
-            for (Entity entity : base.getWorld().getNearbyEntities(box)) {
-                if (!(entity instanceof LivingEntity target) || hit.contains(entity.getUniqueId())
-                        || !plugin.hits().canTarget(player, entity)) {
-                    continue;
-                }
-                double along = entity.getLocation().toVector().subtract(base.toVector()).dot(direction);
-                if (Math.abs(along) > 0.9) {
-                    continue;
-                }
-                hit.add(entity.getUniqueId());
-                if (plugin.hits().hurt(player, target, settings.num("damage"))) {
-                    Hits.knock(target, direction, settings.num("knockback"), settings.num("lift"));
-                    int distortion = settings.ticks("distortion");
-                    PotionEffectType nausea = Compat.effect("nausea");
-                    if (distortion > 0 && nausea != null) {
-                        target.addPotionEffect(new PotionEffect(nausea, distortion, 0, false, false, true));
-                    }
-                    plugin.fx().sound(target.getLocation(), "rift-hit");
-                    Fx.View view = plugin.fx().view(target.getLocation());
-                    view.particle(Fx.REVERSE_PORTAL, Geo.middle(target), 25, 0.3, 0.5, 0.3, 0.05);
-                    view.particle(Fx.INK, Geo.middle(target), 4, 0.2, 0.3, 0.2, 0.02);
-                }
-            }
-        }
-
-        /** A jagged vertical tear: black core, violet edges. */
-        private void draw(Location base) {
-            Fx.View view = plugin.fx().view(base);
-            for (double h = 0.1; h <= height; h += 0.35) {
-                double jitter = Math.sin((h + travelled) * 3.1) * 0.12;
-                for (double w = -halfWidth; w <= halfWidth + 1.0E-6; w += 0.42) {
-                    Location point = base.clone().add(right.clone().multiply(w + jitter)).add(0, h, 0);
-                    boolean edge = Math.abs(w) > halfWidth - 0.45 || h < 0.3 || h > height - 0.35;
-                    view.dust(point, edge ? VIOLET : VOID, edge ? 1.0f : 1.4f, 1, 0.02);
-                }
-            }
-            Location middle = base.clone().add(0, height / 2.0, 0);
-            view.particle(Fx.REVERSE_PORTAL, middle, 10, halfWidth / 2, height / 3, 0.1, 0.02);
-            view.particle(Fx.PORTAL, middle, 8, halfWidth / 2, height / 3, 0.1, 0.4);
-        }
-
-        private void collapse(Location base) {
-            if (base != null) {
-                plugin.fx().view(base).particle(Fx.REVERSE_PORTAL, base.clone().add(0, 1, 0), 30, 0.4, 0.6, 0.4, 0.1);
-            }
-        }
-    }
-
-    // ---- Rift Recall ---------------------------------------------------------------------------------------
-
-    private Result recall(Player player, WeaponItems.Tag weapon) {
-        AbilitySettings settings = plugin.settings().ability(Ability.RIFT_RECALL);
-        long now = plugin.tick();
-        Mark mark = marks.get(player.getUniqueId());
-        if (mark != null && (!mark.weapon().equals(weapon.id()) || !mark.at().getWorld().equals(player.getWorld()))) {
-            fade(player, mark);
-            mark = null;
-        }
-        if (mark == null) {
-            int window = settings.ticks("window");
-            Location at = player.getLocation().clone();
-            marks.put(player.getUniqueId(), new Mark(weapon.id(), at, now + window));
-            plugin.fx().sound(at, "rift-mark");
-            plugin.fx().view(at).particle(Fx.REVERSE_PORTAL, at.clone().add(0, 1, 0), 40, 0.3, 0.8, 0.3, 0.05);
-            plugin.hud().flash(player, Text.format(plugin.settings().message("rift-marked"), "time",
-                    Text.countdown(window)));
-            return Result.HANDLED; // The cooldown starts once the mark is used or fades.
-        }
-        double distance = player.getLocation().distance(mark.at());
-        double max = settings.num("max-distance");
-        if (distance > max) {
-            plugin.hud().flash(player, Text.format(plugin.settings().message("rift-too-far"), "distance",
-                    Math.round(distance), "max", Text.number(max)));
-            return Result.HANDLED;
-        }
-        if (Geo.solid(mark.at().clone().add(0, 0.1, 0)) || Geo.solid(mark.at().clone().add(0, 1.2, 0))) {
-            marks.remove(player.getUniqueId());
-            plugin.abilities().cooldowns().start(weapon.id(), Ability.RIFT_RECALL, now, settings.ticks("cooldown"));
-            plugin.fx().view(mark.at()).particle(Fx.INK, mark.at().clone().add(0, 1, 0), 20, 0.3, 0.5, 0.3, 0.05);
-            plugin.hud().flash(player, Text.color(plugin.settings().message("rift-blocked")));
-            return Result.HANDLED;
-        }
-        Location from = player.getLocation();
-        Location to = mark.at().clone();
-        to.setYaw(from.getYaw());
-        to.setPitch(from.getPitch());
-        if (player.isInsideVehicle()) {
-            player.leaveVehicle();
-        }
-        // A plugin teleport: spawn protection, combat safe zones and region plugins can refuse it.
-        if (!player.teleport(to, PlayerTeleportEvent.TeleportCause.PLUGIN)) {
-            plugin.hud().flash(player, Text.color(plugin.settings().message("rift-failed")));
-            return Result.HANDLED;
-        }
-        player.setFallDistance(0f);
-        player.setVelocity(new Vector());
-        marks.remove(player.getUniqueId());
-        plugin.abilities().cooldowns().start(weapon.id(), Ability.RIFT_RECALL, now, settings.ticks("cooldown"));
-        for (Location at : new Location[] {from, to}) {
-            plugin.fx().sound(at, "rift-recall");
-            Fx.View view = plugin.fx().view(at);
-            view.particle(Fx.REVERSE_PORTAL, at.clone().add(0, 1, 0), 50, 0.3, 0.8, 0.3, 0.1);
-            view.dust(at.clone().add(0, 1, 0), VIOLET, 1.5f, 12, 0.4);
-        }
-        return Result.HANDLED;
-    }
-
-    private void fade(Player player, Mark mark) {
-        marks.remove(player.getUniqueId());
-        AbilitySettings settings = plugin.settings().ability(Ability.RIFT_RECALL);
-        plugin.abilities().cooldowns().atLeast(mark.weapon(), Ability.RIFT_RECALL, plugin.tick(),
-                settings.ticks("cooldown"));
-        if (player.isOnline()) {
-            plugin.send(player, "rift-faded");
-        }
+        return ability == Ability.VOID_REND ? rend(player) : swap(player);
     }
 
     @Override
     public long active(Player player, WeaponItems.Tag weapon, Ability ability, long now) {
-        if (ability != Ability.RIFT_RECALL) {
-            return 0;
-        }
-        Mark mark = marks.get(player.getUniqueId());
-        return mark != null && mark.weapon().equals(weapon.id()) ? Math.max(0, mark.expires() - now) : 0;
+        Rend rend = ability == Ability.VOID_REND ? rends.get(player.getUniqueId()) : null;
+        return rend == null ? 0 : Math.max(0, rend.snap - now);
+    }
+
+    @Override
+    public long activeLength(Ability ability) {
+        return ability == Ability.VOID_REND ? plugin.settings().ability(Ability.VOID_REND).ticks("pull-time") : 0;
     }
 
     @Override
     public void tick(long now) {
-        Iterator<Map.Entry<UUID, Mark>> it = marks.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry<UUID, Mark> entry = it.next();
-            Mark mark = entry.getValue();
-            Player player = Bukkit.getPlayer(entry.getKey());
-            if (player == null || now >= mark.expires() || !mark.at().getWorld().equals(player.getWorld())) {
+        for (Iterator<Rend> it = rends.values().iterator(); it.hasNext(); ) {
+            Rend rend = it.next();
+            if (now >= rend.snap) {
                 it.remove();
-                AbilitySettings settings = plugin.settings().ability(Ability.RIFT_RECALL);
-                plugin.abilities().cooldowns().atLeast(mark.weapon(), Ability.RIFT_RECALL, now,
-                        settings.ticks("cooldown"));
-                if (player != null) {
-                    plugin.send(player, "rift-faded");
-                }
-                continue;
-            }
-            if (now % 5 == 0) {
-                // Everyone can see where the rift will return its owner.
-                Location at = mark.at();
-                Fx.View view = plugin.fx().view(at);
-                double spin = now * 0.3;
-                for (int i = 0; i < 6; i++) {
-                    double angle = spin + Math.PI * 2 * i / 6;
-                    view.dust(at.clone().add(Math.cos(angle) * 0.5, 0.1 + i * 0.3, Math.sin(angle) * 0.5),
-                            i % 2 == 0 ? VIOLET : VOID, 1.1f, 1, 0.01);
-                }
-                view.particle(Fx.REVERSE_PORTAL, at.clone().add(0, 1, 0), 6, 0.2, 0.7, 0.2, 0.01);
+                snap(rend);
+            } else {
+                pull(rend, now);
             }
         }
     }
 
-    @Override
-    public void forget(Player player) {
-        Mark mark = marks.get(player.getUniqueId());
-        if (mark != null) {
-            fade(player, mark);
+    // ---- Void Rend ---------------------------------------------------------------------------------------
+
+    private Result rend(Player player) {
+        AbilitySettings settings = plugin.settings().ability(Ability.VOID_REND);
+        Location start = player.getLocation();
+        Vector direction = Geo.flat(start);
+        Location end = Geo.dash(start, direction, settings.num("distance"));
+        Location center = end.clone().add(0, 1.2, 0);
+        Visuals.Effect rift = plugin.visuals().spawn("rift", center).facing(direction).size(0.08, 3.0, 1.0).send(0)
+                .animate(1, 4, e -> e.size(1.9, 3.6, 1.0));
+        plugin.visuals().spawn("void_portal", center.clone().add(direction.clone().multiply(-0.05)))
+                .facing(direction).size(0.2).send(0)
+                .animate(1, 5, e -> e.size(2.6))
+                .vanish(6 + settings.ticks("pull-time"), 4);
+        long snap = plugin.tick() + settings.ticks("pull-time");
+        rends.put(player.getUniqueId(), new Rend(player, center, snap, rift));
+        plugin.fx().sound(center, "void-rend");
+        return Result.FIRED;
+    }
+
+    private void pull(Rend rend, long now) {
+        AbilitySettings settings = plugin.settings().ability(Ability.VOID_REND);
+        Fx.View view = plugin.fx().view(rend.center);
+        view.particle(Fx.REVERSE_PORTAL, rend.center, 14, 0.4, 1.4, 0.4, 0.05);
+        view.particle(Fx.PORTAL, rend.center, 20, 1.6, 1.2, 1.6, 0.6);
+        view.dust(rend.center, VOID, 2.0f, 4, 0.5);
+        if (!rend.player.isOnline()) {
+            return;
         }
+        double pull = settings.num("pull");
+        for (LivingEntity target : plugin.hits().around(rend.player, rend.center, settings.num("pull-radius"))) {
+            UUID id = target.getUniqueId();
+            if (rend.refused.contains(id)) {
+                continue;
+            }
+            if (!rend.allowed.contains(id)) {
+                if (!plugin.hits().allowed(rend.player, target)) {
+                    rend.refused.add(id);
+                    continue;
+                }
+                rend.allowed.add(id);
+            }
+            Vector in = rend.center.toVector().subtract(Geo.middle(target).toVector());
+            double distance = in.length();
+            if (distance < 0.6) {
+                continue;
+            }
+            Vector velocity = target.getVelocity().multiply(0.6).add(in.normalize().multiply(pull));
+            velocity.setY(Math.max(-0.4, Math.min(0.4, velocity.getY())));
+            target.setVelocity(velocity);
+            if (now % 4 == 0) {
+                view.dust(Geo.middle(target), VIOLET, 1.0f, 3, 0.3);
+            }
+        }
+    }
+
+    private void snap(Rend rend) {
+        AbilitySettings settings = plugin.settings().ability(Ability.VOID_REND);
+        rend.rift.animate(1, 3, e -> e.size(0.02, 4.2, 1.0)).life(5);
+        plugin.visuals().spawn("void_burst", rend.center).billboard().size(0.4).send(0)
+                .animate(1, 3, e -> e.size(settings.num("radius") * 2.2))
+                .vanish(4, 3);
+        plugin.fx().sound(rend.center, "void-rend-snap");
+        Fx.View view = plugin.fx().view(rend.center);
+        view.particle(Fx.FLASH, rend.center, 1, 0, 0, 0, 0);
+        view.particle(Fx.REVERSE_PORTAL, rend.center, 60, 0.8, 1.2, 0.8, 0.3);
+        if (!rend.player.isOnline()) {
+            return;
+        }
+        int darkness = settings.ticks("darkness");
+        for (LivingEntity target : plugin.hits().around(rend.player, rend.center, settings.num("radius"))) {
+            if (plugin.hits().hurt(rend.player, target, settings.num("damage"))) {
+                Hits.effect(target, "darkness", 1, darkness);
+                plugin.fx().sound(target.getLocation(), "riftblade-hit");
+                view.dust(Geo.middle(target), VIOLET, 1.4f, 10, 0.3);
+            }
+        }
+    }
+
+    // ---- Rift Swap ----------------------------------------------------------------------------------------
+
+    private Result swap(Player player) {
+        AbilitySettings settings = plugin.settings().ability(Ability.RIFT_SWAP);
+        LivingEntity target = sighted(player, settings.num("range"));
+        Location from = player.getLocation();
+        if (target == null) {
+            return blink(player, settings);
+        }
+        if (!plugin.hits().allowed(player, target)) {
+            plugin.hud().notice(player, Text.color(plugin.settings().message("swap-refused")));
+            return Result.FAILED;
+        }
+        Location there = target.getLocation();
+        Location mine = from.clone();
+        mine.setYaw(there.getYaw());
+        mine.setPitch(there.getPitch());
+        Location theirs = there.clone();
+        theirs.setYaw(from.getYaw());
+        theirs.setPitch(from.getPitch());
+        if (!target.teleport(mine, PlayerTeleportEvent.TeleportCause.PLUGIN)) {
+            plugin.hud().notice(player, Text.color(plugin.settings().message("swap-refused")));
+            return Result.FAILED;
+        }
+        if (!player.teleport(theirs, PlayerTeleportEvent.TeleportCause.PLUGIN)) {
+            target.teleport(there, PlayerTeleportEvent.TeleportCause.PLUGIN); // Put them back.
+            plugin.hud().notice(player, Text.color(plugin.settings().message("swap-refused")));
+            return Result.FAILED;
+        }
+        player.setFallDistance(0f);
+        target.setFallDistance(0f);
+        portal(from);
+        portal(there);
+        if (plugin.hits().hurt(player, target, settings.num("damage"))) {
+            Hits.effect(target, "nausea", 1, settings.ticks("nausea"));
+            plugin.fx().sound(target.getLocation(), "riftblade-hit");
+        }
+        plugin.fx().sound(from, "rift-swap");
+        plugin.fx().sound(there, "rift-swap");
+        return Result.FIRED;
+    }
+
+    private Result blink(Player player, AbilitySettings settings) {
+        Location from = player.getLocation();
+        Vector direction = Geo.flat(from);
+        Location to = Geo.dash(from, direction, settings.num("blink"));
+        if (Geo.flatDistance(from, to) < 1.0) {
+            return Result.FAILED;
+        }
+        to.setYaw(from.getYaw());
+        to.setPitch(from.getPitch());
+        if (!player.teleport(to, PlayerTeleportEvent.TeleportCause.PLUGIN)) {
+            return Result.FAILED;
+        }
+        player.setFallDistance(0f);
+        portal(from);
+        portal(to);
+        plugin.fx().sound(from, "rift-swap");
+        return Result.FIRED;
+    }
+
+    /** A portal swirling open and shut where someone went through. */
+    private void portal(Location at) {
+        Location middle = at.clone().add(0, 1.0, 0);
+        plugin.visuals().spawn("void_portal", middle).billboard().size(0.2).send(0)
+                .animate(1, 3, e -> e.size(2.4))
+                .vanish(8, 5);
+        Fx.View view = plugin.fx().view(middle);
+        view.particle(Fx.REVERSE_PORTAL, middle, 40, 0.4, 0.9, 0.4, 0.1);
+        view.dust(middle, VOID, 1.8f, 20, 0.5);
+        view.dust(middle, VIOLET, 1.2f, 15, 0.6);
+    }
+
+    /** The first player (or monster) in the line of sight, up to the first wall. */
+    private LivingEntity sighted(Player player, double range) {
+        Location eye = player.getEyeLocation();
+        World world = eye.getWorld();
+        Vector direction = eye.getDirection().normalize();
+        double reach = range;
+        for (double d = 0.5; d <= range; d += 0.25) {
+            Location point = eye.clone().add(direction.clone().multiply(d));
+            if (Geo.solid(point)) {
+                reach = d;
+                break;
+            }
+        }
+        if (world == null) {
+            return null;
+        }
+        List<LivingEntity> line = plugin.hits().along(player, eye, eye.clone().add(direction.multiply(reach)), 0.7);
+        for (LivingEntity entity : line) {
+            if (Geo.clear(eye, Geo.middle(entity))) {
+                return entity;
+            }
+        }
+        return null;
     }
 }

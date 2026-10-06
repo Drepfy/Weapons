@@ -15,8 +15,7 @@ public record Settings(
         List<String> blockedCommands,
         Controls controls,
         HitMobs hitMobs,
-        boolean actionBar,
-        boolean readySound,
+        boolean bossBars,
         Map<WeaponType, Look> looks,
         Map<Ability, AbilitySettings> abilities,
         Map<String, List<SoundSpec>> sounds,
@@ -85,9 +84,13 @@ public record Settings(
         HOSTILE, ALL, NONE
     }
 
-    /** How a weapon looks. Name and lore are uncoloured config text. */
-    public record Look(String name, List<String> lore, int customModelData, String itemModel, boolean unbreakable,
-                       Map<String, Integer> enchantments) {
+    /**
+     * How a weapon looks. Name and lore are uncoloured config text. {@code tooltipStyle} and
+     * {@code itemModel} are resource pack ids ("" = none); {@code glint} is the enchantment shine.
+     */
+    public record Look(String name, List<String> lore, int customModelData, String itemModel, String tooltipStyle,
+                       boolean glint, boolean unbreakable, Map<String, Integer> enchantments,
+                       org.bukkit.boss.BarColor barColor, String barText) {
     }
 
     public record SoundSpec(String key, float volume, float pitch) {

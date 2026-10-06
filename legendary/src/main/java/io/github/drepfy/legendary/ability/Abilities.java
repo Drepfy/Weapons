@@ -4,7 +4,6 @@ import io.github.drepfy.legendary.Ability;
 import io.github.drepfy.legendary.LegendaryPlugin;
 import io.github.drepfy.legendary.WeaponType;
 import io.github.drepfy.legendary.item.WeaponItems;
-import io.github.drepfy.legendary.util.Text;
 import org.bukkit.GameMode;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -64,7 +63,13 @@ public final class Abilities implements Listener {
 
     /** Listeners some kits need of their own. */
     public List<Listener> extraListeners() {
-        return List.of((Listener) kits.get(WeaponType.STARFORGED));
+        List<Listener> listeners = new java.util.ArrayList<>();
+        for (Kit kit : kits.values()) {
+            if (kit instanceof Listener listener) {
+                listeners.add(listener);
+            }
+        }
+        return listeners;
     }
 
     @EventHandler(priority = EventPriority.HIGH)
@@ -151,15 +156,11 @@ public final class Abilities implements Listener {
 
     private void use(Player player, WeaponItems.Tag tag, Ability ability, boolean complain) {
         long now = plugin.tick();
-        String name = plugin.settings().ability(ability).name();
         long left = cooldowns.remaining(tag.id(), ability, now);
         if (left > 0) {
-            if (!complain) {
-                return;
+            if (complain) {
+                plugin.hud().shake(player, ability); // The boss bar shows how long is left.
             }
-            plugin.hud().flash(player, Text.format(plugin.settings().message("on-cooldown"), "ability", name,
-                    "time", Text.countdown(left)));
-            plugin.fx().soundTo(player, "cooldown");
             return;
         }
         Kit.Result result = kits.get(tag.type()).use(player, tag, ability);
@@ -178,8 +179,9 @@ public final class Abilities implements Listener {
         return kits.get(tag.type()).active(player, tag, ability, now);
     }
 
-    public void hudParts(Player player, WeaponItems.Tag tag, List<String> parts, long now) {
-        kits.get(tag.type()).hud(player, tag, parts, now);
+    /** How long an ability runs in all (ticks), for the boss bar; 0 when it is instant. */
+    public long activeLength(WeaponItems.Tag tag, Ability ability) {
+        return kits.get(tag.type()).activeLength(ability);
     }
 
     public void tick(long now) {

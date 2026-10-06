@@ -10,11 +10,11 @@ import java.util.Locale;
 /** The five legendary weapons. F (or right-click) uses the first ability, Shift + F the second. */
 public enum WeaponType {
 
-    KUROGANE("kurogane", Material.NETHERITE_SWORD, Ability.CRESCENT_DRAW, null, Ability.UNBROKEN_EDGE),
-    SUGARCRASH("sugarcrash", Material.NETHERITE_SWORD, Ability.SUGAR_RUSH, Ability.SWEET_SHOCK, null),
-    RIFTBLADE("riftblade", Material.NETHERITE_SWORD, Ability.RIFT_SLASH, Ability.RIFT_RECALL, null),
-    GRAVEBREAKER("gravebreaker", Material.NETHERITE_AXE, Ability.EARTHSPLITTER, null, Ability.EXECUTIONERS_MARK),
-    STARFORGED("starforged", Material.NETHERITE_AXE, Ability.ASTRAL_IMPACT, Ability.GRAVITY_WELL, null);
+    KUROGANE("kurogane", Material.NETHERITE_SWORD, Ability.CRIMSON_FLASH, Ability.BLOOD_MOON, null),
+    SUGARCRASH("sugarcrash", Material.NETHERITE_SWORD, Ability.SUGAR_RUSH, Ability.CANDY_CYCLONE, null),
+    RIFTBLADE("riftblade", Material.NETHERITE_SWORD, Ability.VOID_REND, Ability.RIFT_SWAP, null),
+    GRAVEBREAKER("gravebreaker", Material.NETHERITE_AXE, Ability.EXECUTIONERS_LEAP, Ability.GRAVE_RISE, null),
+    STARFORGED("starforged", Material.NETHERITE_AXE, Ability.STARFALL, Ability.SINGULARITY, null);
 
     private final String key;
     private final Material material;

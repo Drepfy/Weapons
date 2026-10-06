@@ -87,7 +87,7 @@ public final class LegendaryCommand implements TabExecutor {
         if (controls.offhand()) {
             line(sender, "&8(F is your swap-offhand key; the weapon stays in your hand)");
         }
-        line(sender, "&7Cooldowns show above your hotbar while you hold one.");
+        line(sender, "&7Cooldowns show as bars at the top of your screen while you hold one.");
         line(sender, "&7They cannot go in containers, bundles or item frames, and drop when you die.");
         if (sender.hasPermission("legendary.give")) {
             line(sender, "&f/" + label + " give <player> <weapon> &8- &7give a legendary");
@@ -162,7 +162,7 @@ public final class LegendaryCommand implements TabExecutor {
         if (!sender.equals(target)) {
             plugin.send(target, "received", "weapon", name);
         }
-        plugin.fx().soundTo(target, "ready");
+        plugin.fx().soundTo(target, "received");
     }
 
     // ---- remove -------------------------------------------------------------------------------------------

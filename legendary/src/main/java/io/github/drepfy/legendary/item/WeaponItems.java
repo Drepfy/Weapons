@@ -7,6 +7,7 @@ import io.github.drepfy.legendary.util.Compat;
 import io.github.drepfy.legendary.util.Text;
 import org.bukkit.NamespacedKey;
 import org.bukkit.enchantments.Enchantment;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
@@ -116,22 +117,18 @@ public final class WeaponItems {
         // A leading reset keeps the name and lore from turning italic.
         meta.setDisplayName("§r" + Text.color(fill(look.name(), values)));
         List<String> lore = new ArrayList<>();
+        boolean listsEnchantments = false;
         for (String line : look.lore()) {
-            lore.add(line.isEmpty() ? "" : "§r" + Text.color(fill(line, values)));
+            if (line.trim().equals("{enchantments}")) {
+                listsEnchantments = true;
+                lore.addAll(enchantmentLines(look));
+            } else {
+                lore.add(line.isEmpty() ? "" : "§r" + Text.color(fill(line, values)));
+            }
         }
         meta.setLore(lore);
         meta.setCustomModelData(look.customModelData() > 0 ? look.customModelData() : null);
-        if (!look.itemModel().isEmpty()) {
-            Compat.itemModel(meta, NamespacedKey.fromString(look.itemModel()));
-        } else {
-            try {
-                if (meta.hasItemModel()) {
-                    meta.setItemModel(null);
-                }
-            } catch (RuntimeException | LinkageError ignored) {
-                // No item models before 1.21.2.
-            }
-        }
+        modern(meta, look);
         meta.setUnbreakable(look.unbreakable());
         for (Enchantment enchantment : new ArrayList<>(meta.getEnchants().keySet())) {
             meta.removeEnchant(enchantment);
@@ -142,10 +139,84 @@ public final class WeaponItems {
                 meta.addEnchant(enchant, enchantment.getValue(), true);
             }
         }
+        // The lore lists the enchantments (and unbreakable) in the weapon's own style instead.
+        if (listsEnchantments) {
+            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS, ItemFlag.HIDE_UNBREAKABLE);
+        } else {
+            meta.removeItemFlags(ItemFlag.HIDE_ENCHANTS, ItemFlag.HIDE_UNBREAKABLE);
+        }
         PersistentDataContainer data = meta.getPersistentDataContainer();
         data.set(idKey, PersistentDataType.STRING, id.toString());
         data.set(typeKey, PersistentDataType.STRING, type.key());
         data.set(lookKey, PersistentDataType.STRING, lookHash(type, id));
+    }
+
+    /** 1.21.2+: the resource pack model, the weapon's own tooltip frame, and no old-style shine. */
+    private static void modern(ItemMeta meta, Settings.Look look) {
+        try {
+            meta.setItemModel(look.itemModel().isEmpty() ? null : NamespacedKey.fromString(look.itemModel()));
+        } catch (RuntimeException | LinkageError ignored) {
+            // No item models before 1.21.2: custom model data does the job.
+        }
+        try {
+            meta.setTooltipStyle(look.tooltipStyle().isEmpty() ? null : NamespacedKey.fromString(look.tooltipStyle()));
+        } catch (RuntimeException | LinkageError ignored) {
+            // No tooltip styles before 1.21.2.
+        }
+        try {
+            meta.setEnchantmentGlintOverride(look.glint() ? null : Boolean.FALSE);
+        } catch (RuntimeException | LinkageError ignored) {
+            // No glint override before 1.20.5.
+        }
+    }
+
+    /** "Sharpness VII  ✦  Fire Aspect II", two to a line, then "Unbreakable". */
+    private List<String> enchantmentLines(Settings.Look look) {
+        Settings current = settings.get();
+        String format = current.message("lore-enchantment");
+        String separator = Text.color(current.message("lore-separator"));
+        List<String> names = new ArrayList<>();
+        for (Map.Entry<String, Integer> enchantment : look.enchantments().entrySet()) {
+            names.add(Text.format(format, "name", enchantmentName(enchantment.getKey()), "level",
+                    roman(enchantment.getValue())));
+        }
+        if (look.unbreakable() && !current.message("lore-unbreakable").isEmpty()) {
+            names.add(Text.color(current.message("lore-unbreakable")));
+        }
+        List<String> lines = new ArrayList<>();
+        for (int i = 0; i < names.size(); i += 2) {
+            String line = names.get(i) + (i + 1 < names.size() ? separator + names.get(i + 1) : "");
+            lines.add("§r" + line);
+        }
+        return lines;
+    }
+
+    /** "fire_aspect" → "Fire Aspect". */
+    static String enchantmentName(String key) {
+        StringBuilder name = new StringBuilder();
+        for (String word : key.toLowerCase(Locale.ROOT).split("_")) {
+            if (!word.isEmpty()) {
+                name.append(name.length() == 0 ? "" : " ").append(Character.toUpperCase(word.charAt(0)))
+                        .append(word.substring(1));
+            }
+        }
+        return name.toString();
+    }
+
+    static String roman(int level) {
+        if (level <= 0 || level > 3999) {
+            return Integer.toString(level);
+        }
+        int[] values = {1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1};
+        String[] numerals = {"M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I"};
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < values.length; i++) {
+            while (level >= values[i]) {
+                out.append(numerals[i]);
+                level -= values[i];
+            }
+        }
+        return out.toString();
     }
 
     private Map<String, String> placeholders(WeaponType type, UUID id) {
@@ -160,7 +231,10 @@ public final class WeaponItems {
     }
 
     private String lookHash(WeaponType type, UUID id) {
-        return Integer.toHexString((settings.get().look(type).toString() + placeholders(type, id)).hashCode());
+        Settings current = settings.get();
+        return Integer.toHexString((current.look(type).toString() + placeholders(type, id)
+                + current.message("lore-enchantment") + current.message("lore-separator")
+                + current.message("lore-unbreakable") + "/2").hashCode());
     }
 
     private static String fill(String text, Map<String, String> values) {

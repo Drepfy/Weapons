@@ -8,50 +8,63 @@ import io.github.drepfy.legendary.item.WeaponItems;
 import io.github.drepfy.legendary.util.Text;
 import org.bukkit.Color;
 import org.bukkit.Location;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerMoveEvent;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 
 /**
  * Starforged, the celestial axe: area control and gravity.
  * <ul>
- *   <li><b>Astral Impact</b>: a warning circle appears where the player looks; a moment later a
- *   star strikes it, hurting and launching everyone inside.</li>
- *   <li><b>Gravity Well</b>: a field that drags players towards its centre for a few seconds,
- *   then bursts outward.</li>
+ *   <li><b>Starfall</b>: a rune circle opens where the player looks; after a warning, stars rain
+ *   down inside it one after another, each bursting on impact.</li>
+ *   <li><b>Singularity</b>: a black hole opens where the player looks and drags everyone near it
+ *   towards its heart, then collapses into a nova that throws them all away.</li>
  * </ul>
- * The two never overlap: while a star is falling no well can open and the other way round,
- * so nobody can be held in place under a strike.
+ * The two never overlap: while stars are falling no black hole can open and the other way round,
+ * so nobody can be held in place under the stars.
  */
-final class Starforged implements Kit, Listener {
+final class Starforged implements Kit {
 
-    private static final Color GOLD = Color.fromRGB(255, 215, 110);
-    private static final Color SKY = Color.fromRGB(110, 215, 255);
-    private static final Color INDIGO = Color.fromRGB(90, 60, 230);
-    private static final Color DEEP = Color.fromRGB(35, 20, 90);
+    private static final Color GOLD = Color.fromRGB(255, 214, 110);
+    private static final Color SKY = Color.fromRGB(110, 225, 255);
+    private static final Color INDIGO = Color.fromRGB(95, 60, 235);
+    private static final Color DEEP = Color.fromRGB(20, 10, 55);
 
     private final LegendaryPlugin plugin;
-    /** Caster → when their star lands or their well closes (for the action bar). */
-    private final Map<UUID, Long> strikes = new HashMap<>();
-    private final Map<UUID, Long> wells = new HashMap<>();
-    /** How far each player in a well moved up or down last tick. */
-    private final Map<UUID, Double> vertical = new HashMap<>();
-    private int openWells;
+    /** Caster → the tick their last star lands (for the boss bar). */
+    private final Map<UUID, Long> falls = new HashMap<>();
+    private final Map<UUID, Hole> holes = new HashMap<>();
+    private final Random random = new Random();
 
     Starforged(LegendaryPlugin plugin) {
         this.plugin = plugin;
+    }
+
+    private static final class Hole {
+        final Player player;
+        final Location center;
+        final long until;
+        final Visuals.Effect core;
+        final Visuals.Effect disk;
+        final Set<UUID> allowed = new HashSet<>();
+        final Set<UUID> refused = new HashSet<>();
+        int turn;
+
+        Hole(Player player, Location center, long until, Visuals.Effect core, Visuals.Effect disk) {
+            this.player = player;
+            this.center = center;
+            this.until = until;
+            this.core = core;
+            this.disk = disk;
+        }
     }
 
     @Override
@@ -61,297 +74,234 @@ final class Starforged implements Kit, Listener {
 
     @Override
     public Result use(Player player, WeaponItems.Tag weapon, Ability ability) {
-        return ability == Ability.ASTRAL_IMPACT ? strike(player, weapon) : well(player, weapon);
+        return ability == Ability.STARFALL ? starfall(player, weapon) : singularity(player, weapon);
     }
 
     @Override
     public long active(Player player, WeaponItems.Tag weapon, Ability ability, long now) {
-        Long until = (ability == Ability.ASTRAL_IMPACT ? strikes : wells).get(player.getUniqueId());
+        Long until;
+        if (ability == Ability.STARFALL) {
+            until = falls.get(player.getUniqueId());
+        } else {
+            Hole hole = holes.get(player.getUniqueId());
+            until = hole == null ? null : hole.until;
+        }
         return until == null ? 0 : Math.max(0, until - now);
     }
 
     @Override
-    public void forget(Player player) {
-        vertical.remove(player.getUniqueId());
+    public long activeLength(Ability ability) {
+        AbilitySettings settings = plugin.settings().ability(ability);
+        return ability == Ability.STARFALL ? starfallLength(settings) : settings.ticks("duration");
+    }
+
+    private static long starfallLength(AbilitySettings settings) {
+        return settings.ticks("warning") + (long) (settings.whole("stars") - 1) * Math.max(1, settings.ticks("interval")) + 6;
+    }
+
+    @Override
+    public void tick(long now) {
+        falls.values().removeIf(until -> until <= now);
+        for (Iterator<Hole> it = holes.values().iterator(); it.hasNext(); ) {
+            Hole hole = it.next();
+            if (now >= hole.until) {
+                it.remove();
+                collapse(hole);
+            } else {
+                drag(hole, now);
+            }
+        }
     }
 
     private Location target(Player player, double range) {
         Location target = Geo.target(player, range);
         if (target == null) {
-            plugin.hud().flash(player, Text.format(plugin.settings().message("no-target"), "range", Text.number(range)));
+            plugin.hud().notice(player, Text.format(plugin.settings().message("no-target"), "range", Text.number(range)));
         }
         return target;
     }
 
-    // ---- Astral Impact -------------------------------------------------------------------------------------
+    // ---- Starfall ----------------------------------------------------------------------------------------
 
-    private Result strike(Player player, WeaponItems.Tag weapon) {
-        AbilitySettings settings = plugin.settings().ability(Ability.ASTRAL_IMPACT);
+    private Result starfall(Player player, WeaponItems.Tag weapon) {
+        AbilitySettings settings = plugin.settings().ability(Ability.STARFALL);
         Location center = target(player, settings.num("range"));
         if (center == null) {
             return Result.FAILED;
         }
         long now = plugin.tick();
+        long length = starfallLength(settings);
+        AbilitySettings hole = plugin.settings().ability(Ability.SINGULARITY);
+        plugin.abilities().cooldowns().atLeast(weapon.id(), Ability.SINGULARITY, now, length + hole.ticks("lockout"));
+        falls.put(player.getUniqueId(), now + length);
+        double radius = settings.num("radius");
         int warning = settings.ticks("warning");
-        AbilitySettings well = plugin.settings().ability(Ability.GRAVITY_WELL);
-        plugin.abilities().cooldowns().atLeast(weapon.id(), Ability.GRAVITY_WELL, now, warning + well.ticks("lockout"));
-        strikes.put(player.getUniqueId(), now + warning);
-        plugin.fx().sound(center, "astral-warning");
-        new Star(player, center, warning, settings).runTaskTimer(plugin, 0L, 1L);
+        plugin.fx().sound(center, "starfall");
+        // The rune circle: opens, turns while the stars fall, then closes.
+        Visuals.Effect circle = plugin.visuals().spawn("rune_star", center.clone().add(0, 0.06, 0)).size(0.5).send(0)
+                .animate(1, 6, e -> e.size(radius * 2.0));
+        for (int t = 8; t < length; t += 8) {
+            int step = t / 8;
+            circle.animate(t, 8, e -> e.turn(step * 45));
+        }
+        circle.vanish((int) length + 4, 6);
+        int stars = settings.whole("stars");
+        int interval = Math.max(1, settings.ticks("interval"));
+        Map<UUID, Integer> hits = new HashMap<>();
+        for (int i = 0; i < stars; i++) {
+            Location landing = i == 0 ? center.clone() : Geo.scatter(center, radius * 0.8, random);
+            Location floor = Geo.floorBelow(center.getWorld(), landing.getX(), center.getY() + 2, landing.getZ(), 5);
+            Location spot = floor != null ? floor : landing;
+            plugin.visuals().later(warning + i * interval - 6, () -> star(player, spot, hits));
+        }
         return Result.FIRED;
     }
 
-    /** The warning circle, then the star. */
-    private final class Star extends BukkitRunnable {
-        private final Player player;
-        private final Location center;
-        private final int warning;
-        private final AbilitySettings settings;
-        private int age;
+    /** One star: it falls for 6 ticks, then bursts. */
+    private void star(Player player, Location spot, Map<UUID, Integer> hits) {
+        Location sky = spot.clone().add(random.nextDouble() * 4 - 2, 14, random.nextDouble() * 4 - 2);
+        Visuals.Effect star = plugin.visuals().spawn("star", sky).billboard().size(1.4).send(0);
+        plugin.visuals().later(1, () -> star.moveTo(spot.clone().add(0, 0.6, 0), 5));
+        plugin.fx().sound(sky, "starfall-star");
+        plugin.visuals().later(6, () -> {
+            star.animate(1, 2, e -> e.size(2.6)).vanish(3, 2);
+            impact(player, spot, hits);
+        });
+    }
 
-        Star(Player player, Location center, int warning, AbilitySettings settings) {
-            this.player = player;
-            this.center = center;
-            this.warning = warning;
-            this.settings = settings;
+    private void impact(Player player, Location spot, Map<UUID, Integer> hits) {
+        AbilitySettings settings = plugin.settings().ability(Ability.STARFALL);
+        double radius = settings.num("star-radius");
+        plugin.fx().sound(spot, "starfall-impact");
+        plugin.visuals().spawn("nova", spot.clone().add(0, 0.08, 0)).size(0.4).turn(random.nextInt(360)).send(0)
+                .animate(1, 4, e -> e.size(radius * 2.4))
+                .vanish(5, 3);
+        Fx.View view = plugin.fx().view(spot);
+        Location up = spot.clone().add(0, 0.4, 0);
+        view.particle(Fx.FLASH, up, 1, 0, 0, 0, 0);
+        view.particle(Fx.FIREWORK, up, 25, 0.3, 0.3, 0.3, 0.18);
+        view.particle(Fx.END_ROD, up, 12, 0.4, 0.4, 0.4, 0.1);
+        view.dust(up, GOLD, 1.5f, 12, 0.6);
+        view.dust(up, SKY, 1.5f, 12, 0.6);
+        if (!player.isOnline()) {
+            return;
         }
-
-        @Override
-        public void run() {
-            if (age >= warning) {
-                cancel();
-                strikes.remove(player.getUniqueId());
-                land();
-                return;
+        int max = settings.whole("max-hits");
+        for (LivingEntity target : plugin.hits().around(player, spot.clone().add(0, 0.8, 0), radius)) {
+            int count = hits.getOrDefault(target.getUniqueId(), 0);
+            if (count >= max) {
+                continue;
             }
-            if (age % 2 == 0) {
-                warn();
-            }
-            age++;
-        }
-
-        /** The circle everyone sees, with a ring closing in as the star gets near. */
-        private void warn() {
-            double radius = settings.num("radius");
-            Fx.View view = plugin.fx().view(center);
-            int points = (int) Math.max(24, radius * 10);
-            double spin = age * 0.08;
-            for (int i = 0; i < points; i++) {
-                double angle = spin + Math.PI * 2 * i / points;
-                view.dust(center.clone().add(Math.cos(angle) * radius, 0.15, Math.sin(angle) * radius), GOLD, 1.3f, 1, 0);
-            }
-            double inner = radius * (1.0 - (double) age / warning);
-            for (int i = 0; i < 12; i++) {
-                double angle = -spin + Math.PI * 2 * i / 12;
-                view.particle(Fx.END_ROD, center.clone().add(Math.cos(angle) * inner, 0.2, Math.sin(angle) * inner),
-                        1, 0, 0, 0, 0);
-            }
-            view.dust(center.clone().add(0, 0.2 + (double) age / warning * 6, 0), SKY, 1.5f, 2, 0.05);
-        }
-
-        private void land() {
-            Fx.View view = plugin.fx().view(center);
-            for (double y = 14; y >= 0; y -= 0.5) {
-                view.particle(Fx.END_ROD, center.clone().add(0, y, 0), 1, 0.05, 0, 0.05, 0);
-            }
-            view.particle(Fx.FLASH, center.clone().add(0, 0.5, 0), 1, 0, 0, 0, 0);
-            view.particle(Fx.EXPLOSION, center.clone().add(0, 0.5, 0), 1, 0, 0, 0, 0);
-            view.particle(Fx.FIREWORK, center.clone().add(0, 0.6, 0), 70, 0.3, 0.3, 0.3, 0.35);
-            view.particle(Fx.SPARK, center.clone().add(0, 0.6, 0), 40, settings.num("radius") / 2, 0.4,
-                    settings.num("radius") / 2, 0.1);
-            for (int i = 0; i < 30; i++) {
-                double angle = Math.PI * 2 * i / 30;
-                view.dust(center.clone().add(Math.cos(angle) * settings.num("radius"), 0.3,
-                        Math.sin(angle) * settings.num("radius")), i % 2 == 0 ? GOLD : SKY, 1.8f, 1, 0.05);
-            }
-            plugin.fx().sound(center, "astral-impact");
-            if (!player.isOnline() || !player.getWorld().equals(center.getWorld())) {
-                return;
-            }
-            double radius = settings.num("radius");
-            Location above = center.clone().add(0, 1.0, 0);
-            for (Entity entity : center.getWorld().getNearbyEntities(center, radius + 0.5, 3, radius + 0.5)) {
-                if (!(entity instanceof LivingEntity target) || !plugin.hits().canTarget(player, entity)
-                        || Geo.flatDistance(center, entity.getLocation()) > radius
-                        || entity.getLocation().getY() < center.getY() - 1.5 || !Geo.clear(above, Geo.middle(entity))) {
-                    continue;
-                }
-                if (plugin.hits().hurt(player, target, settings.num("damage"))) {
-                    Hits.knock(target, Geo.away(center, entity.getLocation(), new Vector()), settings.num("push"),
-                            settings.num("launch"));
-                    plugin.fx().view(entity.getLocation()).particle(Fx.END_ROD, Geo.middle(entity), 12, 0.3, 0.5, 0.3, 0.1);
-                }
+            if (plugin.hits().hurt(player, target, settings.num("damage"))) {
+                hits.put(target.getUniqueId(), count + 1);
+                Vector away = Geo.away(spot, target.getLocation(), Geo.flat(player.getLocation()));
+                Hits.knock(target, away, 0.25, settings.num("launch"));
+                plugin.fx().sound(target.getLocation(), "starforged-hit");
             }
         }
     }
 
-    // ---- Gravity Well -------------------------------------------------------------------------------------
+    // ---- Singularity ---------------------------------------------------------------------------------------
 
-    private Result well(Player player, WeaponItems.Tag weapon) {
-        AbilitySettings settings = plugin.settings().ability(Ability.GRAVITY_WELL);
+    private Result singularity(Player player, WeaponItems.Tag weapon) {
+        AbilitySettings settings = plugin.settings().ability(Ability.SINGULARITY);
         Location ground = target(player, settings.num("range"));
         if (ground == null) {
             return Result.FAILED;
         }
         long now = plugin.tick();
         int duration = settings.ticks("duration");
-        plugin.abilities().cooldowns().atLeast(weapon.id(), Ability.ASTRAL_IMPACT, now,
-                duration + settings.ticks("lockout"));
-        wells.put(player.getUniqueId(), now + duration);
-        Location center = ground.clone().add(0, 1.0, 0);
-        // The axe's power thrown to the spot.
-        Location hand = player.getEyeLocation().subtract(0, 0.3, 0);
-        Vector line = center.toVector().subtract(hand.toVector());
-        double length = line.length();
-        Fx.View view = plugin.fx().view(hand);
-        if (length > 0.01) {
-            line.multiply(1.0 / length);
-            for (double d = 0; d < length; d += 0.6) {
-                view.dust(hand.clone().add(line.clone().multiply(d)), INDIGO, 1.0f, 1, 0.02);
-            }
-        }
-        plugin.fx().sound(center, "gravity-well");
-        openWells++;
-        new Well(player, center, duration, settings).runTaskTimer(plugin, 0L, 1L);
+        plugin.abilities().cooldowns().atLeast(weapon.id(), Ability.STARFALL, now, duration + settings.ticks("lockout"));
+        Location center = ground.clone().add(0, 1.6, 0);
+        double radius = settings.num("radius");
+        Visuals.Effect core = plugin.visuals().spawn("black_hole", center).billboard().size(0.1).send(0)
+                .animate(1, 6, e -> e.size(2.4));
+        Visuals.Effect disk = plugin.visuals().spawn("accretion", center).size(0.1).send(0)
+                .animate(1, 8, e -> e.size(radius * 0.9));
+        holes.put(player.getUniqueId(), new Hole(player, center, now + duration, core, disk));
+        plugin.fx().sound(center, "singularity");
         return Result.FIRED;
     }
 
-    /** The field: pulls for its whole life, then bursts. */
-    private final class Well extends BukkitRunnable {
-        private final Player player;
-        private final Location center;
-        private final int duration;
-        private final AbilitySettings settings;
-        private final double radius;
-        /** Gripped: the grip hit was allowed. Spared: protected (or not allowed to be hit). */
-        private final Set<UUID> gripped = new HashSet<>();
-        private final Set<UUID> spared = new HashSet<>();
-        private int age;
-
-        Well(Player player, Location center, int duration, AbilitySettings settings) {
-            this.player = player;
-            this.center = center;
-            this.duration = duration;
-            this.settings = settings;
-            this.radius = settings.num("radius");
+    private void drag(Hole hole, long now) {
+        AbilitySettings settings = plugin.settings().ability(Ability.SINGULARITY);
+        double radius = settings.num("radius");
+        if (now % 4 == 0) {
+            hole.turn++;
+            hole.disk.turn(hole.turn * 70.0).send(4);
         }
-
-        @Override
-        public void run() {
-            if (!player.isOnline() || !player.getWorld().equals(center.getWorld())) {
-                close();
-                return;
+        Fx.View view = plugin.fx().view(hole.center);
+        view.particle(Fx.REVERSE_PORTAL, hole.center, 10, 0.3, 0.3, 0.3, 0.02);
+        for (int i = 0; i < 3; i++) {
+            double a = now * 0.35 + i * (Math.PI * 2 / 3);
+            Location point = hole.center.clone().add(Math.cos(a) * radius * 0.6, 0, Math.sin(a) * radius * 0.6);
+            view.dust(point, i == 0 ? SKY : i == 1 ? INDIGO : GOLD, 1.3f, 2, 0.15);
+        }
+        view.dust(hole.center, DEEP, 2.2f, 3, 0.3);
+        if (!hole.player.isOnline()) {
+            return;
+        }
+        double pull = settings.num("pull");
+        for (LivingEntity target : plugin.hits().around(hole.player, hole.center, radius)) {
+            UUID id = target.getUniqueId();
+            if (hole.refused.contains(id)) {
+                continue;
             }
-            if (age >= duration) {
-                close();
-                pulse();
-                return;
-            }
-            for (Entity entity : center.getWorld().getNearbyEntities(center, radius, radius / 2 + 1.5, radius)) {
-                if (!(entity instanceof LivingEntity target) || spared.contains(entity.getUniqueId())
-                        || Geo.flatDistance(center, entity.getLocation()) > radius
-                        || !plugin.hits().canTarget(player, entity)) {
+            if (!hole.allowed.contains(id)) {
+                // The first touch hurts a little: that is what protection plugins get to refuse.
+                if (!plugin.hits().hurt(hole.player, target, settings.num("grip-damage"))) {
+                    hole.refused.add(id);
                     continue;
                 }
-                if (!gripped.contains(entity.getUniqueId())) {
-                    if (plugin.hits().hurt(player, target, settings.num("grip-damage"))) {
-                        gripped.add(entity.getUniqueId());
-                        plugin.fx().view(entity.getLocation()).particle(Fx.REVERSE_PORTAL, Geo.middle(entity), 20,
-                                0.3, 0.5, 0.3, 0.05);
-                    } else {
-                        spared.add(entity.getUniqueId());
-                        continue;
-                    }
-                }
-                if (age % 2 == 0) {
-                    pull(target);
-                }
+                hole.allowed.add(id);
+                plugin.fx().sound(target.getLocation(), "starforged-hit");
             }
-            if (age % 2 == 0) {
-                draw();
+            Vector in = hole.center.toVector().subtract(Geo.middle(target).toVector());
+            double distance = in.length();
+            if (distance < 0.8) {
+                target.setVelocity(target.getVelocity().multiply(0.3));
+                continue;
             }
-            if (age % 20 == 0) {
-                plugin.fx().sound(center, "gravity-hum");
-            }
-            age++;
-        }
-
-        private void pull(LivingEntity target) {
-            Vector to = center.toVector().subtract(target.getLocation().toVector()).setY(0);
-            if (to.lengthSquared() < 0.64) {
-                return; // At the centre already.
-            }
-            to.normalize().multiply(settings.num("pull"));
-            double y;
-            if (target instanceof Player player) {
-                // The well drags players down as well as in: a jump is cut short, a fall is not slowed.
-                double dy = vertical.getOrDefault(player.getUniqueId(), 0.0);
-                y = player.isOnGround() ? 0.0 : (dy > 0 ? dy * 0.5 : dy);
-            } else {
-                y = target.getVelocity().getY();
-            }
-            target.setVelocity(to.setY(y));
-        }
-
-        /** The edge of the field, and particles streaming into its centre. */
-        private void draw() {
-            Fx.View view = plugin.fx().view(center);
-            double spin = age * 0.06;
-            int points = (int) Math.max(30, radius * 8);
-            for (int i = 0; i < points; i++) {
-                double angle = spin + Math.PI * 2 * i / points;
-                view.dust(center.clone().add(Math.cos(angle) * radius, -0.8, Math.sin(angle) * radius),
-                        i % 3 == 0 ? INDIGO : DEEP, 1.3f, 1, 0);
-            }
-            for (int i = 0; i < 10; i++) {
-                double angle = -spin * 2 + Math.PI * 2 * i / 10;
-                double r = radius * (0.4 + 0.6 * ((i * 37 + age) % 10) / 10.0);
-                // A portal particle drifts from the offset back to where it is spawned: into the centre.
-                view.particle(Fx.PORTAL, center, 0, Math.cos(angle) * r, 0.2, Math.sin(angle) * r, 1.0);
-            }
-            view.particle(Fx.END_ROD, center.clone().add(Math.cos(spin * 4) * 0.4, Math.sin(spin * 3) * 0.3,
-                    Math.sin(spin * 4) * 0.4), 1, 0, 0, 0, 0);
-            view.particle(Fx.DRAGON_BREATH, center, 2, 0.2, 0.2, 0.2, 0.01);
-        }
-
-        private void pulse() {
-            Fx.View view = plugin.fx().view(center);
-            view.particle(Fx.SONIC_BOOM, center, 1, 0, 0, 0, 0);
-            view.particle(Fx.EXPLOSION, center, 1, 0, 0, 0, 0);
-            for (int i = 0; i < 40; i++) {
-                double angle = Math.PI * 2 * i / 40;
-                view.dust(center.clone().add(Math.cos(angle) * radius * 0.8, -0.5, Math.sin(angle) * radius * 0.8),
-                        i % 2 == 0 ? INDIGO : SKY, 1.8f, 1, 0.1);
-            }
-            plugin.fx().sound(center, "gravity-pulse");
-            for (Entity entity : center.getWorld().getNearbyEntities(center, radius, radius / 2 + 1.5, radius)) {
-                if (!(entity instanceof LivingEntity target) || spared.contains(entity.getUniqueId())
-                        || Geo.flatDistance(center, entity.getLocation()) > radius
-                        || !plugin.hits().canTarget(player, entity)) {
-                    continue;
-                }
-                if (plugin.hits().hurt(player, target, settings.num("pulse-damage"))) {
-                    Hits.knock(target, Geo.away(center, entity.getLocation(), Geo.flat(player.getLocation())),
-                            settings.num("pulse-knockback"), settings.num("pulse-lift"));
-                }
-            }
-        }
-
-        private void close() {
-            cancel();
-            wells.remove(player.getUniqueId());
-            openWells = Math.max(0, openWells - 1);
-            if (openWells == 0) {
-                vertical.clear();
+            double strength = pull * (0.6 + 0.4 * (1 - Math.min(1, distance / radius)));
+            Vector velocity = target.getVelocity().multiply(0.55).add(in.normalize().multiply(strength));
+            velocity.setY(Math.max(-0.35, Math.min(0.3, velocity.getY())));
+            target.setVelocity(velocity);
+            if (now % 10 == 0) {
+                Hits.effect(target, "slowness", 1, 12);
             }
         }
     }
 
-    /** Only while a well is open: how players move up and down (the server does not know their speed). */
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onMove(PlayerMoveEvent event) {
-        if (openWells > 0 && event.getTo() != null) {
-            vertical.put(event.getPlayer().getUniqueId(), event.getTo().getY() - event.getFrom().getY());
-        }
+    private void collapse(Hole hole) {
+        AbilitySettings settings = plugin.settings().ability(Ability.SINGULARITY);
+        double radius = settings.num("radius");
+        hole.core.animate(1, 3, e -> e.size(0.01)).life(5);
+        hole.disk.animate(1, 3, e -> e.size(0.01)).life(5);
+        plugin.visuals().later(3, () -> {
+            plugin.fx().sound(hole.center, "singularity-nova");
+            plugin.visuals().spawn("nova", hole.center.clone().add(0, -1.5, 0)).size(0.5).send(0)
+                    .animate(1, 5, e -> e.size(radius * 2.4).turn(90))
+                    .vanish(6, 4);
+            plugin.visuals().spawn("star", hole.center).billboard().size(0.5).send(0)
+                    .animate(1, 3, e -> e.size(5.0))
+                    .vanish(4, 3);
+            Fx.View view = plugin.fx().view(hole.center);
+            view.particle(Fx.FLASH, hole.center, 1, 0, 0, 0, 0);
+            view.particle(Fx.SONIC_BOOM, hole.center, 1, 0, 0, 0, 0);
+            view.particle(Fx.END_ROD, hole.center, 40, 0.5, 0.5, 0.5, 0.35);
+            if (!hole.player.isOnline()) {
+                return;
+            }
+            for (LivingEntity target : plugin.hits().around(hole.player, hole.center, radius)) {
+                if (hole.refused.contains(target.getUniqueId())) {
+                    continue;
+                }
+                if (plugin.hits().hurt(hole.player, target, settings.num("nova-damage"))) {
+                    Vector away = Geo.away(hole.center, target.getLocation(), Geo.flat(hole.player.getLocation()));
+                    Hits.knock(target, away, settings.num("nova-knockback"), settings.num("nova-lift"));
+                    plugin.fx().sound(target.getLocation(), "starforged-hit");
+                }
+            }
+        });
     }
 }

@@ -2,7 +2,12 @@ package io.github.drepfy.legendary.ability;
 
 import io.github.drepfy.legendary.config.Settings;
 import io.github.drepfy.legendary.util.Compat;
+import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
+import org.bukkit.damage.DamageSource;
+import org.bukkit.damage.DamageType;
+import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.ComplexEntityPart;
 import org.bukkit.entity.Enemy;
@@ -14,8 +19,15 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
+import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.function.Supplier;
 
 /**
@@ -113,6 +125,103 @@ public final class Hits implements Listener {
         Hit hit = pending;
         if (hit != null && event.getEntity().equals(hit.target) && event.getDamager().equals(hit.attacker)) {
             hit.landed = !event.isCancelled();
+        }
+    }
+
+    /** Everything abilities may hit within a radius of a point (a sphere around the body's middle). */
+    public List<LivingEntity> around(Player attacker, Location center, double radius) {
+        List<LivingEntity> found = new ArrayList<>();
+        World world = center.getWorld();
+        if (world == null) {
+            return found;
+        }
+        for (Entity entity : world.getNearbyEntities(center, radius + 1, radius + 2, radius + 1)) {
+            if (entity instanceof LivingEntity living && canTarget(attacker, entity)) {
+                Location middle = entity.getLocation().add(0, entity.getHeight() / 2.0, 0);
+                double reach = radius + entity.getWidth() / 2.0;
+                if (middle.distanceSquared(center) <= reach * reach) {
+                    found.add(living);
+                }
+            }
+        }
+        found.sort(Comparator.comparingDouble(e -> e.getLocation().distanceSquared(center)));
+        return found;
+    }
+
+    /** Everything abilities may hit along a line (within {@code reach} of it), nearest the start first. */
+    public List<LivingEntity> along(Player attacker, Location from, Location to, double reach) {
+        List<LivingEntity> found = new ArrayList<>();
+        World world = from.getWorld();
+        if (world == null) {
+            return found;
+        }
+        BoundingBox box = BoundingBox.of(from, to).expand(reach + 1.0, 2.0, reach + 1.0);
+        Vector a = from.toVector();
+        Vector ab = to.toVector().subtract(a);
+        double lengthSquared = Math.max(1.0E-6, ab.lengthSquared());
+        for (Entity entity : world.getNearbyEntities(box)) {
+            if (!(entity instanceof LivingEntity living) || !canTarget(attacker, entity)) {
+                continue;
+            }
+            Vector middle = entity.getLocation().toVector().add(new Vector(0, entity.getHeight() / 2.0, 0));
+            double t = Math.max(0.0, Math.min(1.0, middle.clone().subtract(a).dot(ab) / lengthSquared));
+            Vector closest = a.clone().add(ab.clone().multiply(t));
+            double dx = middle.getX() - closest.getX();
+            double dz = middle.getZ() - closest.getZ();
+            double flat = Math.sqrt(dx * dx + dz * dz);
+            if (flat <= reach + entity.getWidth() / 2.0 && Math.abs(middle.getY() - closest.getY()) <= 1.6) {
+                found.add(living);
+            }
+        }
+        found.sort(Comparator.comparingDouble(e -> e.getLocation().distanceSquared(from)));
+        return found;
+    }
+
+    /**
+     * Whether the attacker may affect the target at all here (pulling it, swapping places), asked
+     * without hurting it: protection plugins see an attack and may refuse it.
+     */
+    public boolean allowed(Player attacker, LivingEntity target) {
+        if (!canTarget(attacker, target)) {
+            return false;
+        }
+        Hit outer = pending;
+        pending = new Hit(attacker, target);
+        try {
+            EntityDamageByEntityEvent probe = probe(attacker, target);
+            Bukkit.getPluginManager().callEvent(probe);
+            return !probe.isCancelled();
+        } catch (RuntimeException | LinkageError e) {
+            return true;
+        } finally {
+            pending = outer;
+        }
+    }
+
+    /** An attack event that is only asked about, never applied. */
+    private static EntityDamageByEntityEvent probe(Player attacker, LivingEntity target) {
+        try {
+            DamageSource source = DamageSource.builder(DamageType.GENERIC).withCausingEntity(attacker)
+                    .withDirectEntity(attacker).build();
+            return new EntityDamageByEntityEvent(attacker, target, EntityDamageEvent.DamageCause.CUSTOM, source, 0.0);
+        } catch (RuntimeException | LinkageError e) {
+            return legacyProbe(attacker, target); // Before 1.20.5: no damage sources.
+        }
+    }
+
+    @SuppressWarnings({"deprecation", "removal"})
+    private static EntityDamageByEntityEvent legacyProbe(Player attacker, LivingEntity target) {
+        return new EntityDamageByEntityEvent(attacker, target, EntityDamageEvent.DamageCause.CUSTOM, 0.0);
+    }
+
+    /** A potion effect by its vanilla id, if the level is above 0. */
+    public static void effect(LivingEntity target, String id, int level, int ticks) {
+        if (level <= 0 || ticks <= 0) {
+            return;
+        }
+        PotionEffectType type = Compat.effect(id);
+        if (type != null) {
+            target.addPotionEffect(new PotionEffect(type, ticks, level - 1, false, true, true));
         }
     }
 
