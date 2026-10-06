@@ -12,7 +12,6 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -50,9 +49,7 @@ public final class HeartsCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (args[0].equalsIgnoreCase("top")) {
-            List<Map.Entry<UUID, LifestealStore.Entry>> ranking = new ArrayList<>(store.players().entrySet());
-            ranking.sort(Comparator.comparingInt((Map.Entry<UUID, LifestealStore.Entry> e) -> e.getValue().hearts())
-                    .reversed().thenComparing(e -> String.valueOf(e.getValue().name()), String.CASE_INSENSITIVE_ORDER));
+            List<Map.Entry<UUID, LifestealStore.Entry>> ranking = store.ranking();
             send(sender, messages.get("top-header"));
             int rank = 0;
             for (Map.Entry<UUID, LifestealStore.Entry> entry : ranking.subList(0, Math.min(TOP, ranking.size()))) {

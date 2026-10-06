@@ -4,6 +4,7 @@ main: io.github.drepfy.combat.CombatPlugin
 api-version: '1.20'
 description: 60 second combat timer above the hotbar, a 15 second Ender Pearl cooldown, no elytra or riptide near the players you fight, and safe zones players in combat cannot enter.
 authors: [Drepfy]
+softdepend: [PlaceholderAPI]
 
 commands:
   combat:

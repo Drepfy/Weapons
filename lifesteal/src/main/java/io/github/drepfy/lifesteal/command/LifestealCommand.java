@@ -81,15 +81,24 @@ public final class LifestealCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    @SuppressWarnings("deprecation") // getDescription(): Paper's replacement is not on Spigot.
     private void help(CommandSender sender, String label) {
-        sender.sendMessage(Text.color("&c&lLifesteal &7" + plugin.getDescription().getVersion()));
-        sender.sendMessage(Text.color("  &f/withdraw <amount> &8- &7Turn hearts into Heart items"));
-        sender.sendMessage(Text.color("  &f/hearts [player|top] &8- &7Show hearts"));
+        io.github.drepfy.lifesteal.util.HelpMenu menu = new io.github.drepfy.lifesteal.util.HelpMenu(
+                "&c&lʟɪꜰᴇsᴛᴇᴀʟ &8| &7v" + plugin.getDescription().getVersion());
+        if (sender.hasPermission("lifesteal.hearts")) {
+            menu.command("/hearts [player]", "Your hearts, or another player's");
+            menu.command("/hearts top", "The players with the most hearts");
+        }
+        if (sender.hasPermission("lifesteal.withdraw")) {
+            menu.command("/withdraw <amount>", "Turn hearts into Heart items");
+        }
         for (Sub sub : SUBS) {
             if (sender.hasPermission(sub.permission())) {
-                sender.sendMessage(Text.color("  &f/" + label + " " + sub.usage() + " &8- &7" + sub.description()));
+                menu.command("/" + label + " " + sub.usage(), sub.description());
             }
         }
+        menu.note("&7Kill a player to steal a heart. Right-click a Heart item to use it.");
+        menu.send(sender);
     }
 
     private void reload(CommandSender sender) {

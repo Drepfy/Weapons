@@ -1,6 +1,7 @@
 package io.github.drepfy.combat;
 
 import io.github.drepfy.combat.util.Durations;
+import io.github.drepfy.combat.util.HelpMenu;
 import io.github.drepfy.combat.util.Text;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
@@ -33,17 +34,21 @@ final class CombatCommand implements CommandExecutor, TabCompleter {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 0) {
             if (!(sender instanceof Player player)) {
-                send(sender, "&cUsage: /" + label + " info <player>");
+                help(sender, label);
                 return true;
             }
             status(sender, player);
+            return true;
+        }
+        String sub = args[0].toLowerCase(Locale.ROOT);
+        if (sub.equals("help") || sub.equals("?")) {
+            help(sender, label);
             return true;
         }
         if (!sender.hasPermission(ADMIN)) {
             send(sender, plugin.message("no-permission"));
             return true;
         }
-        String sub = args[0].toLowerCase(Locale.ROOT);
         if (sub.equals("reload")) {
             try {
                 List<String> warnings = plugin.reload();
@@ -59,7 +64,7 @@ final class CombatCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (args.length < 2 || !List.of("info", "tag", "untag").contains(sub)) {
-            send(sender, "&cUsage: /" + label + " [info|tag|untag <player> | zone | reload]");
+            help(sender, label);
             return true;
         }
         Player target = Bukkit.getPlayerExact(args[1]);
@@ -192,6 +197,23 @@ final class CombatCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    @SuppressWarnings("deprecation") // getDescription(): Paper's replacement is not on Spigot.
+    private void help(CommandSender sender, String label) {
+        HelpMenu menu = new HelpMenu("&c&lᴄᴏᴍʙᴀᴛ &8| &7v" + plugin.getDescription().getVersion());
+        menu.command("/" + label, "Your combat time and Ender Pearl cooldown");
+        if (sender.hasPermission(ADMIN)) {
+            menu.command("/" + label + " info <player>", "A player's combat time and who they fight");
+            menu.command("/" + label + " tag <player> [time]", "Put a player in combat");
+            menu.command("/" + label + " untag <player>", "Take a player out of combat");
+            menu.command("/" + label + " zone", "Safe zones that players in combat cannot enter");
+            menu.command("/" + label + " reload", "Reload config.yml");
+        }
+        menu.note("&7A fight lasts &f" + CombatPlugin.seconds(plugin.settings().combatMs())
+                + "s &7after the last hit. " + (plugin.settings().logout() == io.github.drepfy.combat.config.Settings.LogoutRule.KILL
+                ? "Logging out in combat kills you." : "Logging out does not end it."));
+        menu.send(sender);
+    }
+
     private void status(CommandSender sender, Player player) {
         long combat = plugin.combatRemaining(player);
         send(sender, combat > 0 ? Text.format(plugin.message("status-combat"), "seconds", CombatPlugin.seconds(combat))
@@ -209,10 +231,15 @@ final class CombatCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> options = new ArrayList<>();
         if (!sender.hasPermission(ADMIN)) {
+            if (args.length == 1) {
+                options.add("help");
+            }
+            String typed = args[args.length - 1].toLowerCase(Locale.ROOT);
+            options.removeIf(option -> !option.startsWith(typed));
             return options;
         }
         if (args.length == 1) {
-            options.addAll(List.of("info", "tag", "untag", "zone", "reload"));
+            options.addAll(List.of("help", "info", "tag", "untag", "zone", "reload"));
         } else if (args[0].equalsIgnoreCase("zone")) {
             if (args.length == 2) {
                 options.addAll(List.of("create", "pos1", "pos2", "delete", "list"));

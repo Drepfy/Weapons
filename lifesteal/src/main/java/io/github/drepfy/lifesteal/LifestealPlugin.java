@@ -8,6 +8,7 @@ import io.github.drepfy.lifesteal.config.Settings;
 import io.github.drepfy.lifesteal.config.SettingsLoader;
 import io.github.drepfy.lifesteal.data.LifestealStore;
 import io.github.drepfy.lifesteal.heart.CrafterListener;
+import io.github.drepfy.lifesteal.heart.HeartEffects;
 import io.github.drepfy.lifesteal.heart.HeartItemListener;
 import io.github.drepfy.lifesteal.heart.HeartItems;
 import io.github.drepfy.lifesteal.heart.HeartRecipe;
@@ -76,10 +77,11 @@ public class LifestealPlugin extends JavaPlugin implements Listener {
         alts = new AltProtection(this::settings, store, this::now, getLogger());
         recipe = new HeartRecipe(this, items);
         recipe.apply(settings);
-        itemListener = new HeartItemListener(this::settings, items, hearts, this::now, this::log);
+        HeartEffects effects = new HeartEffects(this::settings);
+        itemListener = new HeartItemListener(this::settings, items, hearts, effects, this::now, this::log);
 
         getServer().getPluginManager().registerEvents(new KillListener(this, this::settings, store, hearts, alts,
-                this::now, this::log), this);
+                effects, this::now, this::log), this);
         getServer().getPluginManager().registerEvents(itemListener, this);
         if (Compat.classExists("org.bukkit.event.block.CrafterCraftEvent")) {
             getServer().getPluginManager().registerEvents(new CrafterListener(items), this);
@@ -89,6 +91,13 @@ public class LifestealPlugin extends JavaPlugin implements Listener {
         register("withdraw", new WithdrawCommand(this::settings, hearts, this::log));
         register("hearts", new HeartsCommand(this::settings, store, hearts));
         register("lifesteal", new LifestealCommand(this));
+        if (getServer().getPluginManager().isPluginEnabled("PlaceholderAPI")) {
+            try {
+                io.github.drepfy.lifesteal.hook.LifestealPlaceholders.hook(this);
+            } catch (LinkageError | RuntimeException e) {
+                getLogger().warning("Could not add the PlaceholderAPI placeholders: " + e);
+            }
+        }
 
         preparePack();
         getServer().getServicesManager().register(LifestealPlugin.class, this, this, ServicePriority.Normal);
@@ -158,6 +167,7 @@ public class LifestealPlugin extends JavaPlugin implements Listener {
 
     private Settings readSettings(boolean reloading) {
         File file = new File(getDataFolder(), "config.yml");
+        io.github.drepfy.lifesteal.config.ConfigUpgrade.upgrade(file.toPath(), getLogger());
         YamlConfiguration yaml = new YamlConfiguration();
         try {
             yaml.load(file);

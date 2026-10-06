@@ -87,6 +87,17 @@ alt-protection:
 # Every heart change in logs/lifesteal.log.
 log-to-file: true
 
+# What players see and hear when hearts change hands.
+effects:
+  # A title in the middle of the screen: "+1 ❤" for the killer, "-1 ❤" for the player who lost it
+  # (also when a Heart item is used). The words are title-gain, title-lose and the subtitles below.
+  titles: true
+  # Hearts float up round a player who gains one (everyone near sees them).
+  particles: true
+  # "<sound> <volume> <pitch>", any Minecraft sound, or "" for none.
+  sound-gain: "entity.player.levelup 0.7 1.4"
+  sound-lose: "block.respawn_anchor.deplete 0.8 1.3"
+
 # Placeholders: {killer} {victim} {player} {hearts} {min} {max} {time} {count} {s} {available} {input} {reason}
 messages:
   steal-killer: "&7You stole a heart from &c{victim}&7. You now have &c{hearts} &7hearts."
@@ -100,6 +111,12 @@ messages:
   alt-victim: "&7You did not lose a heart: this kill was not counted by the alt account protection."
   alt-staff: "&8[&cLifesteal&8] &7{killer} killed {victim}, not counted: &f{reason}"
   natural-death: "&7You lost a heart. You now have &c{hearts} &7hearts."
+  # Titles (effects.titles). "" leaves that line empty.
+  title-gain: "&c+{count} ❤"
+  title-lose: "&4-{count} ❤"
+  subtitle-stolen: "&7stolen from &f{victim}"
+  subtitle-taken: "&7taken by &f{killer}"
+  subtitle-hearts: "&7You now have &c{hearts} &7hearts"
   consume: "&7You used &c{count} &7Heart{s}. You now have &c{hearts} &7hearts."
   consume-at-max: "&cYou already have the maximum of {max} hearts."
   withdraw-success: "&7You withdrew &c{count} &7heart{s}. You now have &c{hearts} &7hearts."

@@ -4,6 +4,7 @@ main: io.github.drepfy.lifesteal.LifestealPlugin
 api-version: '1.20'
 description: Steal hearts from the players you kill. Heart items, /withdraw, cooldowns and alt account protection.
 authors: [Drepfy]
+softdepend: [PlaceholderAPI]
 
 commands:
   withdraw:

@@ -260,6 +260,28 @@ and Flight never flagged. Cause, found by making the tests behave like Paper:
   (`upgrade/config-2.5.yml`).
 - Tests: 179 (fake Discord HTTP server, fake WebSocket, ticket scenarios).
 
+## 2.7.0 (with Lifesteal 1.1.0, Combat 1.3.0, Legendary 1.6.1): 1.21.11 check and polish
+
+- Every plugin was compiled against the real Paper 1.21.11 API (built from Paper's
+  `ver/1.21.11` sources): no errors, and the bytecode is identical to the 1.21.4 build, so
+  the jars run unchanged on 1.21.11. The only API marked for removal still in use
+  (`GameRule.FALL_DAMAGE`) is an alias on 1.21.11 and falls back safely if it goes.
+- Anti ESP: copper chests (every oxidised and waxed kind) and shelves (1.21.9+) are hidden
+  like chests.
+- `/ac` shows a help page with every command the sender may use (Vigil's moderation and
+  ticket commands too), clickable and with hover text, like the other plugins' pages.
+- Combat: a player who logged out in combat more than 5 seconds after the last hit died
+  without a killer (the game forgets attackers after 5 s), so their attacker got no kill
+  and, with Lifesteal, no heart. The latest online opponent now gets the kill. Also: sounds
+  for getting into and out of combat, `/combat help` for everyone (it said "no
+  permission"), PlaceholderAPI placeholders.
+- Lifesteal: titles, sounds and floating hearts when hearts change hands, PlaceholderAPI
+  placeholders (hearts, limits, top 10), new settings added to old configs with comments.
+- Legendary: `/auction list` and `/auctionhouse list` (the server's /ah script accepts
+  them) are refused while holding a legendary, like `/ah sell`.
+- Skripts: every syntax checked against the current Skript (2.16) and SkBee sources.
+- Tests: Vigil 180, Lifesteal 37, Combat 39, Legendary 65.
+
 ## Remaining / next steps
 
 - Validate on a live server with a hacked client on an alt (see the README

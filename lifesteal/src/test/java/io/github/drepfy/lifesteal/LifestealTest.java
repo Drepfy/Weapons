@@ -39,6 +39,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Every rule of the plugin on a simulated server. */
@@ -166,6 +167,77 @@ class LifestealTest {
         assertEquals(18.0, alex.getHealth(), "respawned with full (fewer) hearts");
         assertTrue(has(messages(steve), "You stole a heart from Alex. You now have 11 hearts."));
         assertTrue(has(messages(alex), "Steve stole one of your hearts. You now have 9 hearts."));
+    }
+
+    @Test
+    void aStolenHeartShowsATitleAndPlaysASound() {
+        PlayerMock steve = player("Steve");
+        PlayerMock alex = player("Alex");
+        kill(steve, alex);
+        assertEquals("+1 ❤", ChatColor.stripColor(steve.nextTitle()));
+        assertEquals("stolen from Alex", ChatColor.stripColor(steve.nextSubTitle()));
+        assertEquals("-1 ❤", ChatColor.stripColor(alex.nextTitle()));
+        assertEquals("taken by Steve", ChatColor.stripColor(alex.nextSubTitle()));
+        assertTrue(steve.getHeardSounds().stream().anyMatch(s -> s.getSound().equals("entity.player.levelup")),
+                "the killer hears it");
+        assertTrue(alex.getHeardSounds().stream().anyMatch(s -> s.getSound().equals("block.respawn_anchor.deplete")),
+                "the victim hears it");
+
+        // A Heart item: a title with the new total.
+        steve.getInventory().setItemInMainHand(plugin.items().create(1));
+        rightClick(steve);
+        assertEquals("+1 ❤", ChatColor.stripColor(steve.nextTitle()));
+        assertEquals("You now have 12 hearts", ChatColor.stripColor(steve.nextSubTitle()));
+    }
+
+    @Test
+    void titlesAndSoundsCanBeTurnedOff() throws Exception {
+        plugin.getConfig().set("effects.titles", false);
+        plugin.getConfig().set("effects.sound-gain", "");
+        plugin.getConfig().set("effects.sound-lose", "nonsense 9000 lots");
+        plugin.saveConfig();
+        List<String> warnings = plugin.reload();
+        assertEquals(1, warnings.size(), "the broken sound is reported: " + warnings);
+        assertTrue(warnings.get(0).contains("effects.sound-lose"));
+        PlayerMock steve = player("Steve");
+        PlayerMock alex = player("Alex");
+        kill(steve, alex);
+        assertNull(steve.nextTitle());
+        assertNull(alex.nextTitle());
+        assertTrue(steve.getHeardSounds().stream().noneMatch(s -> s.getSound().equals("entity.player.levelup")));
+        assertTrue(alex.getHeardSounds().stream().anyMatch(s -> s.getSound().equals("block.respawn_anchor.deplete")),
+                "the broken sound falls back to the default");
+    }
+
+    @Test
+    void placeholdersForScoreboardsAndHolograms() throws Exception {
+        PlayerMock steve = player("Steve");
+        PlayerMock alex = player("Alex");
+        kill(steve, alex);
+        io.github.drepfy.lifesteal.hook.LifestealPlaceholders placeholders =
+                new io.github.drepfy.lifesteal.hook.LifestealPlaceholders(plugin);
+        placeholders.refresh();
+        assertEquals("lifesteal", placeholders.getIdentifier());
+        assertTrue(placeholders.persist(), "survives /papi reload");
+        assertEquals("11", placeholders.onRequest(steve, "hearts"));
+        assertEquals("9", placeholders.onRequest(alex, "HEARTS"));
+        assertEquals("20", placeholders.onRequest(null, "max"));
+        assertEquals("3", placeholders.onRequest(null, "min"));
+        assertEquals("Steve", placeholders.onRequest(null, "top_1_name"));
+        assertEquals("11", placeholders.onRequest(null, "top_1_hearts"));
+        assertEquals("Alex", placeholders.onRequest(null, "top_2_name"));
+        assertEquals("-", placeholders.onRequest(null, "top_3_name"), "nobody third yet");
+        assertEquals("0", placeholders.onRequest(null, "top_3_hearts"));
+        assertNull(placeholders.onRequest(steve, "nonsense"), "not ours");
+        assertNull(placeholders.onRequest(null, "top_11_name"));
+        assertNull(placeholders.onRequest(null, "top_x_name"));
+        assertEquals("", placeholders.onRequest(null, "hearts"), "no player");
+        // Scoreboard plugins often ask from their own thread: the value of the last second.
+        String[] asked = new String[1];
+        Thread other = new Thread(() -> asked[0] = placeholders.onRequest(steve, "hearts"));
+        other.start();
+        other.join();
+        assertEquals("11", asked[0]);
     }
 
     @Test

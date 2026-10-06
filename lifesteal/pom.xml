@@ -6,7 +6,7 @@
 
     <groupId>io.github.drepfy</groupId>
     <artifactId>lifesteal</artifactId>
-    <version>1.0.1</version>
+    <version>1.1.0</version>
     <packaging>jar</packaging>
 
     <name>Lifesteal</name>
@@ -90,6 +90,13 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
                 <version>3.4.1</version>
+                <configuration>
+                    <!-- PlaceholderAPI's classes are only compiled against (see src/main/java/me/clip):
+                         the server's PlaceholderAPI provides the real ones. -->
+                    <excludes>
+                        <exclude>me/clip/**</exclude>
+                    </excludes>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

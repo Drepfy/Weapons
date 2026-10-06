@@ -3,6 +3,7 @@ package io.github.drepfy.combat;
 import io.github.drepfy.combat.config.ConfigUpgrade;
 import io.github.drepfy.combat.config.Settings;
 import io.github.drepfy.combat.config.SettingsLoader;
+import io.github.drepfy.combat.hook.CombatPlaceholders;
 import io.github.drepfy.combat.util.ActionBar;
 import io.github.drepfy.combat.util.Text;
 import org.bukkit.Bukkit;
@@ -92,6 +93,13 @@ public class CombatPlugin extends JavaPlugin {
             pluginCommand.setTabCompleter(command);
         }
         getServer().getServicesManager().register(CombatPlugin.class, this, this, ServicePriority.Normal);
+        if (getServer().getPluginManager().isPluginEnabled("PlaceholderAPI")) {
+            try {
+                CombatPlaceholders.hook(this);
+            } catch (LinkageError | RuntimeException e) {
+                getLogger().warning("Could not add the PlaceholderAPI placeholders: " + e);
+            }
+        }
 
         for (Player player : Bukkit.getOnlinePlayers()) {
             loggedIn(player); // After /reload.
@@ -148,6 +156,7 @@ public class CombatPlugin extends JavaPlugin {
             ActionBar.clear(player);
             if (tell && wasTold) {
                 send(player, "combat-end");
+                play(player, settings.sounds().end());
             }
         }
     }
@@ -170,6 +179,7 @@ public class CombatPlugin extends JavaPlugin {
                 }
             }
             getLogger().info(player.getName() + " logged out in combat and was killed.");
+            creditKill(player, now);
             loggingOut.add(uuid);
             try {
                 player.setHealth(0.0);
@@ -182,6 +192,48 @@ public class CombatPlugin extends JavaPlugin {
         lastRefusal.remove(uuid);
         lastNotice.keySet().removeIf(key -> key.startsWith(uuid + ":"));
         dirty = true;
+    }
+
+    /** The name of the player this one fought last, while still in combat (null if none). */
+    public String lastOpponent(Player player) {
+        UUID latest = null;
+        long longest = 0;
+        for (Map.Entry<UUID, Long> fight : tracker.opponents(player.getUniqueId(), now()).entrySet()) {
+            if (fight.getValue() > longest) {
+                latest = fight.getKey();
+                longest = fight.getValue();
+            }
+        }
+        if (latest == null) {
+            return null;
+        }
+        return latest.equals(CombatTracker.STAFF) ? "staff" : Bukkit.getOfflinePlayer(latest).getName();
+    }
+
+    /**
+     * The game only remembers who hit a player for 5 seconds. Someone who logs out later in the
+     * fight still dies at the hands of their latest opponent (kill credit, a stolen heart).
+     */
+    private void creditKill(Player player, long now) {
+        if (player.getKiller() != null) {
+            return;
+        }
+        Player opponent = null;
+        long latest = Long.MIN_VALUE;
+        for (Map.Entry<UUID, Long> fight : tracker.opponents(player.getUniqueId(), now).entrySet()) {
+            Player other = fight.getKey().equals(CombatTracker.STAFF) ? null : Bukkit.getPlayer(fight.getKey());
+            if (other != null && other.isOnline() && !other.isDead() && fight.getValue() > latest) {
+                opponent = other;
+                latest = fight.getValue();
+            }
+        }
+        if (opponent != null) {
+            try {
+                player.setKiller(opponent);
+            } catch (LinkageError | RuntimeException ignored) {
+                // Spigot has no setKiller: the death counts without a killer there.
+            }
+        }
     }
 
     void loggedIn(Player player) {
@@ -206,6 +258,7 @@ public class CombatPlugin extends JavaPlugin {
                     ActionBar.clear(player);
                 }
                 send(player, "combat-end");
+                play(player, settings.sounds().end());
             }
             dirty = true;
         }
@@ -217,6 +270,7 @@ public class CombatPlugin extends JavaPlugin {
             }
             if (tracker.announce(uuid)) {
                 send(player, "combat-start");
+                play(player, settings.sounds().start());
             }
             if (barClaimed(player)) {
                 // Another plugin shows the combat time in its own bar (Legendary weapons).
@@ -459,6 +513,17 @@ public class CombatPlugin extends JavaPlugin {
         }
     }
 
+    private static void play(Player player, io.github.drepfy.combat.config.Settings.SoundSpec sound) {
+        if (sound == null) {
+            return;
+        }
+        try {
+            player.playSound(player.getLocation(), sound.key(), sound.volume(), sound.pitch());
+        } catch (RuntimeException | LinkageError ignored) {
+            // Only a sound.
+        }
+    }
+
     /** Paper knows when the server is shutting down (everyone is kicked, nobody logged out to escape). */
     private static boolean serverStopping() {
         try {
@@ -468,7 +533,7 @@ public class CombatPlugin extends JavaPlugin {
         }
     }
 
-    static int seconds(long millis) {
+    public static int seconds(long millis) {
         return (int) ((millis + 999) / 1000);
     }
 

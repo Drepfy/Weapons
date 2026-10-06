@@ -79,32 +79,37 @@ public final class LegendaryCommand implements TabExecutor {
         return false;
     }
 
+    @SuppressWarnings("deprecation") // getDescription(): Paper's replacement is not on Spigot.
     private void help(CommandSender sender, String label) {
-        line(sender, "&6&lLegendary Weapons");
+        io.github.drepfy.legendary.util.HelpMenu menu = new io.github.drepfy.legendary.util.HelpMenu(
+                "&6&lʟᴇɢᴇɴᴅᴀʀʏ &8| &7v" + plugin.getDescription().getVersion());
         Settings.Controls controls = plugin.settings().controls();
-        line(sender, "&7" + controls.key() + " &8» &fthe weapon's first ability");
-        line(sender, "&7" + controls.sneakKey() + " &8» &fits second ability");
+        menu.note("&f" + controls.key() + " &8» &7the weapon's first ability");
+        menu.note("&f" + controls.sneakKey() + " &8» &7its second ability");
         if (controls.offhand()) {
-            line(sender, "&8(F is your swap-offhand key; the weapon stays in your hand)");
+            menu.note("&8(F is your swap-offhand key; the weapon stays in your hand)");
         }
-        line(sender, "&7Cooldowns show as bars at the top of your screen while you hold one.");
-        line(sender, "&7They cannot go in containers, bundles or item frames, and drop when you die.");
+        menu.note("&7Cooldowns show as bars at the top of your screen.");
+        menu.note("&7They cannot go in containers, bundles or item frames, and drop when you die.");
         if (sender.hasPermission("legendary.give")) {
-            line(sender, "&f/" + label + " give <player> <weapon> &8- &7give a legendary");
+            menu.command("/" + label + " give <player> <weapon>", "Give a legendary");
         }
         if (sender.hasPermission("legendary.remove")) {
-            line(sender, "&f/" + label + " remove <player|*> <weapon|all> &8- &7take one away (also offline)");
+            menu.command("/" + label + " remove <player|*> <weapon|all>", "Take one away (also from offline players)");
         }
         if (sender.hasPermission("legendary.list")) {
-            line(sender, "&f/" + label + " list &8- &7every legendary and where it is");
+            menu.command("/" + label + " list", "Every legendary and where it is");
         }
         if (sender.hasPermission("legendary.inspect")) {
-            line(sender, "&f/" + label + " inspect <player> &8- &7a player's legendaries and cooldowns");
+            menu.command("/" + label + " inspect <player>", "A player's legendaries and cooldowns");
         }
         if (sender.hasPermission("legendary.reload")) {
-            line(sender, "&f/" + label + " reload &8- &7reload config.yml");
+            menu.command("/" + label + " reload", "Reload config.yml");
         }
-        line(sender, "&7Weapons: &f" + weaponKeys());
+        if (sender.hasPermission("legendary.give") || sender.hasPermission("legendary.remove")) {
+            menu.note("&7Weapons: &f" + weaponKeys());
+        }
+        menu.send(sender);
     }
 
     private static void line(CommandSender sender, String text) {

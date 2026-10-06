@@ -22,11 +22,25 @@ public record Settings(long combatMs,
                        long pearlMs,
                        boolean pearlOverlay,
                        Zones zones,
+                       Sounds sounds,
                        Messages messages,
                        List<String> warnings) {
 
     public Settings {
         warnings = List.copyOf(warnings);
+    }
+
+    /**
+     * Sounds for the player concerned (null = none).
+     *
+     * @param start when they get into combat (once, not on every hit)
+     * @param end   when their combat time runs out (or staff end it)
+     */
+    public record Sounds(SoundSpec start, SoundSpec end) {
+    }
+
+    /** A vanilla (or resource pack) sound by its key, e.g. {@code block.note_block.bass}. */
+    public record SoundSpec(String key, float volume, float pitch) {
     }
 
     /**

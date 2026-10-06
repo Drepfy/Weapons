@@ -9,6 +9,7 @@ import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.EnderPearl;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Player;
 import org.bukkit.entity.Zombie;
 import org.bukkit.event.Event;
 import org.bukkit.event.block.Action;
@@ -34,6 +35,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The combat timer and Ender Pearl cooldown on a simulated server. */
@@ -341,6 +343,85 @@ class CombatTest {
         hit(alex, sam);
         sam.kick();
         assertFalse(sam.isDead());
+    }
+
+    @Test
+    void everyoneGetsAClickableHelpPage() {
+        PlayerMock steve = player("Steve");
+        steve.performCommand("combat help");
+        List<Component> lines = new ArrayList<>();
+        Component line;
+        while ((line = steve.nextComponentMessage()) != null) {
+            lines.add(line);
+        }
+        List<String> text = lines.stream().map(c -> PlainTextComponentSerializer.plainText().serialize(c)).toList();
+        assertTrue(text.stream().anyMatch(t -> t.contains("ᴄᴏᴍʙᴀᴛ")), "a title: " + text);
+        assertTrue(text.stream().anyMatch(t -> t.contains("/combat » Your combat time")), text.toString());
+        assertFalse(text.stream().anyMatch(t -> t.contains("permission")), "not refused: " + text);
+        assertFalse(text.stream().anyMatch(t -> t.contains("/combat reload")), "staff commands stay hidden");
+        Component command = lines.stream().filter(c -> PlainTextComponentSerializer.plainText().serialize(c)
+                .contains("/combat »")).findFirst().orElseThrow();
+        assertEquals(net.kyori.adventure.text.event.ClickEvent.Action.SUGGEST_COMMAND, command.clickEvent().action());
+        assertEquals("/combat ", command.clickEvent().value(), "a click types the command");
+        assertTrue(PlainTextComponentSerializer.plainText().serialize(command.hoverEvent().asHoverEvent().value()
+                instanceof Component hover ? hover : Component.empty()).contains("Click to type it"));
+
+        PlayerMock staff = player("Staff");
+        staff.setOp(true);
+        staff.performCommand("combat");
+        chat(staff);
+        staff.performCommand("combat nonsense");
+        List<String> staffHelp = chat(staff);
+        assertTrue(staffHelp.stream().anyMatch(t -> t.contains("/combat reload")), "a wrong command shows the help: " + staffHelp);
+        assertEquals(List.of("help"), server.getCommandMap().getCommand("combat").tabComplete(steve, "combat", new String[] {""}));
+    }
+
+    @Test
+    void placeholdersForScoreboards() throws Exception {
+        PlayerMock steve = player("Steve");
+        PlayerMock alex = player("Alex");
+        io.github.drepfy.combat.hook.CombatPlaceholders placeholders = new io.github.drepfy.combat.hook.CombatPlaceholders(plugin);
+        assertEquals("combat", placeholders.getIdentifier());
+        assertEquals("false", placeholders.onRequest(steve, "in_combat"));
+        assertEquals("0", placeholders.onRequest(steve, "time"));
+        assertEquals("", placeholders.onRequest(steve, "opponent"));
+        hit(alex, steve);
+        seconds(5);
+        assertEquals("true", placeholders.onRequest(steve, "in_combat"));
+        assertEquals("55", placeholders.onRequest(steve, "TIME"));
+        assertEquals("Alex", placeholders.onRequest(steve, "opponent"));
+        assertEquals("0", placeholders.onRequest(steve, "pearl"));
+        assertNull(placeholders.onRequest(steve, "nonsense"), "not ours");
+        assertEquals("false", placeholders.onRequest(null, "in_combat"), "no player");
+        // From another thread: the values read on the server thread.
+        placeholders.refresh();
+        String[] asked = new String[1];
+        Thread other = new Thread(() -> asked[0] = placeholders.onRequest(steve, "time"));
+        other.start();
+        other.join();
+        assertEquals("55", asked[0]);
+    }
+
+    @Test
+    void loggingOutLongAfterTheLastHitStillGivesTheKill() {
+        PlayerMock steve = player("Steve");
+        PlayerMock alex = player("Alex");
+        PlayerMock sam = player("Sam");
+        List<Player> killers = new ArrayList<>();
+        server.getPluginManager().registerEvents(new org.bukkit.event.Listener() {
+            @org.bukkit.event.EventHandler(priority = org.bukkit.event.EventPriority.MONITOR)
+            public void onDeath(PlayerDeathEvent event) {
+                killers.add(event.getEntity().getKiller());
+            }
+        }, plugin);
+        hit(sam, steve);
+        seconds(10);
+        hit(alex, steve); // Alex is the latest opponent.
+        seconds(20); // Far longer than the 5 seconds the game remembers the attacker for.
+        assertNull(steve.getKiller(), "the game itself has forgotten who hit Steve");
+        steve.disconnect();
+        assertTrue(steve.isDead());
+        assertEquals(List.of(alex), killers, "the latest opponent gets the kill (and the heart)");
     }
 
     @Test
@@ -850,6 +931,41 @@ class CombatTest {
         assertEquals(upgraded, io.github.drepfy.combat.config.ConfigUpgrade.upgrade(upgraded), "only once");
         String chosen = upgraded.replace("block-commands: true", "block-commands: false").replace("logout: kill", "logout: keep");
         assertEquals(chosen, io.github.drepfy.combat.config.ConfigUpgrade.upgrade(chosen), "later choices are kept");
+    }
+
+    @Test
+    void aConfigFrom12GetsTheSoundsAndIsThenTheNewDefault() throws Exception {
+        String current = new String(CombatTest.class.getResourceAsStream("/config.yml").readAllBytes(),
+                java.nio.charset.StandardCharsets.UTF_8);
+        String old = current.replace(io.github.drepfy.combat.config.ConfigUpgrade.SOUNDS_BLOCK, "");
+        assertFalse(old.contains("sounds:"), "a 1.2 config");
+        assertEquals(current, io.github.drepfy.combat.config.ConfigUpgrade.upgrade(old), "exactly the new default");
+        assertEquals(current, io.github.drepfy.combat.config.ConfigUpgrade.upgrade(current), "only once");
+    }
+
+    @Test
+    void enteringAndLeavingCombatPlaysASound() throws Exception {
+        PlayerMock steve = player("Steve");
+        PlayerMock alex = player("Alex");
+        hit(alex, steve);
+        tick(1);
+        assertTrue(steve.getHeardSounds().stream().anyMatch(s -> s.getSound().equals("block.note_block.bass")));
+        int heard = steve.getHeardSounds().size();
+        hit(alex, steve);
+        tick(1);
+        assertEquals(heard, steve.getHeardSounds().size(), "only when combat starts, not on every hit");
+        seconds(61);
+        assertTrue(steve.getHeardSounds().stream().anyMatch(s -> s.getSound().equals("entity.experience_orb.pickup")),
+                "when it runs out");
+
+        plugin.getConfig().set("sounds.combat-start", "");
+        plugin.getConfig().set("sounds.combat-end", "not a sound at all");
+        plugin.saveConfig();
+        List<String> warnings = plugin.reload();
+        assertEquals(1, warnings.size(), warnings.toString());
+        assertTrue(warnings.get(0).startsWith("sounds.combat-end"));
+        assertEquals(null, plugin.settings().sounds().start(), "\"\" = no sound");
+        assertEquals("entity.experience_orb.pickup", plugin.settings().sounds().end().key(), "a broken one falls back");
     }
 
     @Test

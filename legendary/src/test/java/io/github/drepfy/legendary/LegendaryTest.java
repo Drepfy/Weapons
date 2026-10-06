@@ -524,7 +524,8 @@ class LegendaryTest {
     void sellCommandsAreRefusedForTheLegendaryOnly() {
         PlayerMock steve = player("Steve", 0, 0);
         ItemStack axe = give(steve, WeaponType.GRAVEBREAKER);
-        for (String line : List.of("/sell hand", "/ah sell 1k", "/essentials:sellhand", "/auction sell 10m")) {
+        for (String line : List.of("/sell hand", "/ah sell 1k", "/essentials:sellhand", "/auction sell 10m",
+                "/auction list 5k", "/auctionhouse list 2m", "/AH LIST 1k")) {
             PlayerCommandPreprocessEvent held = new PlayerCommandPreprocessEvent(steve, line);
             server.getPluginManager().callEvent(held);
             assertTrue(held.isCancelled(), line + " with the legendary in hand");
@@ -1738,6 +1739,21 @@ class LegendaryTest {
         assertEquals(List.of("When in Main Hand:", " 14 Attack Damage", " 1 Attack Speed"),
                 lore.subList(lore.size() - 3, lore.size()), String.join("\n", lore));
         assertTrue(axe.hasItemFlag(ItemFlag.HIDE_ATTRIBUTES));
+    }
+
+    @Test
+    void anOldBlockedCommandListGetsTheAuctionListCommands() {
+        plugin.getConfig().set("blocked-commands",
+                List.of("ah sell", "ah list", "auction sell", "auctionhouse sell", "sell", "sellhand", "sellall"));
+        plugin.saveConfig();
+        assertEquals(List.of(), plugin.reload());
+        assertTrue(plugin.settings().blockedCommands().containsAll(List.of("auction list", "auctionhouse list")),
+                "the unchanged old list is brought up to date: " + plugin.settings().blockedCommands());
+        // A list the owner changed is kept as it is.
+        plugin.getConfig().set("blocked-commands", List.of("ah sell", "shop sell"));
+        plugin.saveConfig();
+        plugin.reload();
+        assertEquals(List.of("ah sell", "shop sell"), plugin.settings().blockedCommands());
     }
 
     @Test

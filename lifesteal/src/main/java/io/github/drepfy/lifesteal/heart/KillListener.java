@@ -39,16 +39,18 @@ public final class KillListener implements Listener {
     private final LifestealStore store;
     private final HeartService hearts;
     private final AltProtection alts;
+    private final HeartEffects effects;
     private final LongSupplier clock;
     private final Consumer<String> log;
 
     public KillListener(Plugin plugin, Supplier<Settings> settings, LifestealStore store, HeartService hearts,
-                        AltProtection alts, LongSupplier clock, Consumer<String> log) {
+                        AltProtection alts, HeartEffects effects, LongSupplier clock, Consumer<String> log) {
         this.plugin = plugin;
         this.settings = settings;
         this.store = store;
         this.hearts = hearts;
         this.alts = alts;
+        this.effects = effects;
         this.clock = clock;
         this.log = log;
     }
@@ -124,12 +126,14 @@ public final class KillListener implements Listener {
 
         if (gain > 0) {
             send(killer, config.messages().get("steal-killer"), "victim", victim.getName(), "hearts", killerAfter);
+            effects.gained(killer, gain, victim.getName(), killerAfter);
         }
         if (dropped > 0) {
             send(killer, config.messages().get("steal-killer-at-max"), "victim", victim.getName(),
                     "max", config.maxHearts());
         }
         send(victim, config.messages().get("steal-victim"), "killer", killer.getName(), "hearts", victimAfter);
+        effects.lost(victim, take, killer.getName(), victimAfter);
         log.accept(killer.getName() + " killed " + victim.getName() + ": " + victim.getName() + " " + victimHearts
                 + " -> " + victimAfter + ", " + killer.getName() + " " + killerBefore + " -> " + killerAfter
                 + (dropped > 0 ? ", " + dropped + " Heart item(s) dropped" : ""));
@@ -146,6 +150,7 @@ public final class KillListener implements Listener {
         }
         int after = hearts.set(victim, before - take, false);
         send(victim, config.messages().get("natural-death"), "hearts", after);
+        effects.lost(victim, take, null, after);
         log.accept(victim.getName() + " died: " + before + " -> " + after);
     }
 

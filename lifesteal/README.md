@@ -22,13 +22,19 @@ heart; lose one when you are killed.
 - **Crafting**: 6 diamond blocks, 2 netherite ingots and a nether star make one Heart.
 - **Alt account protection**: kills between accounts of the same person never move
   hearts (both keep theirs). See "Alt accounts".
+- **Feels like a heart changed hands**: the killer sees **+1 ❤** in the middle of the
+  screen ("stolen from Alex"), hears a level-up chime and hearts float up round them; the
+  victim sees **-1 ❤** ("taken by Steve"). Using a Heart item shows the new total. Titles,
+  particles and both sounds can be changed or switched off (`effects`).
+- **PlaceholderAPI**: `%lifesteal_hearts%`, the top 10 and the limits for scoreboards, tab
+  lists and holograms (see "Placeholders").
 - Everything is configurable, every message can be changed, and every heart change is
   logged.
 
 ## Install
 
-1. Put `Lifesteal.jar` in `plugins/` and restart. Works on Paper or Spigot 1.20-1.21.x
-   (Java 17+).
+1. Put `Lifesteal.jar` in `plugins/` and restart. Works on Paper or Spigot 1.20 to 1.21.11
+   (Java 17+; built and checked against the 1.21.11 API).
 2. Optional: set up the Heart texture (see "Resource pack").
 3. Optional: edit `plugins/Lifesteal/config.yml`, then `/lifesteal reload`.
 
@@ -69,7 +75,8 @@ Right-clicking a chest, door or button with a Heart in your hand uses the block 
 | `/lifesteal alts allow\|disallow <player> <player>` | `lifesteal.admin.alts` | op | Treat two accounts on one IP as different people (siblings) |
 | `/lifesteal reload` | `lifesteal.admin.reload` | op | Reload `config.yml` |
 
-`/lifesteal` also works as `/ls`. `lifesteal.admin` gives every staff command, and
+`/lifesteal` on its own shows a help page with the commands you may use (click one to type
+it, hover for what it does). It also works as `/ls`. `lifesteal.admin` gives every staff command, and
 `lifesteal.notify` (included) tells staff when a kill is not counted because of alt
 protection. Hearts are always kept between 3 and 20, even when staff set them.
 
@@ -117,6 +124,21 @@ from the zip into yours (the ᴠᴀɴɪʟʟᴀ sᴍᴘ server pack already has t
 rebuilds the zip. If you change `heart-item.custom-model-data` or `heart-item.material`,
 change the pack to match.
 
+## Placeholders
+
+With [PlaceholderAPI](https://www.spigotmc.org/resources/6245/) installed (optional), these
+work in any plugin that shows placeholders (scoreboards, TAB, holograms, chat):
+
+| Placeholder | Shows |
+|---|---|
+| `%lifesteal_hearts%` | The player's hearts |
+| `%lifesteal_max%`, `%lifesteal_min%`, `%lifesteal_start%` | The limits in `config.yml` |
+| `%lifesteal_top_1_name%` ... `%lifesteal_top_10_name%` | Who has the most hearts (`-` if nobody yet) |
+| `%lifesteal_top_1_hearts%` ... `%lifesteal_top_10_hearts%` | Their hearts |
+
+The top list is updated every second. Nothing to set up: the console says
+"PlaceholderAPI: ... are ready" when they are.
+
 ## Configuration
 
 See [`config.yml`](src/main/resources/config.yml); every option is explained there. The
@@ -128,7 +150,11 @@ cooldown: {time: 30m, both-directions: false}
 withdraw: {enabled: true, max-per-command: 17}
 recipe: {enabled: true, shape: [DND, DSD, DND], ingredients: {D: DIAMOND_BLOCK, N: NETHERITE_INGOT, S: NETHER_STAR}}
 alt-protection: {enabled: true, shared-ip: {remember: 30d, max-accounts-per-ip: 5}, min-playtime: 30m}
+effects: {titles: true, particles: true, sound-gain: "entity.player.levelup 0.7 1.4", sound-lose: "block.respawn_anchor.deplete 0.8 1.3"}
 ```
+
+Updating from 1.0: the new `effects` settings (and their messages) are added to your
+`config.yml` with their comments the first time; nothing you changed is touched.
 
 A wrong value never breaks the plugin: it falls back to its default and the console
 (and `/lifesteal reload`) says what to fix.
@@ -154,9 +180,11 @@ cd lifesteal
 mvn -B package   # runs the tests, writes target/Lifesteal-<version>.jar
 ```
 
-`mvn test` runs 33 tests on a simulated server (MockBukkit): stealing and the heart limits,
+`mvn test` runs 37 tests on a simulated server (MockBukkit): stealing and the heart limits,
+the titles and sounds (and switching them off),
 the drop at 20 hearts, the cooldown (per pair, ends after 30 minutes, kept across
 restarts), withdrawing (every invalid amount, full inventory), using Hearts (one, a stack,
 at the maximum, both hands, chests), Hearts not working as dye or in crafting, the recipe,
 every alt check (and that shared networks and local addresses are ignored), staff commands
-(also for offline players), saving and loading, and config validation.
+(also for offline players), the placeholders (also asked from another thread), saving and
+loading, config validation, and adding the new settings to an old config.

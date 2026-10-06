@@ -33,6 +33,7 @@ public record Settings(int startHearts,
                        Recipe recipe,
                        ResourcePack resourcePack,
                        AltProtection alts,
+                       Effects effects,
                        boolean logToFile,
                        Messages messages,
                        List<String> warnings) {
@@ -91,6 +92,21 @@ public record Settings(int startHearts,
      */
     public record AltProtection(boolean enabled, boolean sharedIp, long rememberIpMs, int maxAccountsPerIp,
                                 long minPlaytimeMs, boolean notifyStaff) {
+    }
+
+    /**
+     * What players see and hear when hearts change hands.
+     *
+     * @param titles    a title in the middle of the screen with the hearts won or lost
+     * @param particles hearts float up round a player who gains one (seen by everyone near)
+     * @param gain      played to a player who gains hearts (null = none)
+     * @param lose      played to a player who loses hearts (null = none)
+     */
+    public record Effects(boolean titles, boolean particles, SoundSpec gain, SoundSpec lose) {
+    }
+
+    /** A vanilla (or resource pack) sound by its key, e.g. {@code entity.player.levelup}. */
+    public record SoundSpec(String key, float volume, float pitch) {
     }
 
     public record Messages(Map<String, String> values) {

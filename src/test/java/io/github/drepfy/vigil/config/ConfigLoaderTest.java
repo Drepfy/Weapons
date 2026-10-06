@@ -36,6 +36,17 @@ class ConfigLoaderTest {
     }
 
     @Test
+    void newerStorageBlocksAreHiddenFromEsp() throws Exception {
+        List<String> blocks = ConfigLoader.load(bundled()).antiEsp().blocks();
+        for (String block : List.of("CHEST", "BARREL", "RED_SHULKER_BOX", "WHITE_BED", "COPPER_CHEST",
+                "WAXED_OXIDIZED_COPPER_CHEST", "EXPOSED_COPPER_CHEST", "OAK_SHELF", "PALE_OAK_SHELF")) {
+            assertTrue(io.github.drepfy.vigil.util.Glob.matchesAny(blocks, block), block + " is hidden: " + blocks);
+        }
+        assertFalse(io.github.drepfy.vigil.util.Glob.matchesAny(blocks, "STONE"));
+        assertFalse(io.github.drepfy.vigil.util.Glob.matchesAny(blocks, "COPPER_BLOCK"));
+    }
+
+    @Test
     void bundledConfigLoadsWithoutWarnings() throws Exception {
         Settings settings = ConfigLoader.load(bundled());
         assertEquals(List.of(), settings.warnings());

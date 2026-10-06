@@ -151,4 +151,23 @@ class StoreAndConfigTest {
         assertEquals("", Text.plural(1));
         assertEquals("s", Text.plural(2));
     }
+
+    @Test
+    void anOlderConfigGetsTheNewSettingsWithTheirComments() throws Exception {
+        String current;
+        try (java.io.InputStream in = getClass().getResourceAsStream("/config.yml")) {
+            current = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+        String old = current.replace(io.github.drepfy.lifesteal.config.ConfigUpgrade.EFFECTS_BLOCK, "")
+                .replaceAll("(?m)^  # Titles \\(effects.titles\\)[^\\n]*\\n", "")
+                .replaceAll("(?m)^  (title|subtitle)-[a-z-]+:[^\\n]*\\n", "");
+        org.junit.jupiter.api.Assertions.assertFalse(old.contains("effects:") || old.contains("title-gain"), "a 1.0 config");
+        org.junit.jupiter.api.Assertions.assertEquals(current, io.github.drepfy.lifesteal.config.ConfigUpgrade.upgrade(old),
+                "upgraded, it is the new default config exactly");
+        org.junit.jupiter.api.Assertions.assertEquals(current, io.github.drepfy.lifesteal.config.ConfigUpgrade.upgrade(current),
+                "only once");
+        String own = old.replace("per-kill: 1", "per-kill: 2");
+        org.junit.jupiter.api.Assertions.assertTrue(io.github.drepfy.lifesteal.config.ConfigUpgrade.upgrade(own)
+                .contains("per-kill: 2"), "the owner's settings are kept");
+    }
 }

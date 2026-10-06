@@ -46,6 +46,13 @@ safe-zones:
   show-border: true
   border-distance: 8
 
+# Sounds for the player concerned: "<sound> <volume> <pitch>", any Minecraft sound, or "" for none.
+sounds:
+  # When you get into combat (once, not on every hit).
+  combat-start: "block.note_block.bass 0.8 0.7"
+  # When your combat time runs out.
+  combat-end: "entity.experience_orb.pickup 0.6 1.2"
+
 # {seconds} = seconds left. Set a message to "" to turn it off.
 messages:
   # Above the hotbar while in combat, updated every second.

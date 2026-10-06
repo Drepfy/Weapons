@@ -21,6 +21,8 @@ Combat timer, Ender Pearl cooldown, elytra/riptide rules and safe zones for a co
   (`pearl-resets-timer: true`): pearling away does not shorten the fight.
 - Above the hotbar: `⚔ Combat: 60s`, `⚔ Combat: 45s`, `⚔ Combat: 10s`... updated every
   second. At 0 the bar disappears and the player is told "You are no longer in combat."
+- A short low note when you get into combat (once, not on every hit) and a chime when it
+  is over (`sounds`, or `""` for none).
 - Counts as a hit: melee, bows and crossbows, tridents, harmful splash and lingering potions
   (poison, harming, weakness, slowness...), TNT, end crystals and respawn anchors/beds the
   attacker set off, and the attacker's tamed wolves. Not: mobs, falling, your own arrows or
@@ -89,11 +91,12 @@ Creating a zone with a name that already exists replaces it.
 | Have someone else accept an old /tpa request | The teleport scripts check the `incombat` flag and cancel it |
 | Move items, swap hands, change hotbar slots | Nothing changes |
 | Teleport or change worlds | The timer keeps running |
-| Log out | **They die** where they logged out and drop everything on the floor, even when keepInventory is on (legendary weapons too); their attacker gets the kill. Kicked players, and everyone when the server stops, are never killed. With `logout: keep` the timer is paused instead and goes on when they come back |
+| Log out | **They die** where they logged out and drop everything on the floor, even when keepInventory is on (legendary weapons too); their latest opponent gets the kill (and with Lifesteal the heart), even when the last hit was long ago. Kicked players, and everyone when the server stops, are never killed. With `logout: keep` the timer is paused instead and goes on when they come back |
 | Server restart | Combat timers and pearl cooldowns are saved and restored |
 
 Updating from an older version changes `logout: keep` to `logout: kill` and adds the command
-settings to your `config.yml` once; after that your own choices are kept.
+settings and the sounds to your `config.yml` once, with their comments; after that your own
+choices are kept.
 
 ## Commands
 
@@ -106,7 +109,20 @@ settings to your `config.yml` once; after that your own choices are kept.
 | `/combat zone ...` | `combat.admin` | op | Create, list and delete safe zones (see above) |
 | `/combat reload` | `combat.admin` | op | Reload `config.yml` |
 
-`/combat` also works as `/ct`. There are no bypass permissions.
+`/combat help` (for everyone) shows the commands you may use: click one to type it, hover
+for what it does. `/combat` also works as `/ct`. There are no bypass permissions.
+
+## Placeholders
+
+With [PlaceholderAPI](https://www.spigotmc.org/resources/6245/) installed (optional), these
+work in any plugin that shows placeholders (scoreboards, TAB, chat):
+
+| Placeholder | Shows |
+|---|---|
+| `%combat_in_combat%` | `true` or `false` |
+| `%combat_time%` | Seconds of combat left (`0` when not in combat) |
+| `%combat_pearl%` | Seconds until the next Ender Pearl (`0` = ready) |
+| `%combat_opponent%` | The player they fought last (empty when not in combat) |
 
 ## Configuration
 
@@ -130,6 +146,9 @@ ender-pearl:
 safe-zones:
   show-border: true     # red particle wall for players in combat near a zone
   border-distance: 8
+sounds:
+  combat-start: "block.note_block.bass 0.8 0.7"
+  combat-end: "entity.experience_orb.pickup 0.6 1.2"
 messages:
   action-bar: "&c⚔ Combat: &f{seconds}s"
 ```
@@ -153,12 +172,14 @@ cd combat
 mvn -B package   # runs the tests, writes target/Combat-<version>.jar
 ```
 
-`mvn test` runs 34 tests on a simulated server: the action bar counting down and
+`mvn test` runs 39 tests on a simulated server: the action bar counting down and
 disappearing, every hit restarting the timer, arrows, TNT, end crystals, wolves and potions
 counting (and mobs, own arrows, healing potions and cancelled hits not), commands refused in
 combat (and /combat and the bypass allowed), the `incombat` flag for scripts, menus, item
-swapping, teleports and world changes not ending combat, logging out killing the player and dropping everything even with keepInventory (and
-kicked players spared), `logout: keep` pausing the timer, an old config being brought up to date, the armored/naked kill rule (including one-hit
+swapping, teleports and world changes not ending combat, logging out killing the player and dropping everything even with keepInventory (the latest
+opponent getting the kill long after the last hit, and
+kicked players spared), `logout: keep` pausing the timer, an old config being brought up to date (and a 1.2 one getting the sounds),
+the sounds, the help page for everyone, the placeholders (also asked from another thread), the armored/naked kill rule (including one-hit
 kills, elytras and pumpkins, and a second fight going on), the pearl cooldown (both hands,
 other hotbar slots, launch blocking, reconnecting, cleared item cooldowns), a pearl starting the
 60 seconds again, elytra and riptide blocked within 15 blocks of an opponent (and allowed further

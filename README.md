@@ -18,9 +18,9 @@ Anti-cheat and moderation for a Spigot/Paper SMP (built for **ᴠᴀɴɪʟʟᴀ 
 - **Anti x-ray**: switches on Paper's built-in anti-xray for you (fake ores and
   fake caves), and hides diamonds and ancient debris in caves until you are down
   there and can see them.
-- **Anti ESP / anti freecam for bases**: chests, barrels, shulker boxes, beds and
-  other storage a player can't see are shown to that player as stone until they
-  get close or can see them, and hidden again when out of sight.
+- **Anti ESP / anti freecam for bases**: chests (copper chests too), barrels, shulker
+  boxes, shelves, beds and other storage a player can't see are shown to that player
+  as stone until they get close or can see them, and hidden again when out of sight.
 - **Blocks hacked clients**: kicks clients that announce themselves (Meteor,
   Wurst, LiquidBounce...) and world downloaders. Optionally kicks every modded
   (Fabric/Forge) client.
@@ -85,7 +85,7 @@ kept as it is. Bans, mutes and warnings are kept.
 replaced by the new, shorter one. Your reasons, messages, prefix and disabled
 worlds are kept, and so are bans and mutes (`data/punishments.yml`).
 
-Requirements: Paper (recommended) or Spigot 1.20–1.21.x, Java 17+ (Java 21 on
+Requirements: Paper (recommended) or Spigot 1.20 to 1.21.11 (built and checked against the 1.21.11 API), Java 17+ (Java 21 on
 1.20.5+). No other plugins needed.
 
 ## Commands
@@ -107,7 +107,8 @@ Requirements: Paper (recommended) or Spigot 1.20–1.21.x, Java 17+ (Java 21 on
 | `/report <player> <reason>` | `vigil.report` (everyone) | Report a player; staff see where you were |
 | `/tickets` | `vigil.tickets` | Open tickets. Also `/tickets view <id>`, `reply <id> <message>`, `claim <id>`, `close <id> [reason]`, `tp <id>` |
 
-`/ac` also works as `/anticheat` and `/vigil`, `/ticket` as `/support`. Durations: `30m`, `12h`, `7d`,
+`/ac` on its own shows a help page with every command you may use (click one to type it,
+hover for what it does). `/ac` also works as `/anticheat` and `/vigil`, `/ticket` as `/support`. Durations: `30m`, `12h`, `7d`,
 `2w`, `1mo`, `1y`, `perm`. Tab completion shows the preset reasons. If another
 plugin also has `/ban`, use `/vigil:ban`.
 
@@ -579,7 +580,8 @@ advanced:
     reveal-distance: 8         # hidden storage is always shown this close
     look-distance: 48          # ...and within this distance once in line of sight
     blocks: [CHEST, TRAPPED_CHEST, BARREL, ENDER_CHEST, "*SHULKER_BOX", HOPPER, DROPPER,
-             DISPENSER, CRAFTER, FURNACE, BLAST_FURNACE, SMOKER, BREWING_STAND, "*_BED", ENCHANTING_TABLE]
+             DISPENSER, CRAFTER, FURNACE, BLAST_FURNACE, SMOKER, BREWING_STAND, "*_BED", ENCHANTING_TABLE,
+             "*COPPER_CHEST", "*_SHELF"]   # copper chests and shelves: 1.21.9+
     ores: [DIAMOND_ORE, DEEPSLATE_DIAMOND_ORE, ANCIENT_DEBRIS]
   lag-protection:
     min-tps: 17.0              # no flags below this TPS
@@ -653,7 +655,7 @@ Maven tab → **Lifecycle → package**. GitHub Actions builds every push.
 
 ## Testing
 
-`mvn test` runs 179 tests. 75 of them are end-to-end scenarios on a simulated
+`mvn test` runs 180 tests. 75 of them are end-to-end scenarios on a simulated
 server (MockBukkit). Moves are handled exactly like on a real Paper server: when
 Vigil sets a player back, the server teleports them and fires a teleport event.
 Hacked clients are modelled like Meteor/Wurst: Flight (fast, hovering, gliding,

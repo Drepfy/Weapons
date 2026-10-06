@@ -39,6 +39,12 @@ public final class SettingsLoader {
         m.put("alt-victim", "&7You did not lose a heart: this kill was not counted by the alt account protection.");
         m.put("alt-staff", "&8[&cLifesteal&8] &7{killer} killed {victim}, not counted: &f{reason}");
         m.put("natural-death", "&7You lost a heart. You now have &c{hearts} &7hearts.");
+        // Titles (effects.titles). Placeholders: {count} {hearts} {killer} {victim}
+        m.put("title-gain", "&c+{count} ❤");
+        m.put("title-lose", "&4-{count} ❤");
+        m.put("subtitle-stolen", "&7stolen from &f{victim}");
+        m.put("subtitle-taken", "&7taken by &f{killer}");
+        m.put("subtitle-hearts", "&7You now have &c{hearts} &7hearts");
         // Heart items. Placeholders: {count} {s} {hearts} {max}
         m.put("consume", "&7You used &c{count} &7Heart{s}. You now have &c{hearts} &7hearts.");
         m.put("consume-at-max", "&cYou already have the maximum of {max} hearts.");
@@ -125,6 +131,11 @@ public final class SettingsLoader {
                 r.duration("alt-protection.min-playtime", 30L * 60 * 1000),
                 r.bool("alt-protection.notify-staff", true));
 
+        Settings.Effects effects = new Settings.Effects(r.bool("effects.titles", true),
+                r.bool("effects.particles", true),
+                r.sound("effects.sound-gain", "entity.player.levelup 0.7 1.4"),
+                r.sound("effects.sound-lose", "block.respawn_anchor.deplete 0.8 1.3"));
+
         Map<String, String> messages = new HashMap<>();
         for (Map.Entry<String, String> entry : DEFAULT_MESSAGES.entrySet()) {
             messages.put(entry.getKey(), r.text("messages." + entry.getKey(), entry.getValue()));
@@ -133,7 +144,7 @@ public final class SettingsLoader {
 
         return new Settings(start, min, max, perKill, r.bool("hearts.lose-on-natural-death", false),
                 r.bool("hearts.heal-gained-hearts", true), disabledWorlds, cooldown,
-                r.bool("cooldown.both-directions", false), withdraw, item, recipe, pack, alts,
+                r.bool("cooldown.both-directions", false), withdraw, item, recipe, pack, alts, effects,
                 r.bool("log-to-file", true), new Settings.Messages(messages), r.warnings);
     }
 
@@ -247,6 +258,36 @@ public final class SettingsLoader {
                 return def;
             }
             return value.toString();
+        }
+
+        /** "entity.player.levelup 0.7 1.4" (volume and pitch may be left out); "" = no sound. */
+        Settings.SoundSpec sound(String path, String def) {
+            String text = string(path, def).trim();
+            if (text.isEmpty()) {
+                return null;
+            }
+            String[] parts = text.split("\\s+");
+            String key = parts[0].toLowerCase(Locale.ROOT);
+            try {
+                if (!key.matches("[a-z0-9_.\\-/:]+") || parts.length > 3) {
+                    throw new NumberFormatException();
+                }
+                float volume = parts.length > 1 ? Float.parseFloat(parts[1]) : 1.0f;
+                float pitch = parts.length > 2 ? Float.parseFloat(parts[2]) : 1.0f;
+                if (!(volume >= 0 && volume <= 10) || !(pitch >= 0.5f && pitch <= 2.0f)) {
+                    throw new NumberFormatException();
+                }
+                return new Settings.SoundSpec(key, volume, pitch);
+            } catch (NumberFormatException e) {
+                warn(path + " must look like \"entity.player.levelup 0.7 1.4\" (a sound, its volume 0-10 and pitch"
+                        + " 0.5-2), or \"\" for none (got '" + text + "'); using \"" + def + "\".");
+                return sound(def);
+            }
+        }
+
+        private static Settings.SoundSpec sound(String text) {
+            String[] parts = text.trim().split("\\s+");
+            return new Settings.SoundSpec(parts[0], Float.parseFloat(parts[1]), Float.parseFloat(parts[2]));
         }
 
         /** Text, or a list of lines. */

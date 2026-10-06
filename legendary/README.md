@@ -160,7 +160,7 @@ shows how long you have to press again.
 | Put it in a bundle, item frame, armour stand, allay, decorated pot or shelf | Refused |
 | Let a hopper or a mob (zombie, fox, allay...) pick it up | Refused |
 | Craft with it (two swords repair into a plain one) | Refused |
-| Sell or list it (`/sell`, `/ah sell`...) | Refused while it is in your hand; `/sellall` is refused while you carry one at all (`blocked-commands`). Other items can still be sold |
+| Sell or list it (`/sell`, `/ah sell`, `/ah list`, `/auction list`...) | Refused while it is in your hand; `/sellall` is refused while you carry one at all (`blocked-commands`). Other items can still be sold |
 | Pass it to an alt (an account that joined from the same IP) | The alt cannot pick it up. Staff are alerted |
 | Duplicate it (a dupe glitch, creative middle-click, an edited item) | Each weapon has a unique id. When two copies can be seen at once, the one the registry does not expect is deleted, and staff are alerted |
 | Stash it somewhere from before the plugin | Opening that container (or joining with it in the ender chest) moves it back to the player |
@@ -179,7 +179,7 @@ it is deleted.
 
 | Command | Permission | |
 |---|---|---|
-| `/legendary` | everyone | How the weapons work |
+| `/legendary` | everyone | How the weapons work, and the commands you may use (click one to type it) |
 | `/legendary give <player> <weapon>` | `legendary.give` | Give a legendary (refused if one already exists) |
 | `/legendary remove <player> <weapon\|all>` | `legendary.remove` | Take it away. Works on offline players: it disappears when they join |
 | `/legendary remove * <weapon\|all>` | `legendary.remove` | Remove it wherever it is |
@@ -231,7 +231,7 @@ cd legendary
 mvn -B package   # runs the tests, writes target/Legendary-<version>.jar
 ```
 
-`mvn test` runs 64 tests on a simulated server:
+`mvn test` runs 65 tests on a simulated server:
 - **Every ability and passive:** what it hits and when (Crimson Flash's two charges and
   bleeding, Iaido's counter and crescent, Crimson Edge's count, the hook's yank, stun and
   grapple, the candy cyclone (its pull, damage, Speed II, bouncing arrows and burst), Sugar
@@ -258,4 +258,5 @@ mvn -B package   # runs the tests, writes target/Legendary-<version>.jar
 - **Controls:** F and Shift + F (the weapon stays in hand), the right-click and both settings,
   offhand food and shields, and the keys shown in the lore.
 - **Other:** the registry across restarts, commands, config checking, upgrading 1.1, 1.2, 1.3,
-  1.3.3 and 1.5 configs, and updating old default texts while keeping your own.
+  1.3.3 and 1.5 configs (and an old sell-command list getting /auction list), and updating
+  old default texts while keeping your own.

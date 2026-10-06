@@ -22,6 +22,8 @@ when the player gets into combat during the warmup, or when the player who asked
 by the time it is accepted.
 
 **Requires:** Paper/Spigot 1.20+, [Skript](https://github.com/SkriptLang/Skript) 2.7+, [SkBee](https://github.com/ShaneBeee/SkBee) (for the sidebar).
+On 1.21.11 use the newest Skript and SkBee: every syntax the scripts use was checked against
+their current versions (Skript 2.16, SkBee's fastboard).
 
 ## Install
 1. Copy every file in `scripts/` into `plugins/Skript/scripts/` (or only `all-in-one/VanillaSMP.sk`)

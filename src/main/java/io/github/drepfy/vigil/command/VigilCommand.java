@@ -12,6 +12,7 @@ import io.github.drepfy.vigil.moderation.Punishment;
 import io.github.drepfy.vigil.moderation.PunishmentType;
 import io.github.drepfy.vigil.storage.PlayerRecord;
 import io.github.drepfy.vigil.util.Clock;
+import io.github.drepfy.vigil.util.HelpMenu;
 import io.github.drepfy.vigil.util.Text;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
@@ -85,20 +86,40 @@ public final class VigilCommand implements CommandExecutor, TabCompleter {
 
     // ---- sub-commands --------------------------------------------------------------------------
 
+    /** Vigil's other commands, shown on the help page to those who may use them. */
+    private static final List<SubCommand> OTHER_COMMANDS = List.of(
+            new SubCommand("ticket", "vigil.ticket", "/ticket <message>", "Ask staff for help"),
+            new SubCommand("report", "vigil.report", "/report <player> <reason>", "Report a player to staff"),
+            new SubCommand("tickets", "vigil.tickets", "/tickets", "See and answer tickets"),
+            new SubCommand("ban", "vigil.ban", "/ban <player> [time] [reason]", "Ban a player (e.g. 7d)"),
+            new SubCommand("unban", "vigil.unban", "/unban <player>", "Lift a ban"),
+            new SubCommand("mute", "vigil.mute", "/mute <player> [time] [reason]", "Mute a player (e.g. 1h)"),
+            new SubCommand("unmute", "vigil.unmute", "/unmute <player>", "Lift a mute"),
+            new SubCommand("warn", "vigil.warn", "/warn <player> <time> [reason]", "Warn a player for a while"),
+            new SubCommand("unwarn", "vigil.unwarn", "/unwarn <player>", "Remove a player's newest warning"),
+            new SubCommand("kick", "vigil.kick", "/kick <player> [reason]", "Kick a player"));
+
+    @SuppressWarnings("deprecation") // getDescription(): Paper's replacement is not on Spigot.
     private void help(CommandSender sender, String label) {
+        HelpMenu menu = new HelpMenu(message("brand") + " &8| &7Anti-Cheat &8| &7v" + plugin.getDescription().getVersion());
         boolean any = false;
         for (SubCommand sub : SUBCOMMANDS) {
             if (sender.hasPermission(sub.permission())) {
-                if (!any) {
-                    send(sender, "&fVigil &7" + plugin.getDescription().getVersion());
-                    any = true;
-                }
-                sender.sendMessage(Text.color(" &b/" + label + " " + sub.usage() + " &8- &7" + sub.description()));
+                menu.command("/" + label + " " + sub.usage(), sub.description());
+                any = true;
+            }
+        }
+        for (SubCommand other : OTHER_COMMANDS) {
+            if (sender.hasPermission(other.permission())) {
+                menu.command(other.usage(), other.description());
+                any = true;
             }
         }
         if (!any) {
             send(sender, message("no-permission"));
+            return;
         }
+        menu.send(sender);
     }
 
     private void alerts(CommandSender sender) {

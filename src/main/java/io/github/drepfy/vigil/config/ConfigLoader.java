@@ -199,7 +199,9 @@ public final class ConfigLoader {
     /** Blocks that give bases away to ESP and base finders. */
     static final List<String> DEFAULT_HIDDEN_STORAGE = List.of("CHEST", "TRAPPED_CHEST", "BARREL", "ENDER_CHEST",
             "*SHULKER_BOX", "HOPPER", "DROPPER", "DISPENSER", "CRAFTER", "FURNACE", "BLAST_FURNACE", "SMOKER",
-            "BREWING_STAND", "*_BED", "ENCHANTING_TABLE");
+            "BREWING_STAND", "*_BED", "ENCHANTING_TABLE",
+            // 1.21.9+: copper chests (all oxidised and waxed kinds) and shelves hold items too.
+            "*COPPER_CHEST", "*_SHELF");
 
     static final long DEFAULT_WARN_MIN_MS = 60L * 60 * 1000;
     static final long DEFAULT_WARN_MAX_MS = 10L * 24 * 60 * 60 * 1000;

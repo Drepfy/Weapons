@@ -128,6 +128,14 @@ public final class LifestealStore {
         return null;
     }
 
+    /** Everyone, most hearts first (then by name). */
+    public java.util.List<Map.Entry<UUID, Entry>> ranking() {
+        java.util.List<Map.Entry<UUID, Entry>> ranking = new java.util.ArrayList<>(players.entrySet());
+        ranking.sort(java.util.Comparator.comparingInt((Map.Entry<UUID, Entry> e) -> e.getValue().hearts())
+                .reversed().thenComparing(e -> String.valueOf(e.getValue().name()), String.CASE_INSENSITIVE_ORDER));
+        return ranking;
+    }
+
     public Map<UUID, Entry> players() {
         return java.util.Collections.unmodifiableMap(players);
     }

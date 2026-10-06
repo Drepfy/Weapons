@@ -9,14 +9,30 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Brings a config.yml from before 1.2.0 up to date, keeping everything else (and the comments)
- * as the owner left it: logging out in combat now kills (it used to be the default to keep the
- * player alive), and the new command settings are added.
+ * Brings an older config.yml up to date, keeping everything else (and the comments) as the owner
+ * left it.
+ * <ul>
+ *   <li>1.2.0: logging out in combat now kills (it used to be the default to keep the player
+ *       alive), and the new command settings are added.</li>
+ *   <li>1.3.0: the sounds for getting into and out of combat are added.</li>
+ * </ul>
  */
 public final class ConfigUpgrade {
 
     private static final Pattern LOGOUT = Pattern.compile("(?m)^(\\s*)logout:\\s*keep\\s*$");
     private static final Pattern LOGOUT_LINE = Pattern.compile("(?m)^(\\s*)logout:[^\\n]*$");
+    private static final Pattern SOUNDS = Pattern.compile("(?m)^sounds:");
+    private static final Pattern MESSAGES = Pattern.compile("(?m)^(# \\{seconds\\}[^\\n]*\\n)?messages:");
+
+    public static final String SOUNDS_BLOCK = """
+            # Sounds for the player concerned: "<sound> <volume> <pitch>", any Minecraft sound, or "" for none.
+            sounds:
+              # When you get into combat (once, not on every hit).
+              combat-start: "block.note_block.bass 0.8 0.7"
+              # When your combat time runs out.
+              combat-end: "entity.experience_orb.pickup 0.6 1.2"
+
+            """;
 
     private ConfigUpgrade() {
     }
@@ -33,8 +49,13 @@ public final class ConfigUpgrade {
                 return false;
             }
             Files.writeString(file, upgraded, StandardCharsets.UTF_8);
-            logger.info("config.yml updated for 1.2.0: players who log out in combat now die and drop their "
-                    + "items (combat.logout: kill), and commands are blocked in combat (combat.block-commands).");
+            if (!text.contains("block-commands:")) {
+                logger.info("config.yml updated for 1.2.0: players who log out in combat now die and drop their "
+                        + "items (combat.logout: kill), and commands are blocked in combat (combat.block-commands).");
+            }
+            if (!SOUNDS.matcher(text).find()) {
+                logger.info("config.yml: added the sounds for getting into and out of combat (sounds).");
+            }
             return true;
         } catch (IOException | RuntimeException e) {
             logger.warning("Could not update config.yml (" + e.getMessage() + "); the new settings use their defaults.");
@@ -43,9 +64,20 @@ public final class ConfigUpgrade {
     }
 
     public static String upgrade(String text) {
-        if (text.contains("block-commands:")) {
-            return text; // Already 1.2.0 or newer.
+        String result = text.contains("block-commands:") ? text : commands(text);
+        if (!SOUNDS.matcher(result).find()) {
+            Matcher messages = MESSAGES.matcher(result);
+            if (messages.find()) {
+                result = result.substring(0, messages.start()) + SOUNDS_BLOCK + result.substring(messages.start());
+            } else {
+                result = result + (result.endsWith("\n") ? "\n" : "\n\n") + SOUNDS_BLOCK.stripTrailing() + "\n";
+            }
         }
+        return result;
+    }
+
+    /** 1.2.0. */
+    private static String commands(String text) {
         String result = LOGOUT.matcher(text).replaceFirst("$1logout: kill");
         result = result.replace("#   keep: nothing else happens (default)", "#   keep: nothing else happens")
                 .replace("#   kill: the player also dies where they logged out and drops their items (not when they",

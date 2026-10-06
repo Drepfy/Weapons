@@ -2,7 +2,6 @@ package io.github.drepfy.lifesteal.heart;
 
 import io.github.drepfy.lifesteal.config.Settings;
 import io.github.drepfy.lifesteal.util.Text;
-import org.bukkit.Sound;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Cat;
 import org.bukkit.entity.Entity;
@@ -57,15 +56,17 @@ public final class HeartItemListener implements Listener {
     private final Supplier<Settings> settings;
     private final HeartItems items;
     private final HeartService hearts;
+    private final HeartEffects effects;
     private final LongSupplier clock;
     private final Consumer<String> log;
     private final Map<UUID, Long> lastUse = new HashMap<>();
 
-    public HeartItemListener(Supplier<Settings> settings, HeartItems items, HeartService hearts, LongSupplier clock,
-                             Consumer<String> log) {
+    public HeartItemListener(Supplier<Settings> settings, HeartItems items, HeartService hearts, HeartEffects effects,
+                             LongSupplier clock, Consumer<String> log) {
         this.settings = settings;
         this.items = items;
         this.hearts = hearts;
+        this.effects = effects;
         this.clock = clock;
         this.log = log;
     }
@@ -131,11 +132,7 @@ public final class HeartItemListener implements Listener {
         }
         int after = hearts.set(player, before + used, config.healGainedHearts());
         send(player, config.messages().get("consume"), "count", used, "s", Text.plural(used), "hearts", after);
-        try {
-            player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.6f, 1.6f);
-        } catch (RuntimeException | LinkageError ignored) {
-            // Sound names differ between versions; it is only a sound.
-        }
+        effects.gained(player, used, null, after);
         log.accept(player.getName() + " used " + used + " Heart item(s): " + before + " -> " + after);
         return used;
     }
