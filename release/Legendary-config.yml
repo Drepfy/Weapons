@@ -1,8 +1,8 @@
 # Legendary Weapons. After editing, run /legendary reload.
 #
 # Controls: F (the swap-offhand key) uses a weapon's first ability, Shift + F its second. Pressing
-# again while one is still going recasts it (Crimson Flash's second dash, Candy Barrage's next
-# cane, Rift Swap's return, Executioner's Leap's dive).
+# again while one is still going recasts it (Crimson Flash's second dash, Rift Swap's return,
+# Executioner's Leap's dive).
 # Times: 8s, 2.5s, 1m, 30d.
 config-version: 4
 prefix: "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ » &r"
@@ -172,8 +172,8 @@ weapons:
       - "&#FF7AC3{key} &8» &f{candy-hook.name} &8({candy-hook.cooldown})"
       - "&7Hook a player to you, or a wall to fly to it."
       - ""
-      - "&#FF7AC3{sneak-key} &8» &f{candy-barrage.name} &8({candy-barrage.cooldown})"
-      - "&7Candy canes float over you. Swing to fire them."
+      - "&#FF7AC3{sneak-key} &8» &f{candy-cyclone.name} &8({candy-cyclone.cooldown})"
+      - "&7Become a candy tornado. Arrows bounce off."
       - ""
       - "{attack}"
     abilities:
@@ -190,21 +190,20 @@ weapons:
         # A wall or the ground it catches: how hard you are pulled to it (0 = not at all).
         # No fall damage after.
         grapple: 1.0
-      candy-barrage:
-        cooldown: 22s
-        # Candy canes float round your head for duration. Swing the scythe (or press Shift + F
-        # again) to fire one where you look. The cooldown starts once they are all fired or the
-        # time is up.
-        canes: 5
-        duration: 8s
-        # Each cane: damage (3 = 1.5 hearts), how fast it flies (blocks per tick), how far, and
-        # how hard it pushes.
-        damage: 3
-        speed: 2.4
-        range: 32
-        knockback: 0.3
-        # The shortest time between two shots.
-        shot-gap: 0.25s
+      candy-cyclone:
+        cooldown: 28s
+        # You can keep moving while it spins (with Speed at speed-level). Arrows bounce off.
+        duration: 4s
+        radius: 4.5
+        # Every interval, players in the tornado take this and are dragged in (1 = half a heart).
+        damage: 1
+        interval: 0.4s
+        pull: 0.25
+        speed-level: 2
+        # When it ends it bursts, throwing everyone out.
+        burst-damage: 4
+        burst-knockback: 1.2
+        burst-lift: 0.5
       sugar-high:
         # Passive: Speed at speed-level while the scythe is in your hand (1 = Speed I, 0 = none).
         speed-level: 1
@@ -426,60 +425,58 @@ weapons:
         radius: 1.8
         launch: 0.5
 
-# Sounds: "<sound> [volume] [pitch]", several played together. They are vanilla Minecraft sounds
-# layered and pitched for each ability, so everyone hears them, pack or not. Set one to [] to
-# silence it.
+# Sounds: "<sound> [volume] [pitch]" (vanilla Minecraft sounds, so everyone hears them, pack or
+# not). One sound when an ability is used and one for its big moment; the small ones (taking a
+# weapon in hand, every hit, every bleed tick, every falling star) are off ([]). Add your own
+# to any of them, several play together.
 sounds:
-  # <weapon>-equip plays when you take a legendary in hand, <weapon>-melee on its sword or axe
-  # hits (off by default: the game's own hit sounds play), and each ability has its own.
-  crimson-flash: ["item.trident.riptide_1 0.8 1.5", "entity.player.attack.sweep 1 0.8"]
-  crimson-flash-end: ["item.armor.equip_netherite 0.7 1.6"]
-  crimson-cut: ["entity.player.attack.sweep 1 0.6", "item.trident.hit 0.7 1.3"]
-  crimson-edge: ["entity.player.attack.crit 1 0.7", "item.trident.hit 0.6 0.9"]
-  iaido: ["item.trident.return 0.9 0.8", "block.amethyst_block.resonate 0.7 1.6"]
-  iaido-parry: ["item.shield.block 1 1.4", "block.anvil.land 0.3 2"]
-  iaido-counter: ["entity.player.attack.knockback 1 0.6", "entity.player.attack.sweep 1 0.7", "item.trident.hit 0.8 0.8"]
-  kurogane-hit: ["entity.player.attack.crit 0.8 1.1"]
-  kurogane-equip: ["item.armor.equip_netherite 0.4 1.4"]
+  crimson-flash: ["entity.player.attack.sweep 1 0.8"]
+  crimson-flash-end: []
+  crimson-cut: ["item.trident.hit 0.8 1.2"]
+  crimson-edge: ["entity.player.attack.crit 1 0.7"]
+  iaido: ["item.trident.return 0.9 0.8"]
+  iaido-parry: ["item.shield.block 1 1.4"]
+  iaido-counter: ["entity.player.attack.sweep 1 0.6"]
+  kurogane-hit: []
+  kurogane-equip: []
   kurogane-melee: []
-  bleed: ["block.pointed_dripstone.drip_lava 0.8 0.8"]
-  candy-hook: ["entity.fishing_bobber.throw 1 0.9", "entity.snowball.throw 0.6 0.8"]
-  candy-hook-catch: ["entity.fishing_bobber.retrieve 1 1.1", "block.chain.hit 0.8 1.3"]
-  candy-barrage: ["block.amethyst_cluster.place 1 1.4", "block.note_block.chime 0.6 1.8", "entity.allay.item_thrown 0.7 1.2"]
-  candy-barrage-shot: ["entity.snowball.throw 1 1.3", "entity.breeze.shoot 0.5 1.8"]
-  candy-barrage-hit: ["block.glass.break 0.5 1.8", "entity.player.attack.crit 0.8 1.3"]
-  sugar-high-full: ["block.amethyst_block.resonate 1 1.6", "block.note_block.chime 0.6 2"]
-  sugar-crash: ["entity.firework_rocket.large_blast 1 1.1", "block.glass.break 0.8 1.4", "entity.firework_rocket.twinkle 0.6 1.2"]
-  sugar-high-stack: ["block.note_block.chime 0.3 0.9"]
-  sugarcrash-equip: ["item.armor.equip_netherite 0.4 1.6"]
+  bleed: []
+  candy-hook: ["entity.fishing_bobber.throw 1 0.9"]
+  candy-hook-catch: ["entity.fishing_bobber.retrieve 1 1.1"]
+  candy-cyclone: ["entity.breeze.wind_burst 0.9 1.2"]
+  candy-cyclone-hit: []
+  candy-burst: ["entity.firework_rocket.blast 1 1.3"]
+  sugar-high-stack: []
+  sugar-high-full: ["block.amethyst_block.resonate 0.8 1.6"]
+  sugar-crash: ["entity.firework_rocket.large_blast 1 1.1"]
+  sugarcrash-equip: []
   sugarcrash-melee: []
-  void-rend: ["entity.warden.sonic_charge 0.7 1.6", "entity.enderman.teleport 0.7 0.5"]
-  void-rend-snap: ["entity.warden.sonic_boom 0.9 1.2", "block.respawn_anchor.deplete 0.7 0.7"]
-  riftblade-hit: ["entity.player.attack.crit 0.8 0.7", "block.amethyst_block.break 0.6 0.6"]
-  riftblade-equip: ["item.armor.equip_netherite 0.4 1.1"]
+  void-rend: ["entity.warden.sonic_charge 0.7 1.6"]
+  void-rend-snap: ["entity.warden.sonic_boom 0.8 1.2"]
+  riftblade-hit: []
+  riftblade-equip: []
   riftblade-melee: []
-  rift-swap: ["entity.illusioner.mirror_move 1 1", "entity.enderman.teleport 0.8 0.8"]
-  rift-return: ["entity.illusioner.mirror_move 1 0.7", "entity.enderman.teleport 0.6 1.2"]
-  phase-shift: ["entity.illusioner.mirror_move 0.9 1.4", "block.amethyst_block.chime 0.7 0.6"]
-  executioners-leap: ["entity.breeze.jump 1 0.7", "item.trident.riptide_2 0.5 0.7"]
-  executioners-slam: ["item.mace.smash_ground_heavy 1 0.9", "entity.generic.explode 0.6 0.8"]
-  executioners-dive: ["item.trident.riptide_3 0.8 0.7", "entity.breeze.wind_burst 0.7 0.6"]
-  last-rites: ["block.bell.use 0.8 0.5", "block.bell.resonate 0.6 0.6"]
-  gravebreaker-hit: ["entity.player.attack.knockback 0.8 0.7", "block.stone.break 0.7 0.7"]
-  gravebreaker-equip: ["item.armor.equip_netherite 0.4 0.8"]
+  rift-swap: ["entity.illusioner.mirror_move 1 1"]
+  rift-return: ["entity.illusioner.mirror_move 1 0.7"]
+  phase-shift: ["entity.enderman.teleport 0.8 1.4"]
+  executioners-leap: ["entity.breeze.jump 1 0.7"]
+  executioners-slam: ["item.mace.smash_ground_heavy 1 0.9"]
+  executioners-dive: ["item.trident.riptide_3 0.8 0.7"]
+  last-rites: ["block.bell.use 0.8 0.5"]
+  gravebreaker-hit: []
+  gravebreaker-equip: []
   gravebreaker-melee: []
-  grave-rise: ["block.deepslate.break 1 0.6", "item.mace.smash_ground 0.7 0.8"]
-  grave-rise-stone: ["block.deepslate_bricks.place 1 0.7", "block.gravel.break 0.7 0.6"]
-  grave-tomb: ["block.respawn_anchor.deplete 0.8 0.6", "entity.generic.explode 0.5 0.7", "block.deepslate.break 0.8 0.5"]
-  starfall: ["block.beacon.activate 0.9 1.4", "block.amethyst_block.resonate 0.8 1.2"]
-  starfall-star: ["entity.firework_rocket.launch 0.7 0.6"]
-  starfall-impact: ["entity.firework_rocket.large_blast 1 0.8", "entity.generic.explode 0.5 1.5", "entity.firework_rocket.twinkle 0.5 1.2"]
-  starforged-hit: ["entity.player.attack.crit 0.8 1.2", "block.amethyst_block.hit 0.7 1.6"]
-  starforged-equip: ["item.armor.equip_netherite 0.4 1.6"]
+  grave-rise: ["block.deepslate.break 1 0.6"]
+  grave-rise-stone: []
+  starfall: ["block.beacon.activate 0.9 1.4"]
+  starfall-star: []
+  starfall-impact: ["entity.firework_rocket.blast 0.7 0.8"]
+  starforged-hit: []
+  starforged-equip: []
   starforged-melee: []
-  starstruck: ["entity.firework_rocket.blast 1 0.9", "block.amethyst_block.resonate 0.6 1.6"]
-  singularity: ["block.respawn_anchor.charge 1 0.6", "entity.warden.sonic_charge 0.7 0.7"]
-  singularity-nova: ["entity.warden.sonic_boom 1 0.8", "entity.generic.explode 0.8 0.7", "block.respawn_anchor.deplete 0.8 0.6"]
+  starstruck: ["entity.firework_rocket.blast 1 0.9"]
+  singularity: ["block.respawn_anchor.charge 1 0.6"]
+  singularity-nova: ["entity.warden.sonic_boom 1 0.8"]
   # Getting a legendary.
   received: ["ui.toast.challenge_complete 0.6 1.2"]
 

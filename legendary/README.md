@@ -46,23 +46,19 @@ They look like 1.21.11 items: with the server resource pack each has its own 3D 
 1.21.2+). Custom model data (1001 to 1005) is still set for older clients. `glint: false`
 turns the shimmer off for good.
 
-**Effects are vanilla particles and blocks**, drawn into shapes the way ability plugins like
-Altar do: crimson slashes that sweep across over a few ticks, X cuts with red chips, a turning
-crimson ring under Iaido, red-and-white candy canes floating over your head and spinning through
-the air, sugar bursting out of every candy hit, a jagged void tear with the warden's sonic boom
-when it snaps, swirling purple columns where Rift Swap moves you, the slam's debris rolling out
-over the ground with the blocks it reaches cracking (only shown), gravestones of real deepslate
-rising out of the ground, a gold and sky-blue rune circle with an eight-pointed star, meteors
-with trails, and a black hole with a turning accretion disk. Nothing pops in: there are no
-pictures to appear or vanish, and nothing is saved with the world. The ones that show an area
-(Starfall's circle, the slam) match it exactly, and the ones that show a state (Iaido's stance,
-a stun) last exactly as long as it does.
+Every ability has its own 3D effect from the pack (crimson slashes, a candy tornado, candy
+canes, a void rift, a shockwave, gravestones, a rune circle, falling stars, a black hole...),
+shown with display entities: the server says where an effect starts and ends, and the players'
+game animates it smoothly in between. They are big, glow and stay a moment so they are easy to
+see in a fight; the ones that show an area (Starfall's circle, the slam's cracks) match it
+exactly, and the ones that show a state (Iaido's stance, a stun) last exactly as long as it
+does. Effects are never saved with the world.
 
-**Sounds are vanilla Minecraft sounds**, two or three layered and pitched for each ability (the
-warden's sonic boom, the mace's ground smash, trident riptides, the illusioner's mirror move,
-bells, amethyst, fireworks...), so they sound clean and everyone hears them, pack or not. Each
-weapon makes a quiet sound when you take it in hand; sword and axe hits keep the game's own hit
-sounds. Every sound can be changed (or silenced with `[]`) in `config.yml`.
+**Sounds are kept few and clean**, the way Altar does it: one vanilla Minecraft sound for each
+ability and for each big moment (the warden's sonic boom when the rift snaps, the mace's ground
+smash for the slam, a breeze's wind burst for the cyclone...), and nothing on ordinary hits,
+stacks or taking a weapon in hand, where sword and axe hits keep the game's own sounds. Everyone
+hears them, pack or not. Every sound can be changed (or silenced with `[]`) in `config.yml`.
 
 Every weapon has a **passive** that works on its own, and two abilities. Several abilities can
 be **pressed again** while they are still going: a second dash, a return, a dive. The boss bar
@@ -90,12 +86,10 @@ shows how long you have to press again.
 - **Candy Hook** (F, 14s): throws a candy-cane hook on a candy rope (22 blocks). A player or
   monster it catches takes 1.5 hearts, is yanked to you and stunned for a moment (too slow to
   walk away). A wall or the ground it catches pulls you to it instead, with no fall damage.
-- **Candy Barrage** (Shift + F, 22s): five candy canes appear and float in a ring over your
-  head for 8 seconds. **Swing the scythe** (left-click) to fire one where you look, or press
-  Shift + F again: it flies 32 blocks in a candy-striped trail and hits the first player or
-  monster for 1.5 hearts (7.5 hearts if all five land). At most one every 0.25s. The cooldown
-  starts once all five are fired or the 8 seconds are up; the boss bar shows how long they last,
-  even while you hold something else.
+- **Candy Cyclone** (Shift + F, 28s): you become a candy-striped tornado for 4 seconds and can
+  keep moving (with Speed II). Every 0.4s everyone within 4.5 blocks takes half a heart and is
+  dragged in, and arrows bounce off you. Then it bursts: 2 hearts and everyone is thrown out
+  (7 hearts if someone stays in it the whole time).
 
 ### Riftblade (void sword): space and positioning
 
@@ -214,10 +208,11 @@ pack required (`require-resource-pack=true` in `server.properties`) or set `tool
 for each weapon.
 
 **Updating from an older version:** nothing to do. On start the settings of abilities that
-were replaced (Blood Moon, Sugar Rush, Candy Cyclone, and everything from 1.1 and older), the
+were replaced (Blood Moon, Sugar Rush, Candy Barrage, and everything from 1.1 and older), the
 action bar settings and the messages and sounds that no longer exist are removed. Settings,
-lore and names still at an older version's default (for example Crimson Flash's 20s cooldown
-from 1.2, 1.3.0's lore and shimmer setting, or 1.3's ability damage) become the new defaults, and enchantments still at the old Sharpness VI
+lore, names and sounds still at an older version's default (for example Crimson Flash's 20s
+cooldown from 1.2, 1.3.0's lore and shimmer setting, 1.3's ability damage, or 1.5's layered
+sounds) become the new defaults, and enchantments still at the old Sharpness VI
 become the new ones. Anything you changed yourself is kept. Everything is saved in `config.yml`.
 
 ## Robust on a live server
@@ -239,7 +234,8 @@ mvn -B package   # runs the tests, writes target/Legendary-<version>.jar
 `mvn test` runs 64 tests on a simulated server:
 - **Every ability and passive:** what it hits and when (Crimson Flash's two charges and
   bleeding, Iaido's counter and crescent, Crimson Edge's count, the hook's yank, stun and
-  grapple, the candy canes (one per swing, the gap between shots, fading), Sugar High's crash, the rift's pull, snap and lift,
+  grapple, the candy cyclone (its pull, damage, Speed II, bouncing arrows and burst), Sugar
+  High's crash, the rift's pull, snap and lift,
   Rift Swap's echo and blink, Phase Shift, the leap, dive and tomb, Last Rites, the star warning,
   hit cap and the circle following your aim, the black hole and nova, Starstruck), walls,
   cooldowns and the Starforged lockout.
@@ -251,9 +247,8 @@ mvn -B package   # runs the tests, writes target/Legendary-<version>.jar
   while recharging, names, times, progress, flashing, staying while the weapon is carried), and
   the 3D effects being cleaned up.
 - **True damage:** Protection made up for so the damage is exact.
-- **Effects and sounds:** no ability shows a picture that pops in (only particles, and real
-  deepslate gravestones that clean up), every sound is a real vanilla sound, and Sugarcrash's
-  Speed comes and goes with the scythe in hand.
+- **Effects and sounds:** every ability shows its effect and cleans it up, every sound is a
+  real vanilla sound, and Sugarcrash's Speed comes and goes with the scythe in hand.
 - **Storage:** blocking for every container type, bundles, armour stands, pots, hoppers, mobs
   and crafting.
 - **Duplicates:** copies (which cannot use abilities), creative middle-click, revoked weapons,
@@ -262,5 +257,5 @@ mvn -B package   # runs the tests, writes target/Legendary-<version>.jar
   deaths), and staff /invsee.
 - **Controls:** F and Shift + F (the weapon stays in hand), the right-click and both settings,
   offhand food and shields, and the keys shown in the lore.
-- **Other:** the registry across restarts, commands, config checking, upgrading 1.1, 1.2, 1.3
-  and 1.3.3 configs, and updating old default texts while keeping your own.
+- **Other:** the registry across restarts, commands, config checking, upgrading 1.1, 1.2, 1.3,
+  1.3.3 and 1.5 configs, and updating old default texts while keeping your own.

@@ -6,7 +6,7 @@ crystal pommel.
 import math
 
 from forge import Weapon, shape
-from looks import gem, wrap
+from looks import gem, runes, scroll, wrap
 from paint import _hash, clamp, fbm, hexrgb, mix, noise, ramp, smooth
 
 Y_BLADE, Y_FORK, Y_TIP = 6.05, 13.6, 15.9
@@ -74,7 +74,16 @@ def blade_height(s):
     d, e, r = blade_parts(s)
     h = 0.03 + 0.15 * smooth(0.0, 0.28, e)       # bevel up from the edge
     h -= 0.07 * smooth(0.2, 0.0, r)              # down into the rift
+    h -= 0.025 * blade_runes(s)                  # the runes are cut into the steel
     return h - 0.03 * smooth(0.06, 0.0, s.d)
+
+
+def blade_runes(s):
+    """A column of runes up each half of the blade above the guard, glowing faintly violet."""
+    if not Y_BLADE + 0.35 < s.y < Y_BLADE + 3.4:
+        return 0.0
+    a = abs(s.x - 8)
+    return runes(s.y - Y_BLADE, (a - 0.52) / 0.2, cell=0.44, width=0.05, seed=53 if s.x < 8 else 59)
 
 
 def blade_colour(s):
@@ -90,7 +99,7 @@ def blade_colour(s):
     bevel = smooth(0.3, 0.24, e)
     c = mix(c, BEVEL(0.2 + 0.75 * smooth(0.26, 0.0, e) + (0.1 if d < 0 else -0.12)), bevel)
     c = mix(c, hexrgb('#8a4dff'), 0.45 * smooth(0.18, 0.0, r))     # the rift's light on its walls
-    return c
+    return mix(c, hexrgb('#c9a4ff'), 0.85 * blade_runes(s))
 
 
 def rift_glow(s, t):
@@ -114,15 +123,22 @@ WING = [(4.9, 5.05), (5.6, 5.35), (6.6, 5.25), (8.0, 5.3), (9.4, 5.25), (10.4, 5
         (6.0, 5.95), (5.15, 6.0), (4.65, 6.6), (4.25, 6.75), (4.4, 5.75)]
 
 
+def guard_scroll(s):
+    """Silver scrollwork engraved along each arm of the guard (not over the crystal)."""
+    if abs(s.x - 8) < 0.75 or not 5.28 < s.y < 6.02 or s.d < 0.2:
+        return 0.0
+    return scroll(abs(s.x - 8), (s.y - 5.64) / 0.26, period=1.1, width=0.06)
+
+
 def guard_colour(s):
     c = GUARD(0.3 + 0.2 * fbm(s.x * 2, s.y * 6, 41))
     c = mix(c, GUARD(0.95), smooth(0.08, 0.02, s.d))            # polished silver rim
     c = mix(c, GUARD(0.08), 0.8 * smooth(0.03, 0.0, abs(s.d - 0.15)))   # engraved line inside it
-    return c
+    return mix(c, GUARD(0.85), 0.8 * guard_scroll(s))
 
 
 def guard_height(s):
-    return 0.12 * smooth(0.0, 0.2, s.d) - 0.02 * smooth(0.03, 0.0, abs(s.d - 0.15))
+    return 0.12 * smooth(0.0, 0.2, s.d) - 0.02 * smooth(0.03, 0.0, abs(s.d - 0.15)) - 0.015 * guard_scroll(s)
 
 
 def gem_glow(s, t):

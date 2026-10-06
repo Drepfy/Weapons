@@ -6,7 +6,7 @@ holds it to a round, glossy candy-cane shaft with a silver ferrule and tip.
 import math
 
 from forge import Weapon, shape
-from looks import gem, helix
+from looks import gem, helix, scroll
 from paint import bezier, clamp, hexrgb, line_dist, mix, noise, ramp, smooth
 
 OUTER = bezier((8.8, 14.5), (7.4, 16.55), (3.2, 16.2), (1.0, 11.1), 48)
@@ -67,6 +67,24 @@ def shaft_colour(s):
     return mix(WHITE, RED, red)
 
 
+def collar_scroll(s):
+    """Scrollwork engraved round the silver collar."""
+    if s.cap != 0 or not 12.98 < s.y < 14.32:
+        return 0.0
+    return scroll(s.u, (s.y - 13.65) / 0.55, period=0.9, width=0.06)
+
+
+def collar_colour(s):
+    if s.cap != 0:
+        return SILVER(0.6)
+    c = SILVER(0.55 + 0.15 * smooth(0.12, 0.0, s.d))
+    return mix(c, SILVER(0.22), 0.8 * collar_scroll(s))
+
+
+def collar_height(s):
+    return -0.012 * collar_scroll(s)
+
+
 def build():
     w = Weapon('sugarcrash', grip=3.0)
     blade = shape(BLADE)
@@ -76,8 +94,7 @@ def build():
     w.sheet('cutting edge', lambda x, y: blade(x, y) and across(x, y) > 0.8, None, '#7a0a3a', box=blade.box,
             gloss=0.85, spec=1.0, glow=edge_glow, glow_colours=PINK, glow_strength=1.2)
     # silver collar with a gem
-    w.rod('collar', 8.0, 12.75, 14.55, 0.66,
-          lambda s: SILVER(0.55 + 0.15 * smooth(0.12, 0.0, s.d) if s.cap == 0 else 0.6), caps=(True, True),
+    w.rod('collar', 8.0, 12.75, 14.55, 0.66, collar_colour, caps=(True, True), height=collar_height, relief=2.0,
           metal=1.0, gloss=0.75, spec=1.0)
     for y0, y1 in ((12.75, 12.95), (14.35, 14.55)):
         w.rod('collar band', 8.0, y0, y1, 0.72, lambda s: SILVER(0.75), caps=(True, True), metal=1.0, gloss=0.8,

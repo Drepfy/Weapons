@@ -6,7 +6,7 @@ walnut haft with iron bands, a leather-wrapped grip and a spiked iron pommel.
 import math
 
 from forge import Weapon, shape
-from looks import hammered, wood, wrap
+from looks import hammered, runes, scratches, wood, wrap
 from paint import bezier, fbm, hexrgb, line_dist, line_pos, mix, noise, ramp, smooth
 
 STEEL = ramp('#2a2e36', '#4c525e', '#7c8492', '#b9c0cc', '#eef2f6')
@@ -16,6 +16,7 @@ WALNUT = ramp('#1c0f07', '#34200f', '#4f3219', '#6e4a28', '#8d6337')
 LEATHER = ramp('#140c08', '#2a1b12', '#45301f', '#634631')
 
 EDGE = bezier((3.25, 15.35), (1.55, 13.9), (1.45, 10.2), (3.0, 8.55), 40)
+EDGE_LENGTH = sum(math.hypot(EDGE[i + 1][0] - EDGE[i][0], EDGE[i + 1][1] - EDGE[i][1]) for i in range(len(EDGE) - 1))
 BEARD = bezier((3.0, 8.55), (4.4, 9.0), (6.0, 9.6), (7.35, 10.75), 20)
 TOP = bezier((7.35, 14.35), (6.0, 14.35), (4.6, 14.6), (3.25, 15.35), 20)
 HEAD = EDGE + BEARD[1:] + [(8.4, 10.75), (8.4, 14.35)] + TOP[:-1]
@@ -34,11 +35,21 @@ def forged(s, seed=5):
     return facets, grain
 
 
+def head_runes(s):
+    """A line of runes engraved along the head, following the bevel a little way in."""
+    de, along = line_pos(EDGE, s.x, s.y)
+    if not 0.12 < along < 0.9:
+        return 0.0
+    return runes(along * EDGE_LENGTH, (de - 0.98) / 0.2, cell=0.4, width=0.05, seed=19)
+
+
 def head_height(s):
     de = line_dist(EDGE, s.x, s.y)
     h = 0.03 + 0.15 * smooth(0.0, 0.6, de)          # the ground bevel of the cutting edge
     facets, _ = forged(s)
     h += 0.018 * facets * smooth(0.5, 0.9, de)       # shallow hammer facets on the flat
+    h -= 0.03 * head_runes(s)                        # the engraving is cut into the steel
+    h -= 0.006 * scratches(s.x, s.y, 23)
     return h - 0.02 * smooth(0.05, 0.0, s.d)
 
 
@@ -55,7 +66,10 @@ def head_colour(s):
     base = mix(base, hexrgb('#2c3550'), 0.25 * facets)
     shade = 0.9 + 0.12 * facets + 0.05 * grain
     c = tuple(v * shade for v in base)
-    return mix(c, STEEL(0.55), 0.35 * smooth(0.9, 0.62, de))     # the bevel line catches the light
+    c = mix(c, STEEL(0.55), 0.35 * smooth(0.9, 0.62, de))     # the bevel line catches the light
+    c = mix(c, STEEL(0.75), 0.45 * scratches(s.x, s.y, 23))    # bright scratches from use
+    rune = head_runes(s)
+    return mix(c, hexrgb('#120d0c'), 0.85 * rune)              # the runes, dark in their grooves
 
 
 def head_sheen(s):
@@ -67,6 +81,8 @@ def plate_colour(s):
     facets, grain = forged(s, 8)
     c = tuple(v * (0.88 + 0.16 * facets + 0.04 * grain) for v in hexrgb('#24262d'))
     c = mix(c, hexrgb('#8a909c'), smooth(0.1, 0.0, s.d))                 # worn bright rim
+    c = mix(c, hexrgb('#0e0d10'), 0.8 * smooth(0.03, 0.0, abs(s.d - 0.2)))   # an engraved border inside it
+    c = mix(c, hexrgb('#6a6f7a'), 0.35 * scratches(s.x, s.y, 29, 6.0))
     glow = smooth(0.35, 0.0, line_dist(CRACK, s.x, s.y))
     return mix(c, hexrgb('#5a1a08'), 0.6 * glow)                          # scorched round the crack
 
@@ -97,7 +113,8 @@ def build():
     w.sheet('head', head, 0.42, head_colour,
             height=head_height, relief=2.5, metal=0.9, gloss=0.7, spec=0.9, sheen=head_sheen)
     w.sheet('plate', shape(FORGE), 0.74, plate_colour,
-            height=lambda s: 0.08 * smooth(0.0, 0.15, s.d) + 0.015 * forged(s, 8)[0],
+            height=lambda s: 0.08 * smooth(0.0, 0.15, s.d) + 0.015 * forged(s, 8)[0]
+            - 0.02 * smooth(0.03, 0.0, abs(s.d - 0.2)),
             relief=2.5, metal=0.7, gloss=0.45, spec=0.6)
     w.sheet('crack', lambda x, y: line_dist(CRACK, x, y) < 0.085, None, '#2a0800', box=(4.4, 10.4, 6.0, 14.35),
             glow=ember_glow, glow_colours=EMBER, glow_strength=1.5)

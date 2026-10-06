@@ -16,7 +16,6 @@ import org.bukkit.util.Vector;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
@@ -42,7 +41,6 @@ final class Starforged implements Kit {
     private static final Color SKY = Color.fromRGB(110, 225, 255);
     private static final Color INDIGO = Color.fromRGB(95, 60, 235);
     private static final Color DEEP = Color.fromRGB(20, 10, 55);
-    private static final Color WHITE = Color.fromRGB(255, 255, 255);
 
     private final LegendaryPlugin plugin;
     private final Map<UUID, Fall> falls = new HashMap<>();
@@ -56,32 +54,35 @@ final class Starforged implements Kit {
 
     private static final class Fall {
         final Player player;
-        final long opened;
         final long until;
+        final Visuals.Effect circle;
         final Map<UUID, Integer> hits = new HashMap<>();
         Location center;
 
-        Fall(Player player, Location center, long opened, long until) {
+        Fall(Player player, Location center, long until, Visuals.Effect circle) {
             this.player = player;
             this.center = center;
-            this.opened = opened;
             this.until = until;
+            this.circle = circle;
         }
     }
 
     private static final class Hole {
         final Player player;
         final Location center;
-        final long opened;
         final long until;
+        final Visuals.Effect core;
+        final Visuals.Effect disk;
         final Set<UUID> allowed = new HashSet<>();
         final Set<UUID> refused = new HashSet<>();
+        int turn;
 
-        Hole(Player player, Location center, long opened, long until) {
+        Hole(Player player, Location center, long until, Visuals.Effect core, Visuals.Effect disk) {
             this.player = player;
             this.center = center;
-            this.opened = opened;
             this.until = until;
+            this.core = core;
+            this.disk = disk;
         }
     }
 
@@ -132,9 +133,6 @@ final class Starforged implements Kit {
                 it.remove();
             } else {
                 follow(fall);
-                if ((now - fall.opened) % 3 == 0) {
-                    runeCircle(fall, now);
-                }
             }
         }
         if (now % 200 == 0) {
@@ -174,10 +172,16 @@ final class Starforged implements Kit {
         double radius = settings.num("radius");
         int warning = settings.ticks("warning");
         plugin.fx().sound(center, "starfall");
-        // The rune circle: drawn on the ground while the stars fall (see tick), turning slowly.
-        Fall fall = new Fall(player, center, now, now + length);
+        // The rune circle: opens, turns while the stars fall, then closes.
+        Visuals.Effect circle = plugin.visuals().spawn("rune_star", center.clone().add(0, 0.06, 0)).size(0.5).send(0)
+                .animate(1, 6, e -> e.size(radius * 2.0));
+        for (int t = 8; t < length; t += 8) {
+            int step = t / 8;
+            circle.animate(t, 8, e -> e.turn(step * 45));
+        }
+        circle.vanish((int) length + 4, 6);
+        Fall fall = new Fall(player, center, now + length, circle);
         falls.put(player.getUniqueId(), fall);
-        runeCircle(fall, now);
         int stars = settings.whole("stars");
         int interval = Math.max(1, settings.ticks("interval"));
         for (int i = 0; i < stars; i++) {
@@ -208,67 +212,31 @@ final class Starforged implements Kit {
             return;
         }
         fall.center = distance <= speed ? aim : fall.center.clone().add(way.multiply(speed / distance));
-    }
-
-    /**
-     * Starfall's rune circle on the ground: a sky-blue ring, a gold inner ring and an eight-pointed
-     * star between them, opening over the first few ticks and turning slowly.
-     */
-    private void runeCircle(Fall fall, long now) {
-        double radius = plugin.settings().ability(Ability.STARFALL).num("radius")
-                * Math.min(1.0, (now - fall.opened + 1) / 6.0);
-        Location at = fall.center.clone().add(0, 0.15, 0);
-        Fx.View view = plugin.fx().view(at);
-        double turn = now * 0.03;
-        view.fade(Shapes.ring(at, radius, (int) (14 + radius * 7), turn), SKY, INDIGO, 1.2f);
-        view.dust(Shapes.ring(at, radius * 0.62, (int) (10 + radius * 4), -turn), GOLD, 0.9f);
-        List<Location> points = Shapes.ring(at, radius * 0.84, 8, turn);
-        for (int k = 0; k < 8; k++) {
-            view.fade(Shapes.line(points.get(k), points.get((k + 3) % 8), 0.55), GOLD, SKY, 0.8f);
-        }
-        view.along(Fx.END_ROD, points, 0.0);
-    }
-
-    /**
-     * A star falling from the sky to {@code spot} over {@code ticks}: a white-hot head in a blue
-     * glow and a golden trail.
-     */
-    private void fallingStar(Location sky, Location spot, int ticks, double size) {
-        Vector way = spot.toVector().subtract(sky.toVector());
-        for (int t = 0; t < ticks; t++) {
-            Location from = sky.clone().add(way.clone().multiply((double) t / ticks));
-            Location head = sky.clone().add(way.clone().multiply((double) (t + 1) / ticks));
-            plugin.visuals().later(t, () -> {
-                Fx.View view = plugin.fx().view(head);
-                view.fade(Shapes.line(from, head, 0.3), GOLD, INDIGO, (float) (0.9 * size));
-                view.dust(head, WHITE, (float) (1.8 * size), 3, 0.08);
-                view.dust(head, SKY, (float) (1.3 * size), 4, 0.25 * size);
-                view.particle(Fx.END_ROD, head, 2, 0.1, 0.1, 0.1, 0.02);
-                view.particle(Fx.FIREWORK, from, 2, 0.15, 0.15, 0.15, 0.02);
-            });
-        }
+        fall.circle.moveTo(fall.center.clone().add(0, 0.06, 0), 1);
     }
 
     /** One star: it falls for 6 ticks, then bursts. */
     private void star(Player player, Location spot, Map<UUID, Integer> hits) {
         Location sky = spot.clone().add(random.nextDouble() * 4 - 2, 14, random.nextDouble() * 4 - 2);
-        fallingStar(sky, spot.clone().add(0, 0.6, 0), 6, 1.0);
+        Visuals.Effect star = plugin.visuals().spawn("star", sky).billboard().size(1.9).send(0);
+        plugin.visuals().later(1, () -> star.moveTo(spot.clone().add(0, 0.6, 0), 5));
         plugin.fx().sound(sky, "starfall-star");
-        plugin.visuals().later(6, () -> impact(player, spot, hits));
+        plugin.visuals().later(6, () -> {
+            star.animate(1, 2, e -> e.size(3.4)).vanish(5, 4);
+            impact(player, spot, hits);
+        });
     }
 
     private void impact(Player player, Location spot, Map<UUID, Integer> hits) {
         AbilitySettings settings = plugin.settings().ability(Ability.STARFALL);
         double radius = settings.num("star-radius");
         plugin.fx().sound(spot, "starfall-impact");
+        plugin.visuals().spawn("nova", spot.clone().add(0, 0.08, 0)).size(0.4).turn(random.nextInt(360)).send(0)
+                .animate(1, 4, e -> e.size(radius * 2.4))
+                .vanish(9, 6);
         Fx.View view = plugin.fx().view(spot);
         Location up = spot.clone().add(0, 0.4, 0);
-        Location ground = spot.clone().add(0, 0.15, 0);
-        for (int k = 1; k <= 3; k++) {
-            double r = radius * k / 3.0;
-            plugin.visuals().later(k - 1, () -> view.fade(Shapes.ring(ground, r, (int) (10 + r * 8), r), SKY, INDIGO, 1.1f));
-        }
-        view.particle(Fx.EXPLOSION, up, 1, 0, 0, 0, 0);
+        view.particle(Fx.FLASH, up, 1, 0, 0, 0, 0);
         view.particle(Fx.FIREWORK, up, 25, 0.3, 0.3, 0.3, 0.18);
         view.particle(Fx.END_ROD, up, 12, 0.4, 0.4, 0.4, 0.1);
         view.dust(up, GOLD, 1.5f, 12, 0.6);
@@ -303,7 +271,12 @@ final class Starforged implements Kit {
         int duration = settings.ticks("duration");
         plugin.abilities().cooldowns().atLeast(weapon.id(), Ability.STARFALL, now, duration + settings.ticks("lockout"));
         Location center = ground.clone().add(0, 1.6, 0);
-        holes.put(player.getUniqueId(), new Hole(player, center, now, now + duration));
+        double radius = settings.num("radius");
+        Visuals.Effect core = plugin.visuals().spawn("black_hole", center).billboard().size(0.1).send(0)
+                .animate(1, 6, e -> e.size(3.0));
+        Visuals.Effect disk = plugin.visuals().spawn("accretion", center).size(0.1).send(0)
+                .animate(1, 8, e -> e.size(radius * 1.1));
+        holes.put(player.getUniqueId(), new Hole(player, center, now + duration, core, disk));
         plugin.fx().sound(center, "singularity");
         return Result.FIRED;
     }
@@ -311,10 +284,18 @@ final class Starforged implements Kit {
     private void drag(Hole hole, long now) {
         AbilitySettings settings = plugin.settings().ability(Ability.SINGULARITY);
         double radius = settings.num("radius");
-        Fx.View view = plugin.fx().view(hole.center);
-        if ((now - hole.opened) % 2 == 0) {
-            blackHole(hole, now, radius);
+        if (now % 4 == 0) {
+            hole.turn++;
+            hole.disk.turn(hole.turn * 70.0).send(4);
         }
+        Fx.View view = plugin.fx().view(hole.center);
+        view.particle(Fx.REVERSE_PORTAL, hole.center, 10, 0.3, 0.3, 0.3, 0.02);
+        for (int i = 0; i < 3; i++) {
+            double a = now * 0.35 + i * (Math.PI * 2 / 3);
+            Location point = hole.center.clone().add(Math.cos(a) * radius * 0.6, 0, Math.sin(a) * radius * 0.6);
+            view.dust(point, i == 0 ? SKY : i == 1 ? INDIGO : GOLD, 1.3f, 2, 0.15);
+        }
+        view.dust(hole.center, DEEP, 2.2f, 3, 0.3);
         if (!hole.player.isOnline()) {
             return;
         }
@@ -346,34 +327,26 @@ final class Starforged implements Kit {
             if (now % 10 == 0) {
                 Hits.effect(target, "slowness", 1, 12);
             }
-            if (now % 3 == 0) {
-                view.fade(Shapes.line(Geo.middle(target), hole.center, 0.4), INDIGO, DEEP, 0.8f);
-            }
         }
     }
 
     private void collapse(Hole hole) {
         AbilitySettings settings = plugin.settings().ability(Ability.SINGULARITY);
         double radius = settings.num("radius");
-        Fx.View implode = plugin.fx().view(hole.center);
-        implode.fade(Shapes.sphere(hole.center, 1.2, 30), INDIGO, DEEP, 1.6f); // It shrinks to a point...
-        implode.particle(Fx.REVERSE_PORTAL, hole.center, 40, 0.8, 0.8, 0.8, 0.4);
+        hole.core.animate(1, 3, e -> e.size(0.01)).life(5);
+        hole.disk.animate(1, 3, e -> e.size(0.01)).life(5);
         plugin.visuals().later(3, () -> {
             plugin.fx().sound(hole.center, "singularity-nova");
+            plugin.visuals().spawn("nova", hole.center.clone().add(0, -1.5, 0)).size(0.5).send(0)
+                    .animate(1, 5, e -> e.size(radius * 2.4).turn(90))
+                    .vanish(10, 6);
+            plugin.visuals().spawn("star", hole.center).billboard().size(0.5).send(0)
+                    .animate(1, 3, e -> e.size(6.5))
+                    .vanish(7, 5);
             Fx.View view = plugin.fx().view(hole.center);
-            // ...and bursts: a sonic boom, a flash of stars, shells of light out to the edge.
+            view.particle(Fx.FLASH, hole.center, 1, 0, 0, 0, 0);
             view.particle(Fx.SONIC_BOOM, hole.center, 1, 0, 0, 0, 0);
-            view.particle(Fx.EXPLOSION, hole.center, 3, 0.6, 0.6, 0.6, 0);
             view.particle(Fx.END_ROD, hole.center, 40, 0.5, 0.5, 0.5, 0.35);
-            view.particle(Fx.FIREWORK, hole.center, 30, 0.4, 0.4, 0.4, 0.3);
-            Location ground = hole.center.clone().add(0, -1.45, 0);
-            for (int k = 1; k <= 4; k++) {
-                double r = radius * k / 4.0;
-                plugin.visuals().later(k - 1, () -> {
-                    view.fade(Shapes.sphere(hole.center, r * 0.6, (int) (12 + r * 6)), SKY, INDIGO, 1.3f);
-                    view.fade(Shapes.ring(ground, r, (int) (12 + r * 6), r), GOLD, INDIGO, 1.2f);
-                });
-            }
             if (!hole.player.isOnline()) {
                 return;
             }
@@ -389,30 +362,6 @@ final class Starforged implements Kit {
                 }
             }
         });
-    }
-
-    /**
-     * The black hole: a dark core ringed by a gold photon ring, and an accretion disk of two
-     * glowing arms spiralling into it, growing as it opens.
-     */
-    private void blackHole(Hole hole, long now, double radius) {
-        double open = Math.min(1.0, (now - hole.opened + 1) / 8.0);
-        Fx.View view = plugin.fx().view(hole.center);
-        view.dust(Shapes.sphere(hole.center, 0.5 * open, 14), DEEP, 2.4f);
-        view.particle(Fx.INK, hole.center, 2, 0.15, 0.15, 0.15, 0.0);
-        view.dust(Shapes.ring(hole.center, 0.85 * open, 16, now * 0.3), GOLD, 1.0f);
-        double outer = radius * 0.55 * open;
-        for (int arm = 0; arm < 2; arm++) {
-            for (int i = 0; i < 18; i++) {
-                double t = i / 17.0;
-                double r = 1.0 + t * outer;
-                double a = arm * Math.PI + now * 0.22 + t * 3.6;
-                Location point = hole.center.clone().add(Math.cos(a) * r, 0, Math.sin(a) * r);
-                Color colour = t < 0.35 ? GOLD : t < 0.7 ? SKY : INDIGO;
-                view.dust(point, colour, (float) (1.4 - 0.5 * t), 1, 0);
-            }
-        }
-        view.particle(Fx.REVERSE_PORTAL, hole.center, 8, outer * 0.5, 0.3, outer * 0.5, 0.05);
     }
 
     // ---- Starstruck (passive) ------------------------------------------------------------------------------
@@ -432,16 +381,17 @@ final class Starforged implements Kit {
             return;
         }
         Location sky = target.getLocation().add(random.nextDouble() - 0.5, 9, random.nextDouble() - 0.5);
-        fallingStar(sky, Geo.middle(target), 5, 0.75);
+        Visuals.Effect star = plugin.visuals().spawn("star", sky).billboard().size(1.3).send(0);
+        plugin.visuals().later(1, () -> star.moveTo(Geo.middle(target), 4));
         plugin.fx().sound(sky, "starfall-star");
         plugin.visuals().later(5, () -> {
+            star.animate(1, 2, e -> e.size(2.8)).vanish(5, 4);
             AbilitySettings settings = plugin.settings().ability(Ability.STARSTRUCK);
             Location at = target.isValid() ? target.getLocation() : sky;
             plugin.fx().sound(at, "starstruck");
             Fx.View view = plugin.fx().view(at);
             view.particle(Fx.FIREWORK, at.clone().add(0, 1, 0), 15, 0.3, 0.3, 0.3, 0.15);
-            view.particle(Fx.END_ROD, at.clone().add(0, 1, 0), 8, 0.2, 0.2, 0.2, 0.12);
-            view.fade(Shapes.ring(at.clone().add(0, 0.15, 0), settings.num("radius"), 18, 0), GOLD, SKY, 1.1f);
+            view.dust(at.clone().add(0, 1, 0), GOLD, 1.4f, 10, 0.5);
             if (!attacker.isOnline() || settings.num("damage") <= 0) {
                 return;
             }

@@ -43,7 +43,6 @@ import java.util.UUID;
 final class Kurogane implements Kit, Listener {
 
     private static final Color CRIMSON = Color.fromRGB(215, 25, 55);
-    private static final Color DARK = Color.fromRGB(80, 0, 14);
     private static final Color STEEL = Color.fromRGB(240, 240, 248);
 
     private final LegendaryPlugin plugin;
@@ -76,10 +75,12 @@ final class Kurogane implements Kit, Listener {
     private static final class Stance {
         final Player player;
         final long until;
+        final Visuals.Effect ring;
 
-        Stance(Player player, long until) {
+        Stance(Player player, long until, Visuals.Effect ring) {
             this.player = player;
             this.until = until;
+            this.ring = ring;
         }
     }
 
@@ -168,7 +169,10 @@ final class Kurogane implements Kit, Listener {
                 plugin.abilities().startCooldown(chain.getKey(), Ability.CRIMSON_FLASH);
             }
         }
-        stances.remove(player.getUniqueId());
+        Stance stance = stances.remove(player.getUniqueId());
+        if (stance != null) {
+            stance.ring.remove();
+        }
         combos.forget(player.getUniqueId());
         cutting.remove(player.getUniqueId());
         bleeds.remove(player.getUniqueId());
@@ -186,12 +190,14 @@ final class Kurogane implements Kit, Listener {
         for (Iterator<Stance> it = stances.values().iterator(); it.hasNext(); ) {
             Stance stance = it.next();
             if (!stance.player.isOnline() || stance.player.isDead()) {
+                stance.ring.remove();
                 it.remove();
             } else if (now >= stance.until) {
                 it.remove();
                 release(stance);
-            } else if (now % 2 == 0) {
-                stanceFx(stance.player, now);
+            } else if (now % 3 == 0) {
+                Location at = stance.player.getLocation().add(0, 1.0, 0);
+                plugin.fx().view(at).dust(at, CRIMSON, 1.0f, 3, 0.45);
             }
         }
         for (Iterator<Bleed> it = bleeds.values().iterator(); it.hasNext(); ) {
@@ -202,7 +208,7 @@ final class Kurogane implements Kit, Listener {
             }
             Fx.View view = plugin.fx().view(bleed.target.getLocation());
             if (now % 3 == 0) {
-                view.fade(Geo.middle(bleed.target), CRIMSON, DARK, 0.9f, 2, 0.25);
+                view.dust(Geo.middle(bleed.target), CRIMSON, 1.0f, 2, 0.25);
             }
             if (now < bleed.next) {
                 continue;
@@ -266,7 +272,7 @@ final class Kurogane implements Kit, Listener {
                     continue;
                 }
                 if (plugin.hits().hurt(player, target, damage)) {
-                    cutFx(target, direction, 35);
+                    cutFx(target, 35);
                     plugin.fx().sound(target.getLocation(), "kurogane-hit");
                     bleed(player, target, bleedDamage, bleedTicks);
                 }
@@ -284,68 +290,36 @@ final class Kurogane implements Kit, Listener {
         return true;
     }
 
-    /** A crimson streak along the path with a white-hot core, sweep sparks, and a slash at the end. */
+    /** A crimson streak along the path, after-images and sparks. */
     private void drawFlash(Location start, Location end, Vector direction, double length) {
-        Location from = start.clone().add(0, 1.0, 0);
-        Location to = end.clone().add(0, 1.0, 0);
-        Fx.View view = plugin.fx().view(from.clone().add(to).multiply(0.5));
-        view.fade(Shapes.line(from, to, 0.16), CRIMSON, DARK, 1.5f);
-        view.dust(Shapes.line(from, to, 0.3), STEEL, 0.6f);
-        for (double d = 0.6; d < length; d += 1.6) {
-            view.particle(Fx.SWEEP, from.clone().add(direction.clone().multiply(d)), 1, 0, 0, 0, 0);
-        }
-        view.particle(Fx.CRIT, to, 18, 0.3, 0.5, 0.3, 0.35);
-        slash(to.clone().add(direction.clone().multiply(0.6)), direction, 2.0, -18, 3);
-    }
-
-    /**
-     * A sword stroke drawn as it is swung: a crescent of crimson dust that sweeps across over a
-     * few ticks, white at its edge, with sweep sparks.
-     */
-    private void slash(Location center, Vector facing, double radius, double tilt, int ticks) {
-        List<Location> arc = Shapes.arc(center, facing, radius, -80, 80, tilt, 34);
-        List<Location> inner = Shapes.arc(center, facing, radius * 0.86, -70, 70, tilt, 26);
-        Fx.View view = plugin.fx().view(center);
-        int parts = Math.max(1, ticks);
-        for (int k = 0; k < parts; k++) {
-            List<Location> outerPart = arc.subList(arc.size() * k / parts, arc.size() * (k + 1) / parts);
-            List<Location> innerPart = inner.subList(inner.size() * k / parts, inner.size() * (k + 1) / parts);
-            Runnable draw = () -> {
-                view.fade(outerPart, STEEL, CRIMSON, 1.1f);
-                view.fade(innerPart, CRIMSON, DARK, 1.4f);
-                if (!outerPart.isEmpty()) {
-                    view.particle(Fx.SWEEP, outerPart.get(outerPart.size() / 2), 1, 0, 0, 0, 0);
-                }
-            };
-            if (k == 0) {
-                draw.run();
-            } else {
-                plugin.visuals().later(k, draw);
+        Location middle = start.clone().add(end).multiply(0.5).add(0, 1.0, 0);
+        Visuals visuals = plugin.visuals();
+        visuals.spawn("crimson_streak", middle).facing(direction).size(0.3, 1.8, 0.3).send(0)
+                .animate(1, 3, e -> e.size(1.4, 2.2, length + 1.5))
+                .vanish(16, 8);
+        visuals.spawn("crimson_slash", end.clone().add(0, 1.1, 0)).facing(direction).tilt(-18).size(0.8).send(0)
+                .animate(1, 3, e -> e.size(4.2))
+                .vanish(9, 6);
+        Fx.View view = plugin.fx().view(middle);
+        for (double d = 0; d <= length; d += 0.5) {
+            Location point = start.clone().add(direction.clone().multiply(d)).add(0, 1.0, 0);
+            view.dust(point, d % 1.0 < 0.5 ? CRIMSON : STEEL, 1.2f, 2, 0.15);
+            if (d % 2.0 < 0.5) {
+                view.particle(Fx.SWEEP, point, 1, 0, 0, 0, 0);
             }
         }
+        view.particle(Fx.CRIT, end.clone().add(0, 1, 0), 20, 0.3, 0.5, 0.3, 0.3);
     }
 
-    /** The cut opening on a target: a crimson X across them, red chips and sparks. */
-    private void cutFx(LivingEntity target, Vector facing, int tilt) {
+    /** The cut opening on a target: a crimson X that flashes and fades. */
+    private void cutFx(LivingEntity target, int tilt) {
         Location at = Geo.middle(target);
-        Vector right = Geo.right(Shapes.flat(facing));
+        plugin.visuals().spawn("crimson_cut", at).billboard().tilt(tilt).size(0.4).send(0)
+                .animate(1, 2, e -> e.size(2.6))
+                .vanish(10, 6);
         Fx.View view = plugin.fx().view(at);
-        for (double angle : new double[]{tilt + 45.0, tilt - 45.0}) {
-            double a = Math.toRadians(angle);
-            Vector half = right.clone().multiply(Math.cos(a) * 0.75).add(new Vector(0, Math.sin(a) * 0.75, 0));
-            view.fade(Shapes.line(at.clone().subtract(half), at.clone().add(half), 0.1), STEEL, CRIMSON, 0.9f);
-        }
-        view.particle(Fx.BLOCK, at, 14, 0.2, 0.3, 0.2, 0.15, Material.REDSTONE_BLOCK.createBlockData());
+        view.dust(at, CRIMSON, 1.5f, 12, 0.35);
         view.particle(Fx.CRIT, at, 10, 0.3, 0.4, 0.3, 0.3);
-    }
-
-    /** Iaido's stance: a slowly turning crimson ring at the feet, and a few motes rising. */
-    private void stanceFx(Player player, long now) {
-        Location feet = player.getLocation().add(0, 0.1, 0);
-        Fx.View view = plugin.fx().view(feet);
-        view.fade(Shapes.ring(feet, 1.25, 26, now * 0.12), CRIMSON, DARK, 1.0f);
-        view.dust(Shapes.ring(feet, 0.95, 4, -now * 0.2), STEEL, 0.7f);
-        view.fade(feet.clone().add(0, 0.9, 0), CRIMSON, DARK, 0.8f, 2, 0.5);
     }
 
     // ---- Iaido -------------------------------------------------------------------------------------------
@@ -353,12 +327,15 @@ final class Kurogane implements Kit, Listener {
     private Result stance(Player player) {
         AbilitySettings settings = plugin.settings().ability(Ability.IAIDO);
         int ticks = settings.ticks("stance");
-        stances.put(player.getUniqueId(), new Stance(player, plugin.tick() + ticks));
-        Location chest = player.getLocation().add(0, 1.1, 0);
-        Fx.View view = plugin.fx().view(chest);
-        view.fade(Shapes.ring(player.getLocation().add(0, 0.1, 0), 1.6, 34, 0), STEEL, CRIMSON, 1.2f);
-        view.particle(Fx.MAGIC_CRIT, chest, 12, 0.3, 0.4, 0.3, 0.15);
-        stanceFx(player, plugin.tick());
+        Visuals.Effect ring = plugin.visuals().spawn("rune_crimson", player.getLocation().add(0, 0.06, 0)).size(0.4).send(0)
+                .animate(1, 4, e -> e.size(3.2).turn(90))
+                .follow(player, new Vector(0, 0.06, 0), ticks);
+        for (int t = 6; t < ticks; t += 6) {
+            int step = t / 6;
+            ring.animate(t, 6, e -> e.turn(90 + step * 60));
+        }
+        ring.vanish(ticks + 1, 4);
+        stances.put(player.getUniqueId(), new Stance(player, plugin.tick() + ticks, ring));
         Hits.effect(player, "slowness", 3, ticks);
         plugin.fx().sound(player.getLocation(), "iaido");
         return Result.FIRED;
@@ -380,16 +357,14 @@ final class Kurogane implements Kit, Listener {
         }
         event.setCancelled(true);
         stances.remove(player.getUniqueId());
+        stance.ring.animate(1, 2, e -> e.size(5.5)).vanish(5, 5);
         org.bukkit.potion.PotionEffectType slowness = Compat.effect("slowness");
         if (slowness != null) {
             player.removePotionEffect(slowness);
         }
         plugin.fx().sound(player.getLocation(), "iaido-parry");
         Fx.View view = plugin.fx().view(player.getLocation());
-        Location chest = player.getLocation().add(0, 1.2, 0);
-        view.particle(Fx.CRIT, chest, 25, 0.4, 0.5, 0.4, 0.45);
-        view.particle(Fx.MAGIC_CRIT, chest, 15, 0.3, 0.4, 0.3, 0.3);
-        view.dust(Shapes.standingRing(chest, Geo.flat(player.getLocation()), 0.9, 22, 0), STEEL, 1.0f);
+        view.particle(Fx.CRIT, player.getLocation().add(0, 1.2, 0), 25, 0.4, 0.5, 0.4, 0.4);
         AbilitySettings settings = plugin.settings().ability(Ability.IAIDO);
         if (attacker.getWorld() != player.getWorld()
                 || attacker.getLocation().distance(player.getLocation()) > settings.num("reach")
@@ -401,19 +376,22 @@ final class Kurogane implements Kit, Listener {
         Location behind = behind(attacker);
         if (behind != null && player.teleport(behind, PlayerTeleportEvent.TeleportCause.PLUGIN)) {
             player.setFallDistance(0f);
-            Location a = from.clone().add(0, 1.0, 0);
-            Location b = behind.clone().add(0, 1.0, 0);
-            view.fade(Shapes.line(a, b, 0.16), CRIMSON, DARK, 1.4f);
-            view.dust(Shapes.line(a, b, 0.3), STEEL, 0.6f);
+            Vector way = behind.toVector().subtract(from.toVector()).setY(0);
+            double length = way.length();
+            if (length > 0.5) {
+                plugin.visuals().spawn("crimson_streak", from.clone().add(behind).multiply(0.5).add(0, 1.0, 0))
+                        .facing(way).size(1.3, 2.0, length).send(0).vanish(10, 7);
+            }
         }
         if (plugin.hits().hurt(player, attacker, settings.num("damage"))) {
             AbilitySettings edge = plugin.settings().ability(Ability.CRIMSON_EDGE);
             bleed(player, attacker, edge.num("bleed-damage"), edge.ticks("bleed-duration"));
             Compat.heal(player, settings.num("heal"));
             Location at = Geo.middle(attacker);
-            Vector facing = Geo.flat(player.getLocation());
-            slash(at.clone().subtract(facing.clone().multiply(0.9)), facing, 1.7, 65, 3);
-            cutFx(attacker, facing, -40);
+            plugin.visuals().spawn("crimson_slash", at).facing(Geo.flat(player.getLocation())).tilt(30).size(1.0).send(0)
+                    .animate(1, 2, e -> e.size(4.6))
+                    .vanish(8, 6);
+            cutFx(attacker, -40);
             plugin.fx().sound(at, "iaido-counter");
         }
     }
@@ -448,26 +426,17 @@ final class Kurogane implements Kit, Listener {
         Location start = player.getLocation().add(0, 0.9, 0);
         Vector direction = Geo.flat(player.getLocation());
         Location end = start.clone().add(direction.clone().multiply(settings.num("slash-range")));
-        // The crescent flies out and fades: drawn a little further on each tick.
-        Fx.View view = plugin.fx().view(start);
-        double range = settings.num("slash-range");
-        int steps = Math.max(2, (int) Math.round(range / 1.2));
-        for (int k = 0; k < steps; k++) {
-            Location center = start.clone().add(direction.clone().multiply(0.4 + range * k / steps)).add(0, 0.2, 0);
-            float size = 1.4f - 0.6f * k / steps;
-            plugin.visuals().later(k, () -> {
-                List<Location> arc = Shapes.arc(center, direction, 1.5, -75, 75, 10, 28);
-                view.fade(arc, STEEL, CRIMSON, size);
-                view.particle(Fx.SWEEP, center.clone().add(direction.clone().multiply(1.5)), 1, 0, 0, 0, 0);
-            });
-        }
+        plugin.visuals().spawn("crimson_slash", player.getLocation().add(direction.clone().multiply(2.0)).add(0, 1.1, 0))
+                .facing(direction).tilt(10).size(1.2).send(0)
+                .animate(1, 3, e -> e.size(6.0))
+                .vanish(9, 6);
         plugin.fx().sound(player.getLocation(), "crimson-cut");
         if (settings.num("slash-damage") <= 0) {
             return;
         }
         for (LivingEntity target : plugin.hits().along(player, start, end, 1.4)) {
             if (plugin.hits().hurt(player, target, settings.num("slash-damage"))) {
-                cutFx(target, direction, 20);
+                cutFx(target, 20);
                 plugin.fx().sound(target.getLocation(), "kurogane-hit");
             }
         }
@@ -493,7 +462,7 @@ final class Kurogane implements Kit, Listener {
         }
         AbilitySettings settings = plugin.settings().ability(Ability.CRIMSON_EDGE);
         bleed(attacker, target, settings.num("bleed-damage"), settings.ticks("bleed-duration"));
-        cutFx(target, Geo.flat(attacker.getLocation()), plugin.tick() % 2 == 0 ? 30 : -30);
+        cutFx(target, plugin.tick() % 2 == 0 ? 30 : -30);
         plugin.fx().sound(target.getLocation(), "crimson-edge");
     }
 }

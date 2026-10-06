@@ -7,8 +7,8 @@ a gold pommel with an ice crystal.
 import math
 
 from forge import Weapon, shape
-from looks import gem, wrap
-from paint import bezier, clamp, fbm, hexrgb, line_dist, line_pos, mix, noise, ramp, smooth
+from looks import gem, scratches, wrap
+from paint import bezier, clamp, fbm, hexrgb, line_dist, line_pos, mix, noise, ramp, seg_dist, smooth
 
 NAVY = ramp('#050817', '#0b1430', '#15224d', '#22346e', '#34509a', '#5a7cc4')
 FROST = ramp('#3d5f9e', '#7ea4dc', '#c4dcf6', '#f2f8ff')
@@ -51,7 +51,15 @@ def blade_colour(s):
     c = mix(c, hexrgb('#4b2a8a'), 0.25 * smooth(0.55, 0.8, fbm(x * 2.1, y * 2.1, 43)))   # violet dust
     c = mix(c, FROST(0.25 + 0.6 * smooth(0.75, 0.15, de)), smooth(0.8, 0.6, de))      # frosted bevel
     c = mix(c, GOLD(0.62 + 0.25 * smooth(0.12, 0.0, rim)), smooth(0.19, 0.15, rim))    # gold trim
-    return c
+    # a fine gold inlay line inside the trim, beaded with little gold dots
+    inlay = smooth(0.03, 0.012, abs(rim - 0.31)) * smooth(0.9, 0.7, de)
+    _, along = line_pos(TOP_R if line_dist(TOP_R, x, y) < line_dist(BOTTOM_R, x, y) else BOTTOM_R, x, y)
+    bead = smooth(0.07, 0.03, math.hypot((along * 40) % 1.0 - 0.5, (rim - 0.31) * 8)) * smooth(0.9, 0.7, de)
+    c = mix(c, GOLD(0.7), max(inlay, bead))
+    # the constellation: faint lines joining the stars
+    for a, b in zip(STARS, STARS[1:]):
+        c = mix(c, hexrgb('#5f9be8'), 0.55 * smooth(0.022, 0.006, seg_dist(x, y, a, b)))
+    return mix(c, FROST(0.6), 0.3 * scratches(x, y, 47, 6.0))
 
 
 def blade_metal(s):

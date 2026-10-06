@@ -165,8 +165,20 @@ def cord_pattern(s):
     return False, min(d1, d2)
 
 
+def menuki(s):
+    """The gold ornament under the cord on each side of the handle: 0..1 how far inside it."""
+    a = math.atan2(math.sin(s.a), math.cos(s.a))
+    side = min(abs(a), abs(abs(a) - math.pi))
+    q = ((s.y - 2.95) / 0.5) ** 2 + (side / 0.55) ** 2
+    return smooth(1.0, 0.75, q)
+
+
 def handle_colour(s):
     on, d = cord_pattern(s)
+    m = menuki(s)
+    if m > 0 and not on:
+        swirl = 0.5 + 0.5 * math.sin(s.y * 22 + s.a * 9)
+        return GOLD(0.45 + 0.35 * swirl * m)
     if on:
         weave = 0.85 + 0.15 * math.sin((s.y * 1.05 + s.a / 6.28) * 120)
         return tuple(v * weave for v in CORD(0.55 + 0.3 * (1 - d)))
@@ -178,6 +190,8 @@ def handle_height(s):
     on, d = cord_pattern(s)
     if on:
         return 0.05 * math.sqrt(max(0.0, 1 - d * d))
+    if menuki(s) > 0:
+        return 0.035 * menuki(s)
     return 0.012 * noise(s.u * 26, s.y * 26, 9)
 
 
@@ -190,7 +204,19 @@ def tsuba_colour(s):
     if rho < 0.82:
         return GOLD(0.5) if rho > 0.72 else IRON
     hammered = 0.8 + 0.4 * fbm(s.x * 5, s.z * 5, 21)
-    return tuple(v * hammered for v in mix(IRON, hexrgb('#3a2c2a'), 0.4 * fbm(s.x * 2, s.z * 2, 22)))
+    c = tuple(v * hammered for v in mix(IRON, hexrgb('#3a2c2a'), 0.4 * fbm(s.x * 2, s.z * 2, 22)))
+    return mix(c, GOLD(0.62), tsuba_inlay(s))                     # gold-inlaid blossom
+
+
+def tsuba_inlay(s):
+    """A five-petal blossom engraved round the guard and inlaid with gold: 0..1."""
+    rho = 1.55 - s.d
+    if not 0.84 < rho < 1.38:
+        return 0.0
+    petal = 1.08 + 0.17 * math.cos(5 * s.a)
+    line = smooth(0.035, 0.0, abs(rho - petal))
+    notch = smooth(0.03, 0.0, abs(math.sin(2.5 * s.a)) * rho) * smooth(0.97, 1.0, rho) * smooth(1.32, 1.27, rho)
+    return max(line, notch)
 
 
 def tsuba_height(s):
@@ -200,7 +226,7 @@ def tsuba_height(s):
     h = 0.03 * smooth(0.18, 0.1, s.d)
     h += 0.015 * fbm(s.x * 5, s.z * 5, 21)
     h += 0.02 * smooth(0.86, 0.8, rho)
-    return h
+    return h - 0.015 * tsuba_inlay(s)
 
 
 def build():

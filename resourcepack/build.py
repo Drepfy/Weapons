@@ -15,6 +15,7 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(ROOT, 'lifesteal', 'resourcepack'))
 import textures  # noqa: E402
+import fx  # noqa: E402
 import tooltips  # noqa: E402
 import make_heart  # noqa: E402
 
@@ -82,8 +83,11 @@ def files():
         # 1.21.4+: item model definitions
         out[f'assets/minecraft/items/{item}.json'] = as_json(
             dispatch(item, [(cmd, f'legendary:item/{name}') for cmd, name in weapons]))
-    # The abilities' effects are vanilla particles and blocks, and their sounds vanilla sounds:
-    # nothing for them in the pack.
+    # ---- the abilities' effects (display entities); their sounds are vanilla sounds ----
+    for name in fx.EFFECTS:
+        out[f'assets/legendary/textures/item/fx/{name}.png'] = textures.png.encode(fx.texture(name))
+        out[f'assets/legendary/models/fx/{name}.json'] = as_json(fx.model(name))
+        out[f'assets/legendary/items/fx/{name}.json'] = as_json(fx.item(name))
     return out
 
 

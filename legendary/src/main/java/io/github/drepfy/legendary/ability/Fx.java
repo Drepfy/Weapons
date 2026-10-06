@@ -41,16 +41,6 @@ public final class Fx {
     public static final Particle CLOUD = Compat.particle("CLOUD");
     public static final Particle FLAME = Compat.particle("FLAME");
     public static final Particle SONIC_BOOM = Compat.particle("SONIC_BOOM", "EXPLOSION", "EXPLOSION_LARGE");
-    public static final Particle FADE = Compat.particle("DUST_COLOR_TRANSITION");
-    public static final Particle ITEM = Compat.particle("ITEM", "ITEM_CRACK");
-    public static final Particle SOUL_FIRE = Compat.particle("SOUL_FIRE_FLAME");
-    public static final Particle LAVA = Compat.particle("LAVA");
-    public static final Particle SMOKE = Compat.particle("LARGE_SMOKE", "SMOKE_LARGE");
-    public static final Particle EMBER_SMOKE = Compat.particle("CAMPFIRE_COSY_SMOKE", "LARGE_SMOKE", "SMOKE_LARGE");
-    public static final Particle GUST = Compat.particle("GUST", "EXPLOSION", "EXPLOSION_LARGE");
-    public static final Particle SCULK_SOUL = Compat.particle("SCULK_SOUL", "SOUL");
-    public static final Particle GLOW = Compat.particle("GLOW", "END_ROD");
-    public static final Particle NOTE_SPARK = Compat.particle("WAX_OFF", "END_ROD");
 
     private final Supplier<Settings> settings;
     private int crackIds = 0x4C470000;
@@ -159,47 +149,6 @@ public final class Fx {
         public void dust(Location at, Color color, float size, int count, double spread) {
             if (DUST != null) {
                 particle(DUST, at, count, spread, spread, spread, 0, new Particle.DustOptions(color, size));
-            }
-        }
-
-        /** One dust mote at each point (a shape drawn in colour). */
-        public void dust(List<Location> points, Color color, float size) {
-            for (Location point : points) {
-                dust(point, color, size, 1, 0);
-            }
-        }
-
-        /** Dust that fades from one colour to another as it settles. */
-        public void fade(Location at, Color from, Color to, float size, int count, double spread) {
-            if (FADE == null) {
-                dust(at, from, size, count, spread);
-                return;
-            }
-            try {
-                particle(FADE, at, count, spread, spread, spread, 0, new Particle.DustTransition(from, to, size));
-            } catch (RuntimeException | LinkageError e) {
-                dust(at, from, size, count, spread);
-            }
-        }
-
-        /** The same along a shape. */
-        public void fade(List<Location> points, Color from, Color to, float size) {
-            for (Location point : points) {
-                fade(point, from, to, size, 1, 0);
-            }
-        }
-
-        /** One particle at each point of a shape (sparks along a slash, flames round a ring). */
-        public void along(Particle particle, List<Location> points, double speed) {
-            for (Location point : points) {
-                particle(particle, point, 1, 0, 0, 0, speed);
-            }
-        }
-
-        /** Bits of an item flying out (sugar, bones...). */
-        public void item(Location at, org.bukkit.inventory.ItemStack item, int count, double spread, double speed) {
-            if (ITEM != null) {
-                particle(ITEM, at, count, spread, spread, spread, speed, item);
             }
         }
 

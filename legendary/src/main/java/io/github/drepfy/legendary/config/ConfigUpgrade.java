@@ -9,14 +9,14 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Brings an older config.yml up to date: settings of abilities that were replaced (Candy Cyclone
- * in 1.4), the action bar settings and the messages and sounds that no longer exist are removed,
+ * Brings an older config.yml up to date: settings of abilities that were replaced (Candy Barrage
+ * in 1.6), the action bar settings and the messages and sounds that no longer exist are removed,
  * and enchantments still at the old default (Sharpness 6) become the new ones. Texts and
  * settings still at an old default are handled by {@link TextUpdate}.
  */
 public final class ConfigUpgrade {
 
-    public static final int VERSION = 4;
+    public static final int VERSION = 5;
 
     private ConfigUpgrade() {
     }

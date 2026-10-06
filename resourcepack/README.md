@@ -46,7 +46,14 @@ burnished back; Sugarcrash's glossy hard candy with a clear shine, sugar sparkle
 stripes; Riftblade's void steel with violet and blue nebula clouds and stars; Gravebreaker's
 forged blued steel with shallow hammer facets and a mirror-bright ground edge (not rough stone);
 Starforged's star-steel and gold. Polished metal reflects a studio with a crisp horizon, so it
-looks like steel and not grey plastic. Every texel is lit smoothly from its own slope, so
+looks like steel and not grey plastic. Up close each weapon has fine detail worked into the
+metal, the way a real smith would: Kurogane's guard is inlaid with a gold blossom and a gold
+ornament sits under the silk cord; Sugarcrash's silver collar is engraved with scrollwork;
+Riftblade has violet runes glowing up the blade above the guard and scrollwork on the guard;
+Gravebreaker has a band of runes cut along the edge, an engraved border round its plate and
+the scratches of use; Starforged has a gold line inlaid round its blades with beads at the
+ends and its stars joined into constellations. Worn steel catches the light along its
+scratches (`scratches`, `runes` and `scroll` in `models/looks.py`). Every texel is lit smoothly from its own slope, so
 blades have real bevels and highlights, metal reflects light, gems show their facets and
 glowing parts bloom onto the steel round them. Grips, hafts, collars and the katana's guard are
 round (8 or 16 sided, lit as if perfectly round), the outlines of blades and axe heads are
@@ -79,11 +86,20 @@ shown, and `models/render.py` draws the showcase. `python3 textures.py --preview
   faint glow at the edge, and a thin frame shading from one colour to another with small gems
   in the corners. Nine-sliced like the vanilla one, so it fits any length of lore. Drawn by
   `tooltips.py`.
-- **No effects or sounds** (Legendary 1.5): the abilities draw their effects with vanilla
-  particles and blocks and play vanilla sounds, so the pack holds only the weapons, their
-  tooltips and the Heart.
+- **Ability effects** (`items/fx/*.json`, `models/fx`, `textures/item/fx`): 19 glowing effects the
+  abilities show with display entities: Kurogane's crimson streak, slash, cut and rune circle;
+  Sugarcrash's candy-cane hook, candy burst, the candy ring of its cyclone and the dizzy candy
+  stars over a stunned player; Riftblade's rift, void portal and void burst; Gravebreaker's
+  shockwave, ember ring and a 3D gravestone; Starforged's rune circle, star, nova, black hole
+  and accretion disk. Each is painted with soft edges at 64 to 256 pixels by `fx.py` (flat ones
+  lie on the ground, upright ones stand facing the viewer), lit at full brightness so they glow
+  at night. Thin lines are thickened and every effect has a soft glow of its own colour round
+  it, so they stand out in daylight and from afar too (`BOLD` in `fx.py`). Without the pack
+  they show as paper.
+- **No sounds:** the abilities play a few vanilla sounds (one per ability), so everyone hears
+  them, pack or not, and the pack holds no sound files.
 
 After `build.py`, `python3 check.py` checks the pack against the plugin: every file parses,
-every model and texture the weapons use is there, every texture a model uses is in
-`textures/item/` or `textures/block/` (anywhere else it shows as the purple and black missing
-texture), and the plugin asks the pack for no effect model or sound.
+every model and texture the weapons and every effect the plugin uses is there, every texture
+a model uses is in `textures/item/` or `textures/block/` (anywhere else it shows as the purple
+and black missing texture), and the plugin asks the pack for no sound.

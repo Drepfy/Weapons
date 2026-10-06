@@ -1,11 +1,16 @@
 package io.github.drepfy.legendary.ability;
 
 import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.ItemDisplay;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.util.Transformation;
 import org.bukkit.util.Vector;
 import org.joml.Quaternionf;
@@ -19,11 +24,13 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 /**
- * Timing for the abilities' effects ({@link #later}), and the real blocks some of them show:
- * rocks thrown up by a slam, gravestones rising out of the ground. Those are block displays of
- * vanilla blocks: the server says where one starts and where it ends up, and the players' game
- * moves it smoothly in between. They are never saved with the world and are cleared when the
- * plugin stops. Everything else is drawn with particles ({@link Shapes}).
+ * The abilities' 3D effects: slashes, rifts, rune circles, stars, a black hole... Each is a
+ * model from the resource pack ({@code legendary:fx/<name>}) shown by a display entity. The
+ * server only says where it starts and where it ends up; the players' game animates it smoothly
+ * in between. Effects are never saved with the world and are cleared when the plugin stops.
+ *
+ * <p>Models are flat (lying on the ground, facing up) or upright (standing, facing the viewer
+ * along +z), one block across at scale 1. Without the resource pack they show as paper.
  */
 public final class Visuals {
 
@@ -77,6 +84,37 @@ public final class Visuals {
     public int count() {
         alive.removeIf(display -> !display.isValid());
         return alive.size();
+    }
+
+    /** A model effect at a place. */
+    public Effect spawn(String model, Location at) {
+        World world = at.getWorld();
+        if (world == null) {
+            return Effect.NONE;
+        }
+        ItemStack item = new ItemStack(Material.PAPER);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            try {
+                meta.setItemModel(NamespacedKey.fromString("legendary:fx/" + model));
+            } catch (RuntimeException | LinkageError ignored) {
+                // Before 1.21.2 there are no item models: the effect shows as paper.
+            }
+            item.setItemMeta(meta);
+        }
+        Location place = at.clone();
+        place.setYaw(0f);
+        place.setPitch(0f);
+        try {
+            ItemDisplay display = world.spawn(place, ItemDisplay.class, d -> {
+                d.setItemStack(item);
+                d.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.NONE);
+                setup(d);
+            });
+            return track(display);
+        } catch (RuntimeException | LinkageError e) {
+            return Effect.NONE;
+        }
     }
 
     /** A block shown as an effect (rock thrown up by a slam). */
