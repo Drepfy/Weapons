@@ -5,8 +5,11 @@ import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -97,9 +100,21 @@ final class ZoneStore {
             yaml.set(path + ".x2", zone.maxX());
             yaml.set(path + ".z2", zone.maxZ());
         }
+        // Written to a temporary file first: a crash while saving never leaves a half-written file.
         try {
-            Files.createDirectories(file.toAbsolutePath().getParent());
-            yaml.save(file.toFile());
+            Path parent = file.toAbsolutePath().getParent();
+            Files.createDirectories(parent);
+            Path temp = Files.createTempFile(parent, "zones", ".tmp");
+            try {
+                Files.writeString(temp, yaml.saveToString(), StandardCharsets.UTF_8);
+                try {
+                    Files.move(temp, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+                } catch (AtomicMoveNotSupportedException e) {
+                    Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING);
+                }
+            } finally {
+                Files.deleteIfExists(temp);
+            }
         } catch (IOException e) {
             logger.warning("Could not save " + file.getFileName() + ": " + e.getMessage());
         }

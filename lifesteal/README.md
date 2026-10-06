@@ -111,8 +111,9 @@ lifesteal.alts().register(new AltCheck() {
    pack to everyone who joins, or put it in `server.properties` (`resource-pack=` and
    `resource-pack-sha1=`) yourself.
 
-If you already use a server resource pack, copy the `assets` folder from the zip into
-yours. The texture is drawn by `resourcepack/make_heart.py`; `resourcepack/build.py`
+On 1.20.3 and newer the plugin's pack is added next to the server's own pack, never in
+place of it. If you already use a server resource pack, you can also copy the `assets` folder
+from the zip into yours (the ᴠᴀɴɪʟʟᴀ sᴍᴘ server pack already has the Heart). The texture is drawn by `resourcepack/make_heart.py`; `resourcepack/build.py`
 rebuilds the zip. If you change `heart-item.custom-model-data` or `heart-item.material`,
 change the pack to match.
 

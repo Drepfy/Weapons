@@ -45,6 +45,8 @@ public final class Abilities implements Listener {
     private final Map<WeaponType, Kit> kits = new EnumMap<>(WeaponType.class);
     private final Map<UUID, Long> lastUse = new HashMap<>();
     private final Map<UUID, Long> softLandings = new HashMap<>();
+    /** Players who died or changed world: their abilities are stopped at the start of the next tick. */
+    private final java.util.Set<Player> toForget = new java.util.LinkedHashSet<>();
 
     public Abilities(LegendaryPlugin plugin) {
         this.plugin = plugin;
@@ -209,8 +211,18 @@ public final class Abilities implements Listener {
     }
 
     public void tick(long now) {
+        // Deaths and world changes can happen in the middle of an ability's tick (its own damage
+        // killing someone): what the player had going is let go of here, between ticks.
+        List<Player> leaving = new java.util.ArrayList<>(toForget);
+        toForget.clear();
+        leaving.forEach(this::forget);
         for (Kit kit : kits.values()) {
-            kit.tick(now);
+            try {
+                kit.tick(now);
+            } catch (RuntimeException e) {
+                // One weapon's bug must not stop the others (or the rest of the plugin).
+                plugin.reportError(kit.type().key() + " abilities", e);
+            }
         }
         if (now % 20 == 0) {
             softLandings.values().removeIf(until -> until < now);
@@ -259,12 +271,12 @@ public final class Abilities implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onDeath(PlayerDeathEvent event) {
-        forget(event.getEntity());
+        toForget.add(event.getEntity());
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onWorldChange(PlayerChangedWorldEvent event) {
-        forget(event.getPlayer());
+        toForget.add(event.getPlayer());
     }
 
     private void forget(Player player) {

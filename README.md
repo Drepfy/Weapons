@@ -661,7 +661,8 @@ climbing, with anti-kick dips, claiming to be on the ground, taking off after
 walking), ground Speed and KillAura (4.5 block reach, no rotations). Each must be
 **banned within a time limit** (see "How a ban happens"). They also check that legit sprint-jumping, wall jumps, stairs,
 bridging, knockback, falls with damage, normal fights, fights against a strafing
-target, real mace smashes and normal branch mining are **never** flagged, and that
+target, real mace smashes (and 1.21.11 spears, whose longer reach and Lunge jabs are
+allowed for) and normal branch mining are **never** flagged, and that
 chests in plain view are never hidden. They also check that flying, speed, walking
 on water, reach, kill aura, no-swing, auto clicking, anti-knockback (also
 mid-combo), NoFall, scaffold, fake mace falls and x-ray mining **are** flagged; that

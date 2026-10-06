@@ -1310,6 +1310,24 @@ class LegendaryTest {
     }
 
     @Test
+    void abilityDamageThatKillsBreaksNothing() {
+        PlayerMock steve = player("Steve", 0, 0);
+        PlayerMock alex = player("Alex", 0, 3);
+        PlayerMock bob = player("Bob", 0, 5);
+        alex.setHealth(7.0);
+        bob.setHealth(7.0);
+        give(steve, WeaponType.KUROGANE);
+        useKey(steve); // The cut leaves both on half a heart; the bleeding finishes both on the same tick.
+        tick(12);
+        assertEquals(1.0, alex.getHealth(), 1.0E-6);
+        assertEquals(1.0, bob.getHealth(), 1.0E-6);
+        tick(25);
+        assertTrue(alex.isDead() && bob.isDead(), "both bled out: " + alex.getHealth() + ", " + bob.getHealth());
+        tick(4);
+        assertEquals(2, plugin.hud().bars(steve).size(), "everything else kept running");
+    }
+
+    @Test
     void creativePlayersAndPvpOffAreLeftAlone() {
         PlayerMock steve = player("Steve", 0, 0);
         PlayerMock builder = player("Builder", 0, 3);

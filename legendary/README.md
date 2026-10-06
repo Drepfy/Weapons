@@ -189,6 +189,15 @@ older version's default (for example Crimson Flash's 20s cooldown from 1.2, or 1
 and shimmer setting) become the new defaults, and enchantments still at the old Sharpness VI
 become the new ones. Anything you changed yourself is kept. Everything is saved in `config.yml`.
 
+## Robust on a live server
+
+Each part runs on its own every tick (effects, abilities, boss bars, the duplicate tracking):
+an error in one is logged once a minute and never stops the others. A player killed by an
+ability (bleeding out, a slam) is let go of between ticks, so nothing is changed while an
+ability is still working through its targets. Asking protection plugins whether a pull or a
+swap is allowed uses the newest event Paper has (the older ones are marked for removal), and
+if it cannot ask, the answer is no.
+
 ## Building and testing
 
 ```bash
@@ -196,7 +205,7 @@ cd legendary
 mvn -B package   # runs the tests, writes target/Legendary-<version>.jar
 ```
 
-`mvn test` runs 57 tests on a simulated server:
+`mvn test` runs 58 tests on a simulated server:
 - **Every ability and passive:** what it hits and when (Crimson Flash's two charges and
   bleeding, Iaido's counter and crescent, Crimson Edge's count, the hook's yank, stun and
   grapple, the cyclone deflecting arrows, Sugar High's crash, the rift's pull, snap and lift,
@@ -204,7 +213,8 @@ mvn -B package   # runs the tests, writes target/Legendary-<version>.jar
   hit cap and the circle following your aim, the black hole and nova, Starstruck), walls,
   cooldowns and the Starforged lockout.
 - **Protection:** protected players are never hurt, pulled, yanked or swapped; creative and PvP-off;
-  counters and dodges ignore protection checks.
+  counters and dodges ignore protection checks; ability kills (two players bleeding out on the
+  same tick) break nothing.
 - **Look:** enchantments listed by the game, the shimmer, item model, tooltip style, the lore's
   own enchantment lines when asked for,
   the boss bars (names, times, progress, flashing, hidden when put away), and the 3D effects

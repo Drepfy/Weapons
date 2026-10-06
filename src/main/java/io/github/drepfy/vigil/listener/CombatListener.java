@@ -11,6 +11,7 @@ import io.github.drepfy.vigil.check.combat.ReachCheck;
 import io.github.drepfy.vigil.check.combat.WallHitCheck;
 import io.github.drepfy.vigil.data.PlayerData;
 import io.github.drepfy.vigil.util.Clock;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.ComplexEntityPart;
 import org.bukkit.entity.ComplexLivingEntity;
 import org.bukkit.entity.Entity;
@@ -24,6 +25,9 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerAnimationEvent;
 import org.bukkit.event.player.PlayerAnimationType;
+import org.bukkit.inventory.ItemStack;
+
+import java.util.Map;
 
 /**
  * Melee attacks and arm swings.
@@ -39,6 +43,9 @@ public final class CombatListener implements Listener {
     private final CheckContext ctx;
     private final LifecycleListener lifecycle;
     private final ReachCheck reach;
+    /** A Lunge spear's grace opens at most this often. */
+    private static final long LUNGE_INTERVAL_MS = 1000;
+
     private final KillAuraCheck killAura;
     private final WallHitCheck wallHit;
     private final NoSwingCheck noSwing;
@@ -144,8 +151,38 @@ public final class CombatListener implements Listener {
         long now = Clock.now();
         PlayerData data = ctx.players().get(player);
         data.lastSwingMs = now;
+        lunge(player, data, now);
         if (ctx.settings().general().enabled()) {
             ctx.run(CheckType.AUTOCLICKER, now, () -> autoClicker.onSwing(player, data, now));
         }
+    }
+
+    /**
+     * A jab with a Lunge spear (1.21.11+) throws the player forward. Usually the server sends that
+     * push (a velocity event), but in case the client moves itself, a jab with such a spear opens
+     * a short grace too: at most once a second, so swinging one cannot keep the checks away.
+     */
+    private void lunge(Player player, PlayerData data, long now) {
+        if (now - data.lastLungeMs < LUNGE_INTERVAL_MS) {
+            return;
+        }
+        int level = lungeLevel(player.getInventory().getItemInMainHand());
+        if (level > 0) {
+            data.lastLungeMs = now;
+            lifecycle.impulse(player, data, 0.6 * level, now);
+        }
+    }
+
+    /** The Lunge level of a spear (0 for anything else). Looked up by name: older servers have neither. */
+    static int lungeLevel(ItemStack item) {
+        if (item == null || !item.getType().name().endsWith("_SPEAR") || !item.hasItemMeta()) {
+            return 0;
+        }
+        for (Map.Entry<Enchantment, Integer> enchantment : item.getEnchantments().entrySet()) {
+            if (enchantment.getKey().getKey().getKey().equals("lunge")) {
+                return enchantment.getValue();
+            }
+        }
+        return 0;
     }
 }

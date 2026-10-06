@@ -27,7 +27,9 @@ import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 
 /**
@@ -203,22 +205,41 @@ public final class Hits implements Listener {
             Bukkit.getPluginManager().callEvent(probe);
             return !probe.isCancelled();
         } catch (RuntimeException | LinkageError e) {
-            return true;
+            return false; // Could not ask: better not to pull anyone out of a protected area.
         } finally {
             pending = outer;
             probing = outerProbing;
         }
     }
 
-    /** An attack event that is only asked about, never applied. */
+    /**
+     * An attack event that is only asked about, never applied. Built with the newest constructor
+     * the server has: Paper marked the shorter ones for removal, so newer servers may not have
+     * them.
+     */
     private static EntityDamageByEntityEvent probe(Player attacker, LivingEntity target) {
+        DamageSource source;
         try {
-            DamageSource source = DamageSource.builder(DamageType.GENERIC).withCausingEntity(attacker)
-                    .withDirectEntity(attacker).build();
-            return new EntityDamageByEntityEvent(attacker, target, EntityDamageEvent.DamageCause.CUSTOM, source, 0.0);
+            source = DamageSource.builder(DamageType.GENERIC).withCausingEntity(attacker).withDirectEntity(attacker).build();
         } catch (RuntimeException | LinkageError e) {
             return legacyProbe(attacker, target); // Before 1.20.5: no damage sources.
         }
+        try {
+            Map<EntityDamageEvent.DamageModifier, Double> modifiers = new EnumMap<>(EntityDamageEvent.DamageModifier.class);
+            modifiers.put(EntityDamageEvent.DamageModifier.BASE, 0.0);
+            Map<EntityDamageEvent.DamageModifier, com.google.common.base.Function<? super Double, Double>> functions =
+                    new EnumMap<>(EntityDamageEvent.DamageModifier.class);
+            functions.put(EntityDamageEvent.DamageModifier.BASE, com.google.common.base.Functions.constant(-0.0));
+            return new EntityDamageByEntityEvent(attacker, target, EntityDamageEvent.DamageCause.CUSTOM, source,
+                    modifiers, functions, false);
+        } catch (RuntimeException | LinkageError e) {
+            return sourceProbe(attacker, target, source); // 1.20.5 to 1.21.3.
+        }
+    }
+
+    @SuppressWarnings({"deprecation", "removal"})
+    private static EntityDamageByEntityEvent sourceProbe(Player attacker, LivingEntity target, DamageSource source) {
+        return new EntityDamageByEntityEvent(attacker, target, EntityDamageEvent.DamageCause.CUSTOM, source, 0.0);
     }
 
     @SuppressWarnings({"deprecation", "removal"})

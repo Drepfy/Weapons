@@ -53,6 +53,7 @@ public class LegendaryPlugin extends JavaPlugin {
     private Hud hud;
     private LongSupplier clock = System::currentTimeMillis;
     private long ticks;
+    private final java.util.Set<String> reportedErrors = new java.util.HashSet<>();
     private final Map<String, Long> notices = new HashMap<>();
 
     @Override
@@ -107,20 +108,38 @@ public class LegendaryPlugin extends JavaPlugin {
 
     private void onTick() {
         ticks++;
-        visuals.tick(ticks);
-        abilities.tick(ticks);
+        // Each part on its own: a bug in one (an effect, a boss bar) never stops the others,
+        // above all the tracking that keeps legendaries from being duplicated.
+        safely("effects", () -> visuals.tick(ticks));
+        safely("abilities", () -> abilities.tick(ticks));
         if (ticks % 2 == 0) {
-            hud.update(ticks);
+            safely("boss bars", () -> hud.update(ticks));
         }
         if (ticks % 10 == 0) {
-            tracker.checkGround();
+            safely("tracking", tracker::checkGround);
         }
         if (ticks % 40 == 0) {
-            tracker.scan();
+            safely("tracking", tracker::scan);
         }
         if (ticks % 1200 == 0) {
-            registry.save(ipCutoff());
+            safely("saving", () -> registry.save(ipCutoff()));
             notices.clear();
+            reportedErrors.clear();
+        }
+    }
+
+    private void safely(String part, Runnable action) {
+        try {
+            action.run();
+        } catch (RuntimeException e) {
+            reportError(part, e);
+        }
+    }
+
+    /** Logs an error once a minute per part (not every tick). */
+    public void reportError(String part, RuntimeException e) {
+        if (reportedErrors.add(part)) {
+            getLogger().log(java.util.logging.Level.SEVERE, "Error in " + part + " (the rest keeps running)", e);
         }
     }
 

@@ -32,6 +32,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -214,11 +215,25 @@ public class LifestealPlugin extends JavaPlugin implements Listener {
         recipe.discover(player);
         Settings.ResourcePack pack = settings.resourcePack();
         if (!pack.url().isEmpty() && packHash != null) {
+            // Added next to the server's own pack (server.properties). Sending it the old way
+            // would replace every other pack, the legendary weapons' included.
+            java.util.UUID id = java.util.UUID.nameUUIDFromBytes(("lifesteal:" + pack.url()).getBytes(StandardCharsets.UTF_8));
             try {
-                player.setResourcePack(pack.url(), packHash, Text.color(pack.prompt()), pack.required());
-            } catch (LinkageError | RuntimeException e) {
+                player.addResourcePack(id, pack.url(), packHash, Text.color(pack.prompt()), pack.required());
+            } catch (LinkageError e) {
+                sendOldWay(player, pack); // Before 1.20.3 a player has only one pack anyway.
+            } catch (RuntimeException e) {
                 getLogger().fine("Could not send the resource pack: " + e);
             }
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private void sendOldWay(Player player, Settings.ResourcePack pack) {
+        try {
+            player.setResourcePack(pack.url(), packHash, Text.color(pack.prompt()), pack.required());
+        } catch (LinkageError | RuntimeException e) {
+            getLogger().fine("Could not send the resource pack: " + e);
         }
     }
 

@@ -50,6 +50,8 @@ public final class PlayerData {
     public long lastGlideMs = NEVER;
     public long lastRiptideMs = NEVER;
     public long lastFlyingMs = NEVER;
+    /** The last jab with a Lunge spear (it throws the player forward). */
+    public long lastLungeMs = NEVER;
     public long lastLiquidMs = NEVER;
     public long lastClimbMs = NEVER;
     public long lastSlowingMs = NEVER;
