@@ -21,10 +21,11 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * While a legendary is held, a boss bar for each of its abilities at the top of the screen:
- * the ability's name and how long until it can be used again, the bar filling up as it
- * recharges (and running down while an ability lasts, such as Blood Moon). The action bar is
- * left to other plugins (the Combat plugin's timer).
+ * While a legendary is held, a boss bar at the top of the screen for each of its abilities that
+ * is recharging: the ability's name and how long until it can be used again, the bar filling up
+ * as it recharges (and running down while an ability lasts or can be pressed again). A ready
+ * ability has no bar, unless display.boss-bars-when-ready is on. The action bar is left to other
+ * plugins (the Combat plugin's timer).
  */
 public final class Hud {
 
@@ -108,6 +109,15 @@ public final class Hud {
         Settings.Look look = settings.look(tag.type());
         for (Ability ability : tag.type().actives()) {
             BossBar bar = current.byAbility.get(ability);
+            if (!settings.barsWhenReady() && plugin.abilities().active(player, tag, ability, now) <= 0
+                    && plugin.abilities().cooldown(tag, ability, now) <= 0) {
+                // Ready: no bar (it only shows while the ability runs or recharges).
+                if (bar != null) {
+                    bar.removeAll();
+                    current.byAbility.remove(ability);
+                }
+                continue;
+            }
             if (bar == null) {
                 bar = Bukkit.createBossBar("", look.barColor(), BarStyle.SOLID);
                 bar.addPlayer(player);

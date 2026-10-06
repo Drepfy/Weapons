@@ -16,6 +16,7 @@ public record Settings(
         Controls controls,
         HitMobs hitMobs,
         boolean bossBars,
+        boolean barsWhenReady,
         Map<WeaponType, Look> looks,
         Map<Ability, AbilitySettings> abilities,
         Map<String, List<SoundSpec>> sounds,

@@ -1324,7 +1324,8 @@ class LegendaryTest {
         tick(25);
         assertTrue(alex.isDead() && bob.isDead(), "both bled out: " + alex.getHealth() + ", " + bob.getHealth());
         tick(4);
-        assertEquals(2, plugin.hud().bars(steve).size(), "everything else kept running");
+        assertEquals(java.util.Set.of(Ability.CRIMSON_FLASH), plugin.hud().bars(steve).keySet(),
+                "everything else kept running");
     }
 
     @Test
@@ -1348,29 +1349,31 @@ class LegendaryTest {
     // ---- display, commands, config -----------------------------------------------------------------------
 
     @Test
-    void bossBarsShowEachAbilityAndHowLongIsLeft() {
+    void bossBarsShowOnlyWhileAnAbilityRecharges() {
         PlayerMock steve = player("Steve", 0, 0);
         give(steve, WeaponType.STARFORGED);
         tick(4);
-        Map<Ability, BossBar> bars = plugin.hud().bars(steve);
-        assertEquals(java.util.Set.of(Ability.STARFALL, Ability.SINGULARITY), bars.keySet());
-        BossBar starfall = bars.get(Ability.STARFALL);
-        BossBar singularity = bars.get(Ability.SINGULARITY);
-        assertEquals("Starfall", title(starfall), "ready: just its name");
-        assertEquals("Singularity", title(singularity));
-        assertEquals(1.0, starfall.getProgress(), 1.0E-9);
-        assertEquals(BarColor.BLUE, starfall.getColor(), "the weapon's colour");
-        assertTrue(starfall.getPlayers().contains(steve));
+        assertTrue(plugin.hud().bars(steve).isEmpty(), "everything ready: no bars");
 
         stand(steve, 0, 0, 15f);
         useKey(steve);
         tick(10);
+        Map<Ability, BossBar> bars = plugin.hud().bars(steve);
+        BossBar starfall = bars.get(Ability.STARFALL);
+        assertNotNull(starfall, "used: its bar appears");
         assertTrue(title(starfall).matches("Starfall » \\d\\.\\ds"), "while the stars fall: " + title(starfall));
         assertTrue(starfall.getProgress() > 0.5 && starfall.getProgress() < 1.0, "running down");
+        assertEquals(BarColor.BLUE, starfall.getColor(), "the weapon's colour");
+        assertTrue(starfall.getPlayers().contains(steve));
+        BossBar singularity = bars.get(Ability.SINGULARITY);
+        assertNotNull(singularity, "locked while the stars fall, so it recharges too");
         tick(60);
         assertEquals("Starfall » 21s", title(starfall), "then how long until it is ready");
         assertTrue(starfall.getProgress() < 0.5, "filling up again");
         assertTrue(title(singularity).startsWith("Singularity » "), title(singularity));
+        tick(12);
+        assertNull(plugin.hud().bars(steve).get(Ability.SINGULARITY), "the lockout is over: gone again");
+        assertFalse(singularity.getPlayers().contains(steve));
 
         // Too early: no message, the bar flashes.
         useKey(steve);
@@ -1382,14 +1385,31 @@ class LegendaryTest {
         assertEquals(List.of(), actionBars(steve), "the action bar is left to the Combat plugin");
         assertFalse(steve.hasMetadata("vanillasmp:actionbar"));
 
-        // Put away: the bars go.
+        // Put away: the bars go; taken out again, the recharging one is back.
         steve.getInventory().setHeldItemSlot(8);
         tick(4);
         assertTrue(plugin.hud().bars(steve).isEmpty());
         assertFalse(starfall.getPlayers().contains(steve));
         steve.getInventory().setHeldItemSlot(0);
         tick(4);
-        assertEquals(2, plugin.hud().bars(steve).size());
+        assertEquals(java.util.Set.of(Ability.STARFALL), plugin.hud().bars(steve).keySet());
+        // Ready again: no bar.
+        tick(24 * 20);
+        assertTrue(plugin.hud().bars(steve).isEmpty(), "ready: the bar is gone");
+    }
+
+    @Test
+    void readyBarsCanBeTurnedOn() {
+        plugin.getConfig().set("display.boss-bars-when-ready", true);
+        plugin.saveConfig();
+        assertEquals(List.of(), plugin.reload());
+        PlayerMock steve = player("Steve", 0, 0);
+        give(steve, WeaponType.STARFORGED);
+        tick(4);
+        Map<Ability, BossBar> bars = plugin.hud().bars(steve);
+        assertEquals(java.util.Set.of(Ability.STARFALL, Ability.SINGULARITY), bars.keySet());
+        assertEquals("Starfall", title(bars.get(Ability.STARFALL)), "ready: just its name");
+        assertEquals(1.0, bars.get(Ability.STARFALL).getProgress(), 1.0E-9);
     }
 
     @Test

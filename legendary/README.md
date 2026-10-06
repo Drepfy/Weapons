@@ -8,13 +8,14 @@ accounts. For Paper 1.21 and newer.
 second; the weapon stays in your hand. `controls: right-click` in `config.yml` switches back to
 right-click and sneak + right-click (or `both`), and the lore always shows the right keys.
 
-**Cooldowns are boss bars.** While you hold a legendary, a boss bar for each of its abilities
-sits at the top of the screen, in the weapon's colour: just the ability's name when it is
-ready (a full bar), `Crimson Flash » 11s` while it recharges (the bar fills up), and the time
-left while it lasts or can be pressed again, such as Crimson Flash's second dash or Rift Swap's
-echo (the bar runs down). Nothing is said in chat or above
-the hotbar when you press too early: the bar flashes white. The action bar is left to the
-Combat plugin's timer. `display.boss-bars: false` turns them off.
+**Cooldowns are boss bars.** When you use an ability, a boss bar for it appears at the top of
+the screen in the weapon's colour: `Crimson Flash » 11s` while it recharges (the bar fills up),
+and the time left while it lasts or can be pressed again, such as Crimson Flash's second dash
+or Rift Swap's echo (the bar runs down). When the ability is ready again its bar goes away, so
+a weapon with everything ready shows no bars. Nothing is said in chat or above the hotbar when
+you press too early: the bar flashes white. The action bar is left to the Combat plugin's
+timer. `display.boss-bars-when-ready: true` also shows the ready ones (just their name, a full
+bar), and `display.boss-bars: false` turns them off.
 
 ![The five tooltips and boss bars](../release/Weapons-Lore.png)
 
@@ -205,7 +206,7 @@ cd legendary
 mvn -B package   # runs the tests, writes target/Legendary-<version>.jar
 ```
 
-`mvn test` runs 58 tests on a simulated server:
+`mvn test` runs 59 tests on a simulated server:
 - **Every ability and passive:** what it hits and when (Crimson Flash's two charges and
   bleeding, Iaido's counter and crescent, Crimson Edge's count, the hook's yank, stun and
   grapple, the cyclone deflecting arrows, Sugar High's crash, the rift's pull, snap and lift,
@@ -217,7 +218,7 @@ mvn -B package   # runs the tests, writes target/Legendary-<version>.jar
   same tick) break nothing.
 - **Look:** enchantments listed by the game, the shimmer, item model, tooltip style, the lore's
   own enchantment lines when asked for,
-  the boss bars (names, times, progress, flashing, hidden when put away), and the 3D effects
+  the boss bars (only while recharging, names, times, progress, flashing, hidden when put away), and the 3D effects
   being cleaned up.
 - **Storage:** blocking for every container type, bundles, armour stands, pots, hoppers, mobs
   and crafting.

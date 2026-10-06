@@ -50,9 +50,12 @@ blocked-commands:
 hit-mobs: hostile
 
 display:
-  # A boss bar for each ability while holding a legendary: its name and how long until it can
-  # be used again (the bar fills up as it recharges).
+  # While holding a legendary, a boss bar for each ability that is recharging: its name and how
+  # long until it can be used again (the bar fills up as it recharges, and goes away when the
+  # ability is ready).
   boss-bars: true
+  # Also show the bars of abilities that are ready (just their name, a full bar).
+  boss-bars-when-ready: false
 
 # Each weapon: its name and lore ({key} / {sneak-key} = the keys that use its abilities,
 # {<ability>.<setting>} = a value below, such as {crimson-flash.cooldown}, {<ability>.name} = the

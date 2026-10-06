@@ -54,6 +54,7 @@ public final class SettingsLoader {
         Settings.Controls controls = in.choice("controls", Settings.Controls.class);
         Settings.HitMobs hitMobs = in.choice("hit-mobs", Settings.HitMobs.class);
         boolean bossBars = in.bool("display.boss-bars");
+        boolean barsWhenReady = in.bool("display.boss-bars-when-ready");
 
         Map<WeaponType, Settings.Look> looks = new EnumMap<>(WeaponType.class);
         Map<Ability, AbilitySettings> abilities = new EnumMap<>(Ability.class);
@@ -98,7 +99,7 @@ public final class SettingsLoader {
             }
         }
         return new Settings(prefix, oneOfEach, dropOnDeath, alts, List.copyOf(blocked), controls, hitMobs, bossBars,
-                looks, abilities, sounds, messages, List.copyOf(warnings));
+                barsWhenReady, looks, abilities, sounds, messages, List.copyOf(warnings));
     }
 
     private static Settings.Look look(Reader in, String base, List<String> warnings) {
