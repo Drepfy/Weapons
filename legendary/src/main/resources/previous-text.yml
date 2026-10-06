@@ -261,6 +261,7 @@ v1_1_0:
         - "&6&lLEGENDARY &8#{id}"
       item-model: ""
     riftblade:
+      name: "<gradient:#C77DFF:#3C096C>&lRiftblade</gradient>"
       lore:
         - "&8Legendary Void Sword"
         - ""
@@ -273,6 +274,7 @@ v1_1_0:
         - "&6&lLEGENDARY &8#{id}"
       item-model: ""
     gravebreaker:
+      name: "<gradient:#A8A8A8:#6B0F1A>&lGravebreaker</gradient>"
       lore:
         - "&8Legendary Battle Axe"
         - ""

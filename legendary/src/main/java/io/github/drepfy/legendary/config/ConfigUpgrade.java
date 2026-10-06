@@ -87,7 +87,8 @@ public final class ConfigUpgrade {
 
     /** 1.1's Sugar Rush (a speed boost) had a duration; 1.2's is a dash. */
     private static boolean isOldSugarRush(Ability ability, ConfigurationSection section) {
-        return ability == Ability.SUGAR_RUSH && section.contains("duration") && !section.contains("dash-speed")
+        // contains(path, true): only what the file says, not the defaults behind it.
+        return ability == Ability.SUGAR_RUSH && section.contains("duration", true) && !section.contains("dash-speed", true)
                 && OLD_ABILITY_OPTIONS.containsAll(section.getKeys(false));
     }
 }

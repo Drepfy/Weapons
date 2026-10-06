@@ -147,8 +147,7 @@ public final class Visuals {
         d.setShadowRadius(0f);
         d.setViewRange(1.5f);
         d.setInterpolationDuration(0);
-        d.setTeleportDuration(0);
-        d.setBillboard(Display.Billboard.FIXED);
+        d.setTeleportDuration(0); // Billboard: FIXED, the default (billboard() changes it).
     }
 
     private Effect track(Display display) {
@@ -186,7 +185,11 @@ public final class Visuals {
         /** Faces the viewer all the time (stars, portals, halos). */
         public Effect billboard() {
             if (display != null) {
-                display.setBillboard(Display.Billboard.CENTER);
+                try {
+                    display.setBillboard(Display.Billboard.CENTER);
+                } catch (RuntimeException | LinkageError ignored) {
+                    // Effects are only for show.
+                }
             }
             return this;
         }
@@ -229,11 +232,15 @@ public final class Visuals {
             if (!exists()) {
                 return this;
             }
-            Quaternionf left = new Quaternionf(rotation).mul(spin);
-            display.setInterpolationDelay(0);
-            display.setInterpolationDuration(Math.max(0, ticks));
-            display.setTransformation(new Transformation(new Vector3f(translation), left, new Vector3f(scale),
-                    new Quaternionf()));
+            try {
+                Quaternionf left = new Quaternionf(rotation).mul(spin);
+                display.setInterpolationDelay(0);
+                display.setInterpolationDuration(Math.max(0, ticks));
+                display.setTransformation(new Transformation(new Vector3f(translation), left, new Vector3f(scale),
+                        new Quaternionf()));
+            } catch (RuntimeException | LinkageError ignored) {
+                // Effects are only for show.
+            }
             return this;
         }
 
@@ -252,11 +259,15 @@ public final class Visuals {
         /** Glides to a place over {@code ticks}. */
         public Effect moveTo(Location to, int ticks) {
             if (exists()) {
-                display.setTeleportDuration(Math.max(0, Math.min(59, ticks)));
-                Location place = to.clone();
-                place.setYaw(0f);
-                place.setPitch(0f);
-                display.teleport(place);
+                try {
+                    display.setTeleportDuration(Math.max(0, Math.min(59, ticks)));
+                    Location place = to.clone();
+                    place.setYaw(0f);
+                    place.setPitch(0f);
+                    display.teleport(place);
+                } catch (RuntimeException | LinkageError ignored) {
+                    // Effects are only for show.
+                }
             }
             return this;
         }

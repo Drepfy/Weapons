@@ -15,7 +15,11 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(ROOT, 'lifesteal', 'resourcepack'))
 import textures  # noqa: E402
+import fx  # noqa: E402
+import tooltips  # noqa: E402
 import make_heart  # noqa: E402
+
+SOUNDS = os.path.join(HERE, 'sounds', 'legendary')
 
 OUT = os.path.join(ROOT, 'release', 'VanillaSMP-ResourcePack.zip')
 
@@ -62,6 +66,15 @@ def files():
             # a 3D model: no item/generated parent, or Minecraft would flatten it again
             out[f'assets/legendary/models/item/{name}.json'] = (
                 json.dumps(textures.model(name), separators=(',', ':'), ensure_ascii=False) + '\n').encode('utf-8')
+            # 1.21.4+: the plugin sets item_model legendary:<name> (and a tooltip style of its own)
+            out[f'assets/legendary/items/{name}.json'] = as_json(
+                {'model': {'type': 'minecraft:model', 'model': f'legendary:item/{name}'}})
+            out[f'assets/legendary/textures/gui/sprites/tooltip/{name}_background.png'] = textures.png.encode(
+                tooltips.background(name))
+            out[f'assets/legendary/textures/gui/sprites/tooltip/{name}_background.png.mcmeta'] = as_json(tooltips.meta(9))
+            out[f'assets/legendary/textures/gui/sprites/tooltip/{name}_frame.png'] = textures.png.encode(
+                tooltips.frame(name))
+            out[f'assets/legendary/textures/gui/sprites/tooltip/{name}_frame.png.mcmeta'] = as_json(tooltips.meta(10))
         # 1.20 - 1.21.3: model overrides
         out[f'assets/minecraft/models/item/{item}.json'] = as_json({
             'parent': 'minecraft:item/handheld',
@@ -72,7 +85,30 @@ def files():
         # 1.21.4+: item model definitions
         out[f'assets/minecraft/items/{item}.json'] = as_json(
             dispatch(item, [(cmd, f'legendary:item/{name}') for cmd, name in weapons]))
+    # ---- the abilities' effects (display entities) and sounds ----
+    for name in fx.EFFECTS:
+        out[f'assets/legendary/textures/fx/{name}.png'] = textures.png.encode(fx.texture(name))
+        out[f'assets/legendary/models/fx/{name}.json'] = as_json(fx.model(name))
+        out[f'assets/legendary/items/fx/{name}.json'] = as_json(fx.item(name))
+    events = {}
+    for weapon in sorted(os.listdir(SOUNDS)):
+        for file in sorted(os.listdir(os.path.join(SOUNDS, weapon))):
+            if file.endswith('.ogg'):
+                sound = file[:-4]
+                with open(os.path.join(SOUNDS, weapon, file), 'rb') as f:
+                    out[f'assets/legendary/sounds/{weapon}/{file}'] = f.read()
+                events[f'{weapon}.{sound}'] = {'sounds': [{'name': f'legendary:{weapon}/{sound}'}],
+                                               'subtitle': f'subtitles.legendary.{weapon}.{sound}'}
+    out['assets/legendary/sounds.json'] = as_json(events)
+    out['assets/legendary/lang/en_us.json'] = as_json(
+        {f'subtitles.legendary.{key}': subtitle(key) for key in events})
     return out
+
+
+def subtitle(key):
+    """kurogane.blood_moon -> 'Kurogane: blood moon'"""
+    weapon, sound = key.split('.', 1)
+    return weapon.capitalize() + ': ' + sound.replace('_', ' ')
 
 
 def dispatch(item, entries):

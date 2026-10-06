@@ -3,8 +3,8 @@
 One pack for everything on the server: the Lifesteal **Heart** and the five **legendary
 weapons** (Kurogane, Sugarcrash, Riftblade, Gravebreaker, Starforged). Built as
 `release/VanillaSMP-ResourcePack.zip` by `python3 resourcepack/build.py`, which also prints its
-SHA-1. Works on Minecraft 1.20 to 1.21.x and newer, because both the old model overrides and
-the 1.21.4+ item model files are inside.
+SHA-1. Made for 1.21.11; the weapons also show on 1.20 to 1.21.3, because both the old model
+overrides and the 1.21.4+ item model files are inside.
 
 | Item | Looks like | How the pack finds it |
 |---|---|---|
@@ -27,9 +27,13 @@ like normal netherite swords and axes with their legendary names.
    ```
    resource-pack=<the direct link>
    resource-pack-sha1=<the SHA-1>
-   require-resource-pack=false
+   require-resource-pack=true
    ```
 3. Restart the server. Players are asked to download the pack when they join.
+
+`require-resource-pack=true` is recommended: without the pack, the weapons' tooltip frames show
+as a missing texture. To let players join without it, keep it `false` and set
+`tooltip-style: ""` for each weapon in Legendary's `config.yml`.
 
 If you used Lifesteal's own `resource-pack.url` setting before, empty it (`url: ""`): this pack
 replaces the heart-only pack and already contains the Heart.
@@ -58,3 +62,27 @@ looks (cut gems, wound grips, wood, hammered iron), `models/common.py` sets how 
 shown, and `models/render.py` draws the showcase. `python3 textures.py --preview out.png` draws
 `release/Weapons-Showcase.png`, and `python3 textures.py --obj folder` writes every weapon as
 `.obj` + `.mtl` + `.png` to open in Blender or Blockbench (`release/Weapons-3D-Models.zip`).
+
+## 1.21 item look, tooltips, effects and sounds (Legendary 1.2)
+
+- **Item models** (`assets/legendary/items/<weapon>.json`, 1.21.4+): Legendary sets each
+  weapon's `item_model` to `legendary:<weapon>`, so the model no longer depends on custom model
+  data (which is still there for older clients).
+- **Tooltips** (`textures/gui/sprites/tooltip/<weapon>_background.png` and `_frame.png`,
+  1.21.2+): each weapon has its own tooltip, a dark background tinted in its colours with a
+  faint glow at the edge, and a thin frame shading from one colour to another with small gems
+  in the corners. Nine-sliced like the vanilla one, so it fits any length of lore. Drawn by
+  `tooltips.py`.
+- **Ability effects** (`items/fx/*.json`, `models/fx`, `textures/fx`): 19 glowing effects the
+  abilities show with display entities: Kurogane's crimson streak, slash, cut, blood moon and
+  rune circle; Sugarcrash's sprinkles, candy burst and candy ring; Riftblade's rift, void portal
+  and void burst; Gravebreaker's shockwave, ember ring and a 3D gravestone; Starforged's rune
+  circle, star, nova, black hole and accretion disk. Each is painted with soft edges at
+  64 to 256 pixels by `fx.py` (flat ones lie on the ground, upright ones stand facing the
+  viewer), lit at full brightness so they glow at night. Without the pack they show as paper.
+- **Sounds** (`sounds/legendary/<weapon>/*.ogg`, `sounds.json`): 28 sounds, a cast sound for
+  every ability and a hit sound for every weapon (`legendary:kurogane.flash`,
+  `legendary:starforged.nova`...), with subtitles. They are made from scratch by
+  `sounds/make_sounds.py` (`pip install numpy soundfile`): blade swishes, whooshes, sparkles,
+  void hums, rumbles, chimes and impacts built from noise and tones. The `.ogg` files are kept
+  in the repository, so `build.py` only copies them.

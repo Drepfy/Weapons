@@ -167,7 +167,7 @@ weapons:
         burst-lift: 0.45
 
   riftblade:
-    name: "<gradient:#C77DFF:#3C096C>&lRiftblade</gradient>"
+    name: "<gradient:#E9C6FF:#A855F7>&lRiftblade</gradient>"
     custom-model-data: 1003
     item-model: "legendary:riftblade"
     tooltip-style: "legendary:riftblade"
@@ -216,7 +216,7 @@ weapons:
         blink: 10
 
   gravebreaker:
-    name: "<gradient:#A8A8A8:#6B0F1A>&lGravebreaker</gradient>"
+    name: "<gradient:#E2E2E2:#E0475A>&lGravebreaker</gradient>"
     custom-model-data: 1004
     item-model: "legendary:gravebreaker"
     tooltip-style: "legendary:gravebreaker"
@@ -356,7 +356,7 @@ sounds:
   starfall-star: ["legendary:starforged.fall 0.8 1"]
   starfall-impact: ["legendary:starforged.impact 1 1", "entity.firework_rocket.twinkle 0.3 1.2"]
   starforged-hit: ["legendary:starforged.hit 0.9 1"]
-  singularity: ["legendary:starforged.singularity 1 1", "block.portal.trigger 0.12 1.4"]
+  singularity: ["legendary:starforged.singularity 0.8 1", "block.portal.trigger 0.12 1.4"]
   singularity-nova: ["legendary:starforged.nova 1 1", "entity.generic.explode 0.3 1.3"]
   # Getting a legendary.
   received: ["ui.toast.challenge_complete 0.6 1.2"]
