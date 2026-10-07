@@ -1,4 +1,4 @@
-"""Builds the server resource pack: the Lifesteal Heart and the five legendary weapons.
+"""Builds the server resource pack: the Lifesteal Heart and the four legendary weapons.
 
 Run from anywhere: python3 resourcepack/build.py
 Writes release/VanillaSMP-ResourcePack.zip and prints its SHA-1 for server.properties.
@@ -21,9 +21,9 @@ import make_heart  # noqa: E402
 
 OUT = os.path.join(ROOT, 'release', 'VanillaSMP-ResourcePack.zip')
 
-# custom-model-data in Legendary's config.yml (1001-1005) and Lifesteal's (1001 on red dye).
-SWORDS = [(1001, 'kurogane'), (1002, 'sugarcrash'), (1003, 'wyrmfang')]
-AXES = [(1004, 'gravebreaker'), (1005, 'starforged')]
+# custom-model-data in Legendary's config.yml (1001-1004) and Lifesteal's (1001 on red dye).
+SWORDS = [(1001, 'katana'), (1002, 'candycane'), (1003, 'reaper')]
+AXES = [(1004, 'crush')]
 
 
 def as_json(data):
@@ -103,10 +103,10 @@ def dispatch(item, entries):
 
 
 def icon():
-    """64x64: Kurogane and Starforged crossed, as 3D models, on a dark background."""
+    """64x64: the Katana and Crush crossed, as 3D models, on a dark background."""
     size = 64
     pixels = [[(24, 22, 32)] * size for _ in range(size)]
-    for name, mirror in (('starforged', True), ('kurogane', False)):
+    for name, mirror in (('crush', True), ('katana', False)):
         image = textures.gui_image(name, size)
         for y in range(size):
             for x in range(size):

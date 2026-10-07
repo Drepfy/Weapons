@@ -1,53 +1,39 @@
 package io.github.drepfy.legendary.ability;
 
-import io.github.drepfy.legendary.Ability;
 import io.github.drepfy.legendary.WeaponType;
 import io.github.drepfy.legendary.item.WeaponItems;
-import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
-import org.bukkit.event.entity.EntityDamageByEntityEvent;
 
-/** One weapon's abilities. */
+/** One weapon: its ability (Shift + F) and its passive. */
 interface Kit {
 
     enum Result {
         /** It went off: its cooldown starts now. */
         FIRED,
-        /** The kit looked after the cooldown itself (or there is none yet). */
-        HANDLED,
         /** Nothing happened: no cooldown. */
         FAILED
     }
 
     WeaponType type();
 
-    Result use(Player player, WeaponItems.Tag weapon, Ability ability);
+    /** Shift + F (or sneak + right-click) with the weapon in hand, when the ability is ready. */
+    Result use(Player player, WeaponItems.Tag weapon);
 
-    /**
-     * The key pressed again while an ability is still going: another charge, a return, a dive.
-     * Asked before the cooldown is checked.
-     *
-     * @return whether it was a recast (then nothing else happens)
-     */
-    default boolean recast(Player player, WeaponItems.Tag weapon, Ability ability) {
-        return false;
+    /** A sword or axe hit on a player that the weapon's passive and ability may act on, before it lands. */
+    default void melee(Swing swing) {
     }
 
-    /** A fully counted sword or axe hit, before damage is applied (may change it). */
-    default void melee(EntityDamageByEntityEvent event, Player attacker, LivingEntity target, WeaponItems.Tag weapon) {
+    /** The same hit, after it landed (not cancelled, and not fully blocked by a shield). */
+    default void landed(Swing swing) {
     }
 
-    /** The same hit after it landed. */
-    default void landed(Player attacker, LivingEntity target, WeaponItems.Tag weapon) {
-    }
-
-    /** Ticks an ability is still running for (Crimson Tempest, Dragon's Breath, a prison...), or 0. */
-    default long active(Player player, WeaponItems.Tag weapon, Ability ability, long now) {
+    /** Ticks the ability is still waiting for its hit (Draw, Crush, Reap) or still out (traps), or 0. */
+    default long active(Player player, long now) {
         return 0;
     }
 
-    /** How long an ability runs in all, in ticks (for the boss bar), or 0. */
-    default long activeLength(Ability ability) {
+    /** How long the ability runs in all, in ticks (for the boss bar), or 0. */
+    default long activeLength() {
         return 0;
     }
 

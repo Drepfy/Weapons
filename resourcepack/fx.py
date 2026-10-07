@@ -1,11 +1,10 @@
-"""The abilities' effect textures and models (slashes, claw marks, rune circles, rings, dragon
-fire, stars...), painted in code like the weapons. The plugin shows them with display entities
+"""The abilities' effect textures and models (slashes, sigils, sugar traps, rings, craters...),
+painted in code like the weapons. The plugin shows them with display entities
 (legendary:fx/<name>) and animates them.
 
 Kinds of model:
     flat     lying on the ground, seen from above (texture top = north, bottom = the way it faces)
     upright  standing, facing the viewer (south); billboards always turn to face the camera
-    streak   standing along its length (the plane runs north-south), for a dash trail
 
     python3 fx.py out.png      a contact sheet of every effect
 """
@@ -149,7 +148,7 @@ def _polar(u, v):
     return math.hypot(u, v), math.atan2(v, u)
 
 
-# ---- Kurogane -----------------------------------------------------------------------------------------
+# ---- Katana -------------------------------------------------------------------------------------------
 
 
 def crimson_slash(u, v):
@@ -168,18 +167,6 @@ def crimson_slash(u, v):
     return hexrgb('#ff3355') + (halo,)
 
 
-def crimson_streak(u, v):
-    """A long dash trail: a white core line in a crimson glow, tapering at both ends."""
-    taper = clamp(1 - abs(u) ** 6)
-    wobble = 0.02 * math.sin(u * 9)
-    d = abs(v - wobble)
-    core = _glow(d, 0.025)
-    body = _glow(d, 0.11)
-    ghost = 0.35 * (_glow(abs(v - 0.28), 0.02) + _glow(abs(v + 0.26), 0.02)) * smooth(0.95, 0.2, abs(u))
-    c = mix(hexrgb('#c0102c'), hexrgb('#ffffff'), core)
-    return c + ((core + 0.75 * body + ghost) * taper,)
-
-
 def crimson_cut(u, v):
     """An X of two slashes crossing."""
     best = 0.0
@@ -195,42 +182,32 @@ def crimson_cut(u, v):
     return c + (max(best, halo),)
 
 
-def _rune_circle(u, v, colour, accent, seed):
+def draw_sigil(u, v):
+    """The half-drawn blade: one sweeping brush stroke round (thick and thin, with the gap where
+    the brush lifted), eight small blades pointing in, and a thin inner ring."""
     r, a = _polar(u, v)
-    ring = _glow(r - 0.9, 0.025) + 0.8 * _glow(r - 0.82, 0.012) + 0.7 * _glow(r - 0.6, 0.012)
-    # rune marks between the rings
-    marks = 0.0
-    k = 16
-    sector = (a / TAU * k) % 1.0
-    idx = int(math.floor((a / TAU) * k)) % k
-    rnd = random.Random(seed * 100 + idx)
-    if 0.66 < r < 0.78:
-        shape = rnd.randint(0, 3)
-        x = (sector - 0.5) * 2
-        y = (r - 0.72) / 0.06
-        if shape == 0:
-            marks = _glow(abs(x), 0.12) * (abs(y) < 0.9)
-        elif shape == 1:
-            marks = _glow(abs(y), 0.18) * (abs(x) < 0.5) + _glow(abs(x), 0.1) * (abs(y) < 0.9)
-        elif shape == 2:
-            marks = _glow(abs(abs(x) - abs(y) * 0.5), 0.12) * (abs(y) < 0.9)
-        else:
-            marks = _glow(math.hypot(x, y) - 0.5, 0.15)
-    # small dots on the outer ring
-    dots = _glow(r - 0.96, 0.02) * (0.5 + 0.5 * math.cos(a * 24)) ** 8
-    inner = 0.08 * smooth(0.62, 0.0, r)
-    intensity = clamp(ring + 0.85 * marks + dots)
-    c = mix(hexrgb(colour), hexrgb(accent), clamp(ring * 0.6 + marks * 0.3))
-    return c + (clamp(intensity + inner),)
+    # the brush stroke: it starts thick, thins out, and stops short of where it began
+    turn = ((a + 2.2) % TAU) / TAU                       # 0..1 round the stroke
+    width = 0.028 + 0.05 * (1 - turn) ** 1.4
+    fade = smooth(0.0, 0.03, turn) * smooth(0.97, 0.88, turn)
+    bristles = 0.75 + 0.25 * fbm(turn * 40, r * 30, 11)
+    stroke = smooth(width, width * 0.55, abs(r - 0.84 - 0.02 * math.sin(a * 3))) * fade * bristles
+    inner = 0.75 * _glow(r - 0.6, 0.012)
+    blades = 0.0
+    for k in range(8):
+        ang = k * TAU / 8
+        x = u * math.cos(ang) + v * math.sin(ang)        # along the blade (pointing in)
+        y = -u * math.sin(ang) + v * math.cos(ang)
+        if 0.64 < x < 0.78:
+            half = 0.03 * (x - 0.64) / 0.14
+            blades = max(blades, smooth(half + 0.006, half, abs(y)))
+    core = _glow(r - 0.84, 0.012) * fade
+    c = mix(hexrgb('#b80c26'), hexrgb('#ff8094'), clamp(core + 0.4 * blades))
+    fill = 0.07 * smooth(0.84, 0.2, r)
+    return c + (clamp(stroke + inner + blades + fill),)
 
 
-def rune_crimson(u, v):
-    return _rune_circle(u, v, '#c2102c', '#ff9aa8', 3)
-
-
-# ---- Sugarcrash ----------------------------------------------------------------------------------------
-
-CANDY = ['#ff2d55', '#ffffff', '#ff7ac3', '#7af0ff', '#ffe066']
+# ---- Candy Cane ----------------------------------------------------------------------------------------
 
 
 def candy_burst(u, v):
@@ -250,150 +227,128 @@ def candy_burst(u, v):
     return mix(col, (1, 1, 1), clamp(core + sparkle)) + (alpha,)
 
 
-def candy_ring(u, v):
+def sugar_trap(u, v):
+    """A peppermint lying on the ground: red swirls curving round a white candy, a clear glossy
+    rim, a soft pink glow round it and sugar sparkling on top."""
     r, a = _polar(u, v)
-    band = smooth(0.66, 0.72, r) * smooth(0.97, 0.9, r)
-    swirl = (a / TAU * 9 + r * 5) % 1.0
-    k = int(math.floor(a / TAU * 9 + r * 5)) % 3
-    col = hexrgb(['#ff2d55', '#ffffff', '#ff7ac3'][k])
-    edge = smooth(0.0, 0.08, min(swirl, 1 - swirl))
-    gloss = _glow(r - 0.8, 0.03) * 0.5
-    col = mix(col, hexrgb('#8a0a2a'), (1 - edge) * 0.5)
-    col = mix(col, (1, 1, 1), gloss)
-    glow = _glow(r - 0.82, 0.12) * 0.35
-    return col + (clamp(band * (0.75 + 0.25 * edge) + glow),)
-
-
-# ---- Wyrmfang ------------------------------------------------------------------------------------------
-
-
-def wyrm_slash(u, v):
-    """A wide jade crescent bulging towards the bottom (the way it faces): a pale-green burning
-    leading edge, venom green inside, with a gold glint at its heart."""
-    co, ro = (0.0, -0.3), 1.0
-    ci, ri = (0.0, -0.78), 1.08
-    do = ro - math.hypot(u - co[0], v - co[1])
-    di = math.hypot(u - ci[0], v - ci[1]) - ri
-    tips = smooth(1.0, 0.5, abs(u))
-    if do >= 0 and di >= 0:
-        q = do / max(do + di, 1e-6)                      # 0 on the leading edge, 1 inside
-        c = _ramp(q, [(0, '#f2fff6'), (0.12, '#b8ffd0'), (0.4, '#2fd47a'), (1, '#063a1e')])
-        c = mix(c, hexrgb('#ffd56a'), 0.35 * _glow(u, 0.18) * _glow(q - 0.25, 0.12))
-        return c + ((1 - 0.5 * q) * tips,)
-    halo = _glow(max(-do, 0) + max(-di, 0), 0.06) * tips * 0.6
-    return hexrgb('#3de08a') + (halo,)
-
-
-def wyrm_claw(u, v):
-    """Three parallel claw gashes, pale green at their cores, fading at both ends."""
-    best = 0.0
-    for k in (-1, 0, 1):
-        along = v + 0.08 * k * k
-        across = u - 0.3 * k - 0.12 * v * v
-        width = 0.055 * clamp(1 - (along / (0.9 - 0.12 * abs(k))) ** 2)
-        if width > 0:
-            best = max(best, _glow(across, width + 1e-3))
-    halo = best ** 0.5 * 0.45
-    c = mix(hexrgb('#1fae5e'), hexrgb('#f0fff4'), best ** 2)
-    return c + (max(best, halo),)
-
-
-def dragon_flame(u, v):
-    """A puff of green dragon fire: a white-hot core, tongues of venom-green flame licking
-    outwards (furthest upwards), thinning to nothing at their tips."""
-    r, a = _polar(u, v)
-    lick = 0.24 * fbm(a * 2.6 + 3, r * 3.2, 6) + 0.1 * math.sin(a * 7 + r * 9)
-    edge = 0.62 + lick - 0.16 * v                        # v grows downwards: taller on top
-    if r > edge + 0.1:
+    if r > 1.0:
         return (0.0, 0.0, 0.0, 0.0)
-    heat = clamp(1 - r / max(edge, 1e-3))
-    swirl = fbm(u * 4 + 7, v * 4 - 2, 9)
-    c = _ramp(heat * 0.9 + swirl * 0.2, [(0, '#0b5a2c'), (0.3, '#22c76a'), (0.6, '#7dff9e'),
-                                          (0.82, '#d9ffb0'), (1, '#ffffff')])
-    alpha = smooth(edge + 0.1, edge - 0.12, r) * (0.35 + 0.65 * heat ** 0.6) * (0.65 + 0.35 * swirl)
-    return c + (clamp(alpha * 1.3),)
+    rho = r / 0.74
+    swirl = ((a + rho * 1.7) / TAU * 8) % 1.0
+    red = smooth(0.05, 0.0, abs(swirl - 0.5) - 0.2) * smooth(0.12, 0.22, rho) * smooth(0.98, 0.9, rho)
+    c = mix(hexrgb('#fff6f4'), hexrgb('#e0142f'), red)
+    c = mix(c, hexrgb('#ffd8e6'), 0.5 * smooth(0.86, 1.0, rho))
+    c = mix(c, (1.0, 1.0, 1.0), 0.6 * _glow(math.hypot(u + 0.25, v + 0.25), 0.12))     # the shine
+    if noise(u * 40, v * 40, 12) > 0.86 and rho < 0.95:
+        c = mix(c, (1.0, 1.0, 1.0), 0.7)
+    candy = smooth(1.0, 0.97, rho)
+    glow = _glow(r - 0.8, 0.09) * 0.75
+    if candy > 0:
+        return c + (candy,)
+    return hexrgb('#ff5aa5') + (glow,)
 
 
-# ---- Gravebreaker ---------------------------------------------------------------------------------------
+# ---- Crush ---------------------------------------------------------------------------------------------
 
 
-def shockwave(u, v):
-    """Cracked ground: cracks running out from the impact, glowing like embers near it, and a
-    ring of dust."""
+def crush_ring(u, v):
+    """Charged up: a heavy azure ring split into eight plates, bronze studs between them, and a
+    faint ring of light inside."""
+    r, a = _polar(u, v)
+    plate = ((a / TAU) * 8) % 1.0
+    gap = smooth(0.03, 0.06, min(plate, 1 - plate))
+    ring = smooth(0.06, 0.035, abs(r - 0.82)) * gap
+    core = _glow(r - 0.82, 0.012) * gap
+    studs = 0.0
+    for k in range(8):
+        ang = k * TAU / 8
+        studs = max(studs, _glow(math.hypot(u - 0.82 * math.cos(ang), v - 0.82 * math.sin(ang)), 0.035))
+    inner = 0.6 * _glow(r - 0.62, 0.014)
+    ticks = 0.0
+    if 0.66 < r < 0.74:
+        ticks = smooth(0.1, 0.0, abs(((a / TAU) * 32) % 1.0 - 0.5) * 2 - 0.85)
+    c = mix(hexrgb('#1a6fd0'), hexrgb('#bfeaff'), clamp(core + 0.5 * inner))
+    c = mix(c, hexrgb('#e8b878'), studs)
+    glow = 0.25 * _glow(r - 0.82, 0.1)
+    return c + (clamp(ring * 0.85 + core + studs + inner + 0.8 * ticks + glow),)
+
+
+def crush_crater(u, v):
+    """The ground where they landed: broken into a ring of plates round a dark hollow, cracks
+    branching out from it glowing azure near the middle, and a ring of dust."""
     r, a = _polar(u, v)
     cracks = 0.0
-    rnd = random.Random(5)
-    for k in range(9):
-        base = k / 9 * TAU + rnd.uniform(-0.2, 0.2)
-        wob = 0.12 * math.sin(r * 9 + k) + 0.06 * math.sin(r * 23 + k * 2)
+    rnd = random.Random(21)
+    for k in range(11):
+        base = k / 11 * TAU + rnd.uniform(-0.25, 0.25)
+        bend = rnd.uniform(-0.5, 0.5)
+        reach = rnd.uniform(0.72, 0.95)
+        wob = 0.035 * math.sin(r * 8 + k) + 0.02 * math.sin(r * 21 + k * 2) + bend * r * 0.25
         da = math.atan2(math.sin(a - base - wob), math.cos(a - base - wob))
         dist = abs(da) * r
-        width = 0.03 * (1 - r) + 0.006
-        if r < 0.95:
+        width = 0.02 * (1 - r / reach) + 0.004
+        if r < reach:
             cracks = max(cracks, smooth(width, width * 0.3, dist))
-    ring_cracks = smooth(0.012, 0.004, abs(r - 0.42 - 0.03 * math.sin(a * 7))) * (math.sin(a * 5) > -0.2)
-    cracks = max(cracks, ring_cracks * 0.9)
-    ember = smooth(0.75, 0.0, r)
-    c = mix(hexrgb('#1a0d08'), hexrgb('#ff7a1a'), ember * 0.9)
-    c = mix(c, hexrgb('#ffe08a'), ember ** 3)
-    dust = _glow(r - 0.88, 0.07) * 0.45 * (0.6 + 0.4 * fbm(u * 6, v * 6, 2))
-    alpha = clamp(cracks * (0.75 + 0.25 * ember) + dust)
-    col = c if cracks > dust else hexrgb('#8a7a66')
-    return col + (alpha,)
+        # a branch half way out
+        if 0.4 < r < reach * 0.9:
+            db = math.atan2(math.sin(a - base - wob - 0.7 * (r - 0.4)), math.cos(a - base - wob - 0.7 * (r - 0.4)))
+            cracks = max(cracks, smooth(width * 0.8, width * 0.25, abs(db) * r) * smooth(0.4, 0.5, r))
+    rim = smooth(0.016, 0.004, abs(r - 0.3 - 0.025 * math.sin(a * 9))) * (math.sin(a * 6 + 1) > -0.4)
+    cracks = max(cracks, rim)
+    hollow = 0.55 * smooth(0.3, 0.15, r)
+    energy = smooth(0.7, 0.0, r)
+    c = mix(hexrgb('#141a24'), hexrgb('#2f9bff'), energy * 0.95)
+    c = mix(c, hexrgb('#d6f4ff'), energy ** 3)
+    dust = _glow(r - 0.88, 0.07) * 0.4 * (0.6 + 0.4 * fbm(u * 6, v * 6, 22))
+    if cracks > max(dust, hollow):
+        return c + (clamp(cracks * (0.75 + 0.25 * energy)),)
+    if hollow > dust:
+        return hexrgb('#06080c') + (hollow,)
+    return hexrgb('#8a8a96') + (dust,)
 
 
-def ember_ring(u, v):
+# ---- Reaper --------------------------------------------------------------------------------------------
+
+
+def soul_ring(u, v):
+    """Souls gather: a ring of spectral green fire with wisps rising off it, a thin ring inside,
+    and small soul lights circling."""
     r, a = _polar(u, v)
-    ring = _glow(r - 0.86, 0.045) + 0.4 * _glow(r - 0.86, 0.12)
-    flicker = 0.75 + 0.25 * noise(a * 6, 3, 4)
-    c = mix(hexrgb('#ff5a0a'), hexrgb('#fff0b0'), _glow(r - 0.86, 0.02))
-    return c + (clamp(ring * flicker),)
+    lick = 0.06 * fbm(a * 3.2 + 5, 2.0, 13) + 0.03 * math.sin(a * 11)
+    flame = smooth(0.07, 0.02, abs(r - 0.8 - lick * 0.5)) + 0.6 * smooth(0.12, 0.0, r - 0.8 - lick) * (r > 0.8)
+    flame *= 0.7 + 0.3 * fbm(a * 6, r * 8, 14)
+    core = _glow(r - 0.8, 0.014)
+    inner = 0.65 * _glow(r - 0.58, 0.012)
+    lights = 0.0
+    for k in range(6):
+        ang = k * TAU / 6 + 0.3
+        lights = max(lights, _glow(math.hypot(u - 0.68 * math.cos(ang), v - 0.68 * math.sin(ang)), 0.03))
+    c = _ramp(clamp(core + lights + 0.3 * inner), [(0, '#0a7a58'), (0.5, '#3dffc0'), (1, '#f0fff9')])
+    c = mix(c, hexrgb('#6d3fb0'), 0.35 * smooth(0.85, 1.0, r))
+    fill = 0.06 * smooth(0.8, 0.1, r)
+    return c + (clamp(flame + core + inner + lights + fill),)
 
 
-# ---- Starforged -----------------------------------------------------------------------------------------
-
-
-def rune_star(u, v):
-    r, a = _polar(u, v)
-    ring = _glow(r - 0.9, 0.022) + 0.7 * _glow(r - 0.84, 0.01) + 0.8 * _glow(r - 0.58, 0.014)
-    # an eight-pointed star drawn with straight lines between points on the inner ring
-    lines = 0.0
-    pts = [(0.84 * math.cos(k * TAU / 8), 0.84 * math.sin(k * TAU / 8)) for k in range(8)]
-    for k in range(8):
-        (x1, y1), (x2, y2) = pts[k], pts[(k + 3) % 8]
-        dx, dy = x2 - x1, y2 - y1
-        t = clamp(((u - x1) * dx + (v - y1) * dy) / (dx * dx + dy * dy))
-        d = math.hypot(u - x1 - t * dx, v - y1 - t * dy)
-        lines = max(lines, _glow(d, 0.009))
-    dots = 0.0
-    for x, y in pts:
-        dots = max(dots, _glow(math.hypot(u - x, v - y), 0.035))
-    twinkle = (0.5 + 0.5 * math.cos(a * 32)) ** 16 * _glow(r - 0.9, 0.04)
-    gold, cyan = hexrgb('#ffd36b'), hexrgb('#6fe6ff')
-    c = mix(gold, cyan, clamp(lines * 0.9 + _glow(r - 0.58, 0.02)))
-    c = mix(c, (1, 1, 1), clamp(dots + twinkle) * 0.7)
-    fill = 0.06 * smooth(0.9, 0.0, r)
-    return c + (clamp(ring + 0.85 * lines + dots + twinkle + fill),)
-
-
-def star(u, v):
-    r, a = _polar(u, v)
-    rays = max(_glow(u, 0.045) * _glow(v, 0.55), _glow(v, 0.045) * _glow(u, 0.55))
-    diag = 0.5 * max(_glow((u + v) / 1.414, 0.03) * _glow((u - v) / 1.414, 0.3),
-                     _glow((u - v) / 1.414, 0.03) * _glow((u + v) / 1.414, 0.3))
-    core = _glow(r, 0.12)
-    halo = _glow(r, 0.4) * 0.45
-    c = _ramp(clamp(core + rays * 0.7), [(0, '#6fe6ff'), (0.5, '#ffd36b'), (1, '#ffffff')])
-    return c + (clamp(core + rays + diag + halo),)
-
-
-def nova(u, v):
-    r, a = _polar(u, v)
-    ring = _glow(r - 0.8, 0.07)
-    inner = 0.22 * smooth(0.82, 0.3, r)
-    sparks = (0.5 + 0.5 * math.cos(a * 18)) ** 20 * _glow(r - 0.86, 0.08)
-    c = _ramp(ring, [(0, '#8a5cff'), (0.6, '#6fe6ff'), (1, '#ffffff')])
-    return c + (clamp(ring + inner + sparks),)
+def reap_slash(u, v):
+    """A scythe's sweep: a long crescent, thick at one end and drawn out to a fine hooked point
+    at the other, white at its cutting edge, spectral green, with wisps trailing behind it."""
+    co, ro = (0.08, 0.38), 0.95
+    ci, ri = (0.2, 0.62), 0.92
+    do = ro - math.hypot(u - co[0], v - co[1])
+    di = math.hypot(u - ci[0], v - ci[1]) - ri
+    side = clamp((u + 0.95) / 1.9)                       # 0 at the thin point (left) .. 1 at the heel
+    body = smooth(0.0, 0.35, side) * smooth(1.0, 0.86, side)
+    if do >= 0 and di >= 0 and v < 0.35:
+        q = do / max(do + di, 1e-6)                      # 0 on the cutting edge (top), 1 at the back
+        c = _ramp(q, [(0, '#ffffff'), (0.12, '#c8fff0'), (0.4, '#2ee6b0'), (1, '#2a1250')])
+        return c + ((1 - 0.5 * q) * body,)
+    # wisps trailing below the arc
+    trail = 0.0
+    if v < 0.55 and di < 0:
+        wisp = fbm(u * 3.0 + 4, v * 6.0, 15)
+        trail = smooth(0.25, 0.0, -di) * wisp * 0.6 * body
+    halo = _glow(max(-do, 0) + max(-di, 0), 0.05) * body * 0.55
+    return hexrgb('#3dffc0') + (max(halo, trail),)
 
 
 # ---- the list --------------------------------------------------------------------------------------------
@@ -401,19 +356,14 @@ def nova(u, v):
 EFFECTS = {
     # name: (painter, size, kind)
     'crimson_slash': (crimson_slash, 128, 'flat'),
-    'crimson_streak': (crimson_streak, 128, 'streak'),
     'crimson_cut': (crimson_cut, 128, 'upright'),
-    'rune_crimson': (rune_crimson, 256, 'flat'),
+    'draw_sigil': (draw_sigil, 256, 'flat'),
     'candy_burst': (candy_burst, 128, 'flat'),
-    'candy_ring': (candy_ring, 256, 'flat'),
-    'wyrm_slash': (wyrm_slash, 128, 'flat'),
-    'wyrm_claw': (wyrm_claw, 128, 'upright'),
-    'dragon_flame': (dragon_flame, 128, 'upright'),
-    'shockwave': (shockwave, 256, 'flat'),
-    'ember_ring': (ember_ring, 128, 'flat'),
-    'rune_star': (rune_star, 256, 'flat'),
-    'star': (star, 64, 'upright'),
-    'nova': (nova, 128, 'flat'),
+    'sugar_trap': (sugar_trap, 128, 'flat'),
+    'crush_ring': (crush_ring, 256, 'flat'),
+    'crush_crater': (crush_crater, 256, 'flat'),
+    'soul_ring': (soul_ring, 256, 'flat'),
+    'reap_slash': (reap_slash, 128, 'upright'),
 }
 
 
@@ -421,19 +371,14 @@ EFFECTS = {
 # in texels, solidness). Thin lines get thicker; everything gets a glow of its own colour.
 BOLD = {
     'crimson_slash': (0, 0.55, 4, 1.5),
-    'crimson_streak': (1, 0.7, 5, 1.7),
     'crimson_cut': (2, 0.7, 4, 1.7),
-    'rune_crimson': (1, 0.6, 5, 1.6),
+    'draw_sigil': (1, 0.6, 5, 1.6),
     'candy_burst': (2, 0.6, 4, 1.6),
-    'candy_ring': (0, 0.4, 4, 1.4),
-    'wyrm_slash': (0, 0.55, 4, 1.5),
-    'wyrm_claw': (2, 0.7, 4, 1.7),
-    'dragon_flame': (0, 0.35, 3, 1.2),
-    'shockwave': (2, 0.5, 5, 1.7),
-    'ember_ring': (1, 0.4, 3, 1.4),
-    'rune_star': (2, 0.6, 5, 1.6),
-    'star': (0, 0.7, 3, 1.6),
-    'nova': (1, 0.4, 4, 1.4),
+    'sugar_trap': (0, 0.4, 3, 1.3),
+    'crush_ring': (1, 0.55, 5, 1.6),
+    'crush_crater': (1, 0.5, 5, 1.6),
+    'soul_ring': (1, 0.6, 5, 1.6),
+    'reap_slash': (0, 0.6, 4, 1.5),
 }
 
 
@@ -460,12 +405,9 @@ def model(name):
     if kind == 'flat':
         elements = [{'from': [0, 8, 0], 'to': [16, 8, 16], 'shade': False, 'light_emission': 15,
                      'faces': {'up': _face(full), 'down': _face([0, 16, 16, 0])}}]
-    elif kind == 'upright':
+    else:
         elements = [{'from': [0, 0, 8], 'to': [16, 16, 8], 'shade': False, 'light_emission': 15,
                      'faces': {'south': _face(full), 'north': _face(full, flip=True)}}]
-    else:
-        elements = [{'from': [8, 0, 0], 'to': [8, 16, 16], 'shade': False, 'light_emission': 15,
-                     'faces': {'east': _face(full), 'west': _face(full, flip=True)}}]
     return {'textures': {'0': texture_id, 'particle': texture_id}, 'elements': elements}
 
 

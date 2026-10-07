@@ -69,7 +69,7 @@ for n in sorted(names):
     m = re.match(r'assets/legendary/items/fx/([a-z_]+)\.json$', n)
     if m and m.group(1) not in fx:
         problems.append(f'effect {m.group(1)} is in the pack but no ability shows it')
-for w in ['kurogane', 'sugarcrash', 'wyrmfang', 'gravebreaker', 'starforged']:
+for w in ['katana', 'candycane', 'crush', 'reaper']:
     for f in [f'assets/legendary/items/{w}.json', f'assets/legendary/textures/gui/sprites/tooltip/{w}_frame.png',
               f'assets/legendary/textures/gui/sprites/tooltip/{w}_background.png']:
         if f not in names:

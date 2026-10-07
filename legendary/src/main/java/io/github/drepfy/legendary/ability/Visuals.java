@@ -4,8 +4,6 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.World;
-import org.bukkit.block.data.BlockData;
-import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.ItemDisplay;
@@ -122,30 +120,6 @@ public final class Visuals {
         }
     }
 
-    /** A block shown as an effect (rock thrown up by a slam). */
-    public Effect block(BlockData block, Location at) {
-        World world = at.getWorld();
-        if (world == null || block == null) {
-            return Effect.NONE;
-        }
-        Location place = at.clone();
-        place.setYaw(0f);
-        place.setPitch(0f);
-        try {
-            BlockDisplay display = world.spawn(place, BlockDisplay.class, d -> {
-                d.setBlock(block);
-                setup(d);
-                d.setBrightness(null);
-            });
-            Effect effect = track(display);
-            // A block display's corner is its origin: centre it.
-            effect.translation.set(-0.5f, -0.5f, -0.5f);
-            return effect.send(0);
-        } catch (RuntimeException | LinkageError e) {
-            return Effect.NONE;
-        }
-    }
-
     private static void setup(Display d) {
         d.setPersistent(false);
         d.setBrightness(GLOW);
@@ -224,18 +198,6 @@ public final class Visuals {
         /** Tilted about the facing direction (a slash at an angle). */
         public Effect tilt(double degrees) {
             spin.identity().rotateZ((float) Math.toRadians(degrees));
-            return this;
-        }
-
-        /** Any orientation (a weapon thrown flat and spinning); replaces facing, turn and tilt. */
-        public Effect orient(Quaternionf orientation) {
-            rotation.set(orientation);
-            spin.identity();
-            return this;
-        }
-
-        public Effect offset(double x, double y, double z) {
-            translation.set((float) x, (float) y, (float) z);
             return this;
         }
 

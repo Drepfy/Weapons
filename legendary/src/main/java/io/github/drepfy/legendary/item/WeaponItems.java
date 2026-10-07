@@ -78,6 +78,23 @@ public final class WeaponItems {
         }
     }
 
+    /**
+     * The name of a legendary of an older version that no longer exists (it is taken away), or
+     * null for any other item.
+     */
+    public String retired(ItemStack item) {
+        if (item == null || !WeaponType.isWeaponMaterial(item.getType()) || !item.hasItemMeta()) {
+            return null;
+        }
+        ItemMeta meta = item.getItemMeta();
+        String type = meta == null ? null : meta.getPersistentDataContainer().get(typeKey, PersistentDataType.STRING);
+        if (!WeaponType.retired(type)) {
+            return null;
+        }
+        String name = meta.hasDisplayName() ? org.bukkit.ChatColor.stripColor(meta.getDisplayName()).trim() : "";
+        return name.isEmpty() ? type.substring(0, 1).toUpperCase(Locale.ROOT) + type.substring(1) : name;
+    }
+
     public boolean isLegendary(ItemStack item) {
         return read(item) != null;
     }
@@ -235,6 +252,11 @@ public final class WeaponItems {
 
     /** The weapon's own damage plus Sharpness, as vanilla counts it. */
     public static double baseAttackDamage(WeaponType type, Settings.Look look) {
+        return type.attackDamage() + sharpnessDamage(look);
+    }
+
+    /** What the weapon's Sharpness adds to a fully charged hit (0.5 a level plus 0.5). */
+    public static double sharpnessDamage(Settings.Look look) {
         int sharpness = 0;
         for (Map.Entry<String, Integer> enchantment : look.enchantments().entrySet()) {
             String key = enchantment.getKey();
@@ -242,7 +264,7 @@ public final class WeaponItems {
                 sharpness = enchantment.getValue();
             }
         }
-        return type.attackDamage() + (sharpness > 0 ? 0.5 * sharpness + 0.5 : 0.0);
+        return sharpness > 0 ? 0.5 * sharpness + 0.5 : 0.0;
     }
 
     /** 12.0 → "12", 11.5 → "11.5". */

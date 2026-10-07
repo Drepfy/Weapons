@@ -24,17 +24,12 @@ public final class Fx {
 
     public static final Particle DUST = Compat.particle("DUST", "REDSTONE");
     public static final Particle CRIT = Compat.particle("CRIT");
-    public static final Particle END_ROD = Compat.particle("END_ROD");
-    public static final Particle DRAGON_BREATH = Compat.particle("DRAGON_BREATH");
-    public static final Particle FIREWORK = Compat.particle("FIREWORK", "FIREWORKS_SPARK");
     public static final Particle EXPLOSION = Compat.particle("EXPLOSION", "EXPLOSION_LARGE");
     public static final Particle BLOCK = Compat.particle("BLOCK", "BLOCK_CRACK");
     public static final Particle SOUL = Compat.particle("SOUL");
     public static final Particle CLOUD = Compat.particle("CLOUD");
-    public static final Particle FLAME = Compat.particle("FLAME");
 
     private final Supplier<Settings> settings;
-    private int crackIds = 0x4C470000;
 
     public Fx(Supplier<Settings> settings) {
         this.settings = settings;
@@ -84,11 +79,6 @@ public final class Fx {
                 // Sounds are only for show.
             }
         }
-    }
-
-    /** An id for a crack overlay (each cracked block needs its own). */
-    public int crackId() {
-        return crackIds++;
     }
 
     /** Everyone who sees one effect. */
@@ -150,15 +140,5 @@ public final class Fx {
             }
         }
 
-        /** The breaking texture on a block, without breaking it. Progress 0 removes it. */
-        public void crack(Location block, float progress, int id) {
-            for (Player player : players) {
-                try {
-                    player.sendBlockDamage(block, progress, id);
-                } catch (RuntimeException | LinkageError ignored) {
-                    // Only for show.
-                }
-            }
-        }
     }
 }

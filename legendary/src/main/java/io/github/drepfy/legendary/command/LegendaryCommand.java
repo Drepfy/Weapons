@@ -84,11 +84,12 @@ public final class LegendaryCommand implements TabExecutor {
         io.github.drepfy.legendary.util.HelpMenu menu = new io.github.drepfy.legendary.util.HelpMenu(
                 "&6&lʟᴇɢᴇɴᴅᴀʀʏ &8| &7v" + plugin.getDescription().getVersion());
         Settings.Controls controls = plugin.settings().controls();
-        menu.note("&f" + controls.key() + " &8» &7the weapon's first ability");
-        menu.note("&f" + controls.sneakKey() + " &8» &7its second ability");
+        menu.note("&f" + controls.sneakKey() + " &8» &7the weapon's ability");
+        menu.note("&fHits &8» &7its passive works on its own");
         if (controls.offhand()) {
             menu.note("&8(F is your swap-offhand key; the weapon stays in your hand)");
         }
+        menu.note("&7Draw, Crush and Reap wait for your next full-strength hit on a player.");
         menu.note("&7Cooldowns show as bars at the top of your screen.");
         menu.note("&7They cannot go in containers, bundles or item frames, and drop when you die.");
         if (sender.hasPermission("legendary.give")) {

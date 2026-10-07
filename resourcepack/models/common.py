@@ -1,4 +1,4 @@
-"""What all five weapon models share: how they are held, shown in the inventory, dropped and framed.
+"""What all the weapon models share: how they are held, shown in the inventory, dropped and framed.
 
 The models stand upright (16 units tall). In the inventory they are turned 45 degrees and scaled
 to fill the slot from corner to corner. In the hand they are turned like vanilla's sword and

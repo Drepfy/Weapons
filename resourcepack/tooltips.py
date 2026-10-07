@@ -15,11 +15,10 @@ SIZE = 100
 
 # weapon: (background top, background bottom, frame top, frame bottom, corner gem)
 STYLES = {
-    'kurogane': ('#1c0a10', '#0a0408', '#ff4d6a', '#8a1022', '#ffffff'),
-    'sugarcrash': ('#210c19', '#0e050b', '#ff9ad2', '#ff2d55', '#ffffff'),
-    'wyrmfang': ('#08190f', '#030a06', '#7dffb0', '#0f6b38', '#ffd36b'),
-    'gravebreaker': ('#1c130d', '#0b0706', '#ff9a4a', '#7a141e', '#ffd36b'),
-    'starforged': ('#0b1128', '#05070f', '#ffd36b', '#6fd6ff', '#ffffff'),
+    'katana': ('#1a0609', '#08030a', '#ff3352', '#6a0a18', '#ffd36b'),
+    'candycane': ('#22091a', '#0e050b', '#ff9ad2', '#ff2d55', '#ffffff'),
+    'crush': ('#0a1424', '#04070e', '#82d6ff', '#1f4f8a', '#e8b878'),
+    'reaper': ('#0d0a1c', '#05030a', '#5affd2', '#4a2a7a', '#ece3cb'),
 }
 
 

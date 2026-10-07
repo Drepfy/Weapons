@@ -26,6 +26,8 @@ public final class Compat {
     /** {@code MAX_HEALTH} since 1.21.3, {@code GENERIC_MAX_HEALTH} before. */
     private static final Attribute MAX_HEALTH = attribute("MAX_HEALTH", "GENERIC_MAX_HEALTH");
 
+    private static final Attribute ATTACK_DAMAGE = attribute("ATTACK_DAMAGE", "GENERIC_ATTACK_DAMAGE");
+
     private Compat() {
     }
 
@@ -40,6 +42,22 @@ public final class Compat {
             // Default maximum.
         }
         return 20.0;
+    }
+
+    /**
+     * The player's attack damage with what they hold (Strength and Weakness included), or -1
+     * when the server cannot say.
+     */
+    public static double attackDamage(LivingEntity entity) {
+        try {
+            AttributeInstance instance = ATTACK_DAMAGE == null ? null : entity.getAttribute(ATTACK_DAMAGE);
+            if (instance != null) {
+                return instance.getValue();
+            }
+        } catch (RuntimeException | LinkageError ignored) {
+            // Unknown.
+        }
+        return -1;
     }
 
     /** Heals up to the entity's maximum health. */

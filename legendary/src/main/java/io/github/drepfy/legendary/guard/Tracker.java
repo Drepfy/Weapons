@@ -169,6 +169,7 @@ public final class Tracker implements Listener {
             if (top != null && isForeign(player, top)) {
                 takeOut(top, player);
             }
+            removeRetired(player);
             for (Spot spot : spots(player)) {
                 seen.computeIfAbsent(spot.tag().id(), key -> new ArrayList<>()).add(spot);
             }
@@ -196,6 +197,30 @@ public final class Tracker implements Listener {
                         + "It can be given out again.");
             }
         }
+    }
+
+    /** Takes away legendaries of an older version that no longer exist, and says why. */
+    private void removeRetired(Player player) {
+        PlayerInventory inventory = player.getInventory();
+        for (int slot = 0; slot < inventory.getSize(); slot++) {
+            String name = items().retired(inventory.getItem(slot));
+            if (name != null) {
+                inventory.setItem(slot, null);
+                retired(player, name);
+            }
+        }
+        String name = items().retired(player.getItemOnCursor());
+        if (name != null) {
+            player.setItemOnCursor(null);
+            retired(player, name);
+        }
+    }
+
+    private void retired(Player player, String name) {
+        plugin.send(player, "retired", "weapon", name);
+        registry().log("RETIRED " + name + " taken from " + player.getName() + " (this weapon no longer exists)");
+        plugin.alert(name + " was taken from " + player.getName() + ": that weapon no longer exists. "
+                + "Give them a new legendary if you like.");
     }
 
     /** Milliseconds since this weapon was first missed (0 the first time). */

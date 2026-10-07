@@ -311,6 +311,38 @@ and Flight never flagged. Cause, found by making the tests behave like Paper:
 - Tests: Legendary 68 (every new ability, the Riftblade conversion, the 2.0 config upgrade,
   1.25x hits). Compiled against Paper 1.21.11.
 
+## Legendary 3.0.0: four new PvP weapons, new models and effects
+
+- Four new weapons replace the five old ones, each with one ability (Shift + F) and one
+  passive, made for PvP: the **Katana** (Bleed: half a heart a second for 4 s, starts over and
+  never stacks; Draw: the next full-strength hit within 4 s cuts for 30% of the health they have
+  left, 1 to 3.5 hearts, 25 s), the **Candy Cane** (Sticky Sweet: 25% chance of Slowness I for
+  1.5 s, then 3 s immunity; Sugar Trap: up to 5 traps for 8 s, Poison I and Nausea for 4 s and
+  Slowness I for 1 s, never the owner, 25 s), **Crush** (Heavy: 30% more knockback, a
+  full-strength hit in the air knocks down for 0.75 hearts; Crush: the next full-strength hit
+  slams them down for 0.5 hearts plus 0.75 a block of height, at most 4, 28 s) and the **Reaper**
+  (Execution: 0.75 hearts more below 6 hearts; Reap: 3.5 hearts more on the next full-strength
+  hit on a player below 8 hearts, waits for one, 30 s). No luck, stacks, combos, dashes or
+  area blasts; they only ever affect players.
+- Draw, Crush, Reap and Heavy's knock-down only go off on a full-strength hit
+  (`full-strength-hits`), and are used up only when they land. Plain F swaps hands again.
+- Extra damage is true damage dealt a tick after the hit without a source entity: no extra
+  knockback and the next sword hit is not blocked by invulnerability frames.
+- The old weapons convert in place (same id and holder): Kurogane to Katana, Sugarcrash to
+  Candy Cane, Gravebreaker to Crush, Wyrmfang and Riftblade to Reaper. The Starforged is
+  retired: taken from whoever has it, with a message and a staff alert. Config version 7
+  replaces the `weapons` section, removes `hit-mobs` and the old sounds and messages.
+- Heavy's knockback uses Paper's `EntityPushedByEntityAttackEvent` (the Bukkit knockback event
+  is marked for removal in 1.21.11); 0 removal warnings against 1.21.11.
+- Pack: four new 3D models (obsidian katana with a molten crimson edge and a tassel, peppermint
+  broadsword with candy-cane guard and peppermint pommel, crescent war axe with a hammer back
+  and azure cracks, sickle-sword with soul-fire edge, rib guard and skull pommel), new tooltips
+  and nine effects (draw sigil, sugar trap, crush ring and crater, soul ring, reap slash...).
+  The forge got a clear `coat` material, a per-part `bloom`, and packs single patches into
+  small gaps (the big axe head ran out of texture space).
+- Tests: Legendary 52 (every ability and passive, conversions, the retired Starforged, the 2.0
+  config upgrade). Compiled against Paper 1.21.11.
+
 ## Remaining / next steps
 
 - Validate on a live server with a hacked client on an alt (see the README

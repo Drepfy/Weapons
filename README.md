@@ -5,7 +5,7 @@ Anti-cheat and moderation for a Spigot/Paper SMP (built for **ᴠᴀɴɪʟʟᴀ 
 > This repository also has the server's **[Lifesteal plugin](lifesteal/README.md)**
 > (`lifesteal/`, released as `release/Lifesteal.jar`) and **[Combat plugin](combat/README.md)**
 > (combat timer, Ender Pearl cooldown, elytra/riptide rules and spawn safe zones; `combat/`, released as `release/Combat.jar`)
-> and **[Legendary plugin](legendary/README.md)** (five legendary weapons with abilities that cannot be duplicated or
+> and **[Legendary plugin](legendary/README.md)** (four legendary PvP weapons, each with an ability and a passive, that cannot be duplicated or
 > stored; `legendary/`, released as `release/Legendary.jar`), the server's **[Skript scripts](skripts/README.md)**
 > (economy, market, auction house, scoreboard, teleports, `/string`; `skripts/`) and the **[resource pack](resourcepack/README.md)**
 > (Lifesteal Heart and legendary weapon textures; released as `release/VanillaSMP-ResourcePack.zip`).

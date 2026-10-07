@@ -18,11 +18,6 @@ final class Geo {
         return new Vector(-Math.sin(yaw), 0, Math.cos(yaw));
     }
 
-    /** To the right of a flat direction. */
-    static Vector right(Vector flat) {
-        return new Vector(-flat.getZ(), 0, flat.getX());
-    }
-
     static boolean solid(World world, double x, double y, double z) {
         Block block = world.getBlockAt((int) Math.floor(x), (int) Math.floor(y), (int) Math.floor(z));
         return block.getType().isSolid();
@@ -74,43 +69,6 @@ final class Geo {
             }
         }
         return Integer.MIN_VALUE;
-    }
-
-    /** Away from a point, flat; the fallback direction when standing right on it. */
-    static Vector away(Location from, Location to, Vector fallback) {
-        Vector away = to.toVector().subtract(from.toVector()).setY(0);
-        if (away.lengthSquared() < 1.0E-4) {
-            return fallback.clone();
-        }
-        return away.normalize();
-    }
-
-    /**
-     * How far a player can dash along a flat direction: the last spot (up to {@code range}
-     * blocks) where both their feet and head are clear, stopping at the first wall.
-     */
-    static Location dash(Location start, Vector direction, double range) {
-        World world = start.getWorld();
-        Location last = start.clone();
-        if (world == null) {
-            return last;
-        }
-        Vector step = direction.clone().setY(0);
-        if (step.lengthSquared() < 1.0E-6) {
-            return last;
-        }
-        step.normalize().multiply(0.25);
-        Location point = start.clone();
-        for (double travelled = 0.25; travelled <= range + 1.0E-6; travelled += 0.25) {
-            point.add(step);
-            if (solid(world, point.getX(), point.getY() + 0.1, point.getZ())
-                    || solid(world, point.getX(), point.getY() + 1.0, point.getZ())
-                    || solid(world, point.getX(), point.getY() + 1.7, point.getZ())) {
-                break;
-            }
-            last = point.clone();
-        }
-        return last;
     }
 
     static double flatDistance(Location a, Location b) {

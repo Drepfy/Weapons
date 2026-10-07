@@ -53,7 +53,7 @@ public final class SettingsLoader {
             }
         }
         Settings.Controls controls = in.choice("controls", Settings.Controls.class);
-        Settings.HitMobs hitMobs = in.choice("hit-mobs", Settings.HitMobs.class);
+        boolean fullStrengthHits = in.bool("full-strength-hits");
         boolean trueDamage = in.bool("true-damage");
         double meleeDamage = in.number("melee-damage", 0.1, 10);
         boolean bossBars = in.bool("display.boss-bars");
@@ -101,7 +101,7 @@ public final class SettingsLoader {
                 messages.put(key, in.string("messages." + key));
             }
         }
-        return new Settings(prefix, oneOfEach, markLost, dropOnDeath, alts, List.copyOf(blocked), controls, hitMobs,
+        return new Settings(prefix, oneOfEach, markLost, dropOnDeath, alts, List.copyOf(blocked), controls, fullStrengthHits,
                 trueDamage, meleeDamage, bossBars, barsWhenReady, looks, abilities, sounds, messages, List.copyOf(warnings));
     }
 

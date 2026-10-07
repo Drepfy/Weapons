@@ -362,15 +362,21 @@ public final class WeaponRegistry {
         }
         salt = yaml.getString("salt");
         int skipped = 0;
+        int retired = 0;
         ConfigurationSection weapons = yaml.getConfigurationSection("weapons");
         if (weapons != null) {
             for (String key : weapons.getKeys(false)) {
                 ConfigurationSection section = weapons.getConfigurationSection(key);
                 try {
                     UUID id = UUID.fromString(key);
-                    WeaponType type = WeaponType.byKey(section == null ? null : section.getString("type"));
+                    String typeKey = section == null ? null : section.getString("type");
+                    WeaponType type = WeaponType.byKey(typeKey);
                     if (type == null) {
-                        skipped++;
+                        if (WeaponType.retired(typeKey)) {
+                            retired++; // A weapon that no longer exists: it is let go of.
+                        } else {
+                            skipped++;
+                        }
                         continue;
                     }
                     WeaponRecord record = new WeaponRecord(id, type, section.getLong("created"),
@@ -407,6 +413,10 @@ public final class WeaponRegistry {
         }
         if (skipped > 0) {
             logger.warning(skipped + " broken entr" + (skipped == 1 ? "y" : "ies") + " in data.yml skipped.");
+        }
+        if (retired > 0) {
+            logger.info(retired + " weapon" + (retired == 1 ? "" : "s") + " that no longer exist"
+                    + (retired == 1 ? "s" : "") + " removed from data.yml.");
         }
     }
 

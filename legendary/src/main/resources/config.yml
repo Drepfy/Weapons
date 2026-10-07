@@ -1,20 +1,20 @@
-# Legendary Weapons. After editing, run /legendary reload.
+# Legendary Weapons: four PvP weapons, each with an ability and a passive. After editing, run
+# /legendary reload.
 #
-# Controls: F (the swap-offhand key) uses a weapon's first ability, Shift + F its second. Pressing
-# Shift + F again while Iron Bastion or Sugar Rush is going ends it early (the release or burst
-# happens straight away).
-# Times: 8s, 2.5s, 1m, 30d.
-config-version: 6
+# Shift + F (F is the swap-offhand key) uses the weapon's ability; plain F swaps hands as usual.
+# The passive works on its own on every hit. The weapons only ever affect other players.
+# Times: 8s, 2.5s, 1m, 30d. Damage and health: in hearts (1 = one heart).
+config-version: 7
 prefix: "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ » &r"
 
-# Which keys use the abilities:
-#   offhand     - F and Shift + F. The weapon stays in your hand (it is not swapped).
-#   right-click - right-click and sneak + right-click (how 1.0 worked).
+# Which key uses the ability:
+#   offhand     - Shift + F. The weapon stays in your hand (it is not swapped).
+#   right-click - sneak + right-click.
 #   both        - either.
-# The lore shows the right keys by itself ({key} and {sneak-key}).
+# The lore shows the right key by itself ({sneak-key}).
 controls: offhand
 
-# Only one of each weapon can exist. /legendary give refuses a second Kurogane while the first
+# Only one of each weapon can exist. /legendary give refuses a second Katana while the first
 # is still around; remove it first (/legendary remove), or give a new one if it was lost.
 one-of-each: true
 
@@ -53,17 +53,19 @@ blocked-commands:
   - "sellhand"
   - "sellall"
 
-# What the abilities hit besides players: hostile (monsters), all (every mob) or none.
-hit-mobs: hostile
+# Draw, Crush and Reap only go off on a full-strength hit (the attack bar at 90% or more), and so
+# does Heavy's knock-down: spam-clicking does not use them up. false = any hit counts.
+full-strength-hits: true
 
-# Ability damage goes straight through armour and Protection: damage 8 takes 4 hearts, whatever
-# the target wears (Resistance and absorption hearts still count). Sword and axe hits are not
-# changed. false = armour reduces ability damage like it reduces a sword hit.
+# The extra damage of the abilities and passives goes straight through armour and Protection:
+# 2 hearts take 2 hearts, whatever the target wears (Resistance, absorption hearts and totems
+# still count). It never knocks back and never gets in the way of the next sword hit.
+# false = armour reduces it like a sword hit.
 true-damage: true
 
 # Sword and axe hits with a legendary do this many times their normal damage (1.25 = 25% more;
-# 1 = like any netherite weapon). The {attack} lore line shows the result. Ability damage below
-# is set on its own.
+# 1 = like any netherite weapon). The {attack} lore line shows the result. The extra damage of
+# the abilities is set on its own, below.
 melee-damage: 1.25
 
 display:
@@ -75,25 +77,24 @@ display:
   # legendary in your hand.
   boss-bars-when-ready: false
 
-# Each weapon: its name and lore ({key} / {sneak-key} = the keys that use its abilities,
-# {<ability>.<setting>} = a value below, such as {phantom-step.cooldown}, {<ability>.name} = the
-# ability's name), resource pack looks, enchantments and abilities. The enchantments show under
-# the name like on any enchanted item (put a "{enchantments}" line in the lore to list them there
-# in the weapon's own style instead). An "{attack}" line shows the weapon's real attack damage,
-# Sharpness and melee-damage included (the vanilla tooltip leaves Sharpness out). Damage is in
-# health points (2 = one heart); see true-damage above. An ability can be renamed with "name:" in
-# its section.
+# Each weapon: its name and lore ({sneak-key} = the key that uses its ability,
+# {<ability>.<setting>} = a value below, such as {draw.cooldown}, {<ability>.name} = the
+# ability's name), resource pack looks, enchantments and its ability and passive. The
+# enchantments show under the name like on any enchanted item (put a "{enchantments}" line in
+# the lore to list them there in the weapon's own style instead). An "{attack}" line shows the
+# weapon's real attack damage, Sharpness and melee-damage included (the vanilla tooltip leaves
+# Sharpness out). An ability can be renamed with "name:" in its section.
 #
 # item-model and tooltip-style come from the server resource pack (1.21.4+ clients): the 3D
 # model, and the weapon's own tooltip frame. Without the pack, tooltip styles show as a missing
 # texture: if players may join without it (require-resource-pack=false), set them to "".
 # glint: the enchantment shimmer (always on, like the Heart items; false = never).
 weapons:
-  kurogane:
-    name: "<gradient:#F5F5F5:#C21E3A>&lKurogane</gradient>"
+  katana:
+    name: "<gradient:#FFFFFF:#FF2A4A>&lKatana</gradient>"
     custom-model-data: 1001
-    item-model: "legendary:kurogane"
-    tooltip-style: "legendary:kurogane"
+    item-model: "legendary:katana"
+    tooltip-style: "legendary:katana"
     glint: true
     unbreakable: true
     enchantments:
@@ -108,55 +109,37 @@ weapons:
     lore:
       - "&8Legendary Katana"
       - ""
-      - "&#FF4D6APassive &8» &f{crimson-hunger.name}"
-      - "&7Hits can make them bleed. Hitting a"
-      - "&7bleeding enemy heals you."
+      - "&#FF4D6APassive &8» &f{bleed.name}"
+      - "&7Hits make players bleed for {bleed.duration}."
+      - "&7Hitting them again starts it over."
       - ""
-      - "&#FF4D6A{key} &8» &f{phantom-step.name} &8({phantom-step.cooldown})"
-      - "&7Vanish forward through enemies. Everyone"
-      - "&7you pass is cut and bleeds."
-      - ""
-      - "&#FF4D6A{sneak-key} &8» &f{crimson-tempest.name} &8({crimson-tempest.cooldown})"
-      - "&7For {crimson-tempest.duration}, every swing sends out"
-      - "&7a crimson crescent."
+      - "&#FF4D6A{sneak-key} &8» &f{draw.name} &8({draw.cooldown})"
+      - "&7Your next full-strength hit within {draw.window}"
+      - "&7cuts deep: the more health they have, the more."
       - ""
       - "{attack}"
     abilities:
-      phantom-step:
-        cooldown: 21s
-        # How far you vanish (you stop before walls) and how wide the cut along the way is.
-        range: 10
-        width: 1.8
-        damage: 7.5
-        # Bleeding: this much damage every second, for this long (0 = none).
-        bleed-damage: 1.25
-        bleed-duration: 3s
-        # Speed afterwards (level 0 = none).
-        speed-level: 3
-        speed-duration: 3s
-      crimson-tempest:
-        cooldown: 27s
-        # For duration, each sword swing also sends a crescent range blocks forward (at most
-        # one every gap). It cuts everyone within width of its path. Speed while it lasts.
-        duration: 5s
-        range: 7
-        width: 2.4
-        damage: 5
-        gap: 0.5s
-        speed-level: 2
-      crimson-hunger:
-        # Passive: the chance (0.25 = 25%) that a sword hit makes the target bleed, and the
-        # health you get back when you hit someone who is already bleeding (2 = one heart).
-        chance: 0.25
-        bleed-damage: 1.25
-        bleed-duration: 3s
-        heal: 1
+      bleed:
+        # Passive: a hit on a player makes them bleed for duration, losing damage hearts every
+        # interval. Hitting them again starts it over; it never stacks.
+        duration: 4s
+        damage: 0.5
+        interval: 1s
+      draw:
+        cooldown: 25s
+        # For window, the next full-strength hit on a player cuts for extra damage: percent of the
+        # health they have left (0.3 = 30%), at least min and at most max hearts. It is used up
+        # only when it lands.
+        window: 4s
+        percent: 0.3
+        min: 1
+        max: 3.5
 
-  sugarcrash:
-    name: "<gradient:#FF3B5C:#FFFFFF:#FF3B5C>&lSugarcrash</gradient>"
+  candycane:
+    name: "<gradient:#FF3B5C:#FFFFFF:#FF3B5C>&lCandy Cane</gradient>"
     custom-model-data: 1002
-    item-model: "legendary:sugarcrash"
-    tooltip-style: "legendary:sugarcrash"
+    item-model: "legendary:candycane"
+    tooltip-style: "legendary:candycane"
     glint: true
     unbreakable: true
     enchantments:
@@ -168,54 +151,90 @@ weapons:
       color: pink
       text: "&#FF7AC3"
     lore:
-      - "&8Legendary Candy Scythe"
+      - "&8Legendary Candy Cane"
       - ""
-      - "&#FF7AC3Passive &8» &f{sugar-high.name}"
-      - "&7Speed I while held. Hits slow them down."
+      - "&#FF7AC3Passive &8» &f{sticky-sweet.name}"
+      - "&7Hits can stick, slowing players for a moment."
       - ""
-      - "&#FF7AC3{key} &8» &f{candy-reaper.name} &8({candy-reaper.cooldown})"
-      - "&7Throw the scythe. It cuts on the way out"
-      - "&7and drags them back to you on the return."
-      - ""
-      - "&#FF7AC3{sneak-key} &8» &f{sugar-rush.name} &8({sugar-rush.cooldown})"
-      - "&7Charge where you look, ramming everyone."
-      - "&7Ends in a candy blast. Arrows bounce off."
+      - "&#FF7AC3{sneak-key} &8» &f{sugar-trap.name} &8({sugar-trap.cooldown})"
+      - "&7Set {sugar-trap.traps} sugar traps round you. Enemies who"
+      - "&7step on one are poisoned, dizzy and slowed."
       - ""
       - "{attack}"
     abilities:
-      candy-reaper:
-        cooldown: 19s
-        # How far the scythe flies (it turns back at walls) and how fast, out and back
-        # (blocks per tick). Each target is cut once going out and once coming back.
-        range: 18
-        speed: 1.3
-        return-speed: 1.6
-        damage: 6.25
-        # How hard the return cut drags them towards you (0 = not at all).
-        pull: 0.9
-      sugar-rush:
-        cooldown: 33s
-        # You charge where you look for duration, at speed blocks per tick. Everyone you run
-        # into is hit once and thrown aside. Press again to end it early.
-        duration: 3s
-        speed: 0.9
-        damage: 6.25
-        knockback: 0.9
-        # The candy blast at the end (radius 0 = none).
-        burst-radius: 4
-        burst-damage: 5
-      sugar-high:
-        # Passive: Speed while the scythe is in your hand (1 = Speed I, 0 = none), and
-        # Slowness for whoever a scythe hit lands on (level 0 = none).
-        speed-level: 1
+      sticky-sweet:
+        # Passive: the chance (0.25 = 25%) that a hit gives Slowness I for duration. It never
+        # stacks, and the same player cannot be slowed by it again until immunity has passed
+        # (counted from when it struck), so hitting faster does not keep them slowed.
+        chance: 0.25
+        duration: 1.5s
+        immunity: 3s
+      sugar-trap:
+        cooldown: 25s
+        # Up to traps traps pop out round you, radius blocks away (only where there is ground
+        # and no wall in between), and stay for lifetime. The first enemy to walk over one gets
+        # Poison, Nausea and Slowness (level 0 = none), and that trap is gone. Your own traps
+        # never catch you.
+        traps: 5
+        radius: 2.5
+        lifetime: 8s
+        poison-level: 1
+        poison-duration: 4s
+        nausea-duration: 4s
         slow-level: 1
-        slow-duration: 1.5s
+        slow-duration: 1s
 
-  wyrmfang:
-    name: "<gradient:#B8FFD0:#2FD47A:#E8C25A>&lWyrmfang</gradient>"
+  crush:
+    name: "<gradient:#EAF6FF:#4FB4FF>&lCrush</gradient>"
+    custom-model-data: 1004
+    item-model: "legendary:crush"
+    tooltip-style: "legendary:crush"
+    glint: true
+    unbreakable: true
+    enchantments:
+      sharpness: 7
+      efficiency: 5
+      fortune: 3
+    boss-bar:
+      color: blue
+      text: "&#6FC3FF"
+    lore:
+      - "&8Legendary War Axe"
+      - ""
+      - "&#6FC3FFPassive &8» &f{heavy.name}"
+      - "&7Hits knock further. Catch a player in the"
+      - "&7air to knock them down."
+      - ""
+      - "&#6FC3FF{sneak-key} &8» &f{crush.name} &8({crush.cooldown})"
+      - "&7Your next full-strength hit slams them into"
+      - "&7the ground. The higher they were, the harder."
+      - ""
+      - "{attack}"
+    abilities:
+      heavy:
+        # Passive: axe hits knock players knockback times as far. A full-strength hit on a
+        # player at least airborne blocks above the ground knocks them down (slam = how fast)
+        # and does damage hearts more.
+        knockback: 1.3
+        airborne: 0.5
+        slam: 0.8
+        damage: 0.75
+      crush:
+        cooldown: 28s
+        # For window, the next full-strength hit on a player slams them into the ground: damage
+        # hearts, plus damage-per-block for every block they were above the ground, at most
+        # max-damage. It is used up only when it lands.
+        window: 10s
+        slam: 1.6
+        damage: 0.5
+        damage-per-block: 0.75
+        max-damage: 4
+
+  reaper:
+    name: "<gradient:#C8FFF0:#5AFFD2:#7B4FD0>&lReaper</gradient>"
     custom-model-data: 1003
-    item-model: "legendary:wyrmfang"
-    tooltip-style: "legendary:wyrmfang"
+    item-model: "legendary:reaper"
+    tooltip-style: "legendary:reaper"
     glint: true
     unbreakable: true
     enchantments:
@@ -225,183 +244,45 @@ weapons:
       sweeping_edge: 3
     boss-bar:
       color: green
-      text: "&#3DE08A"
+      text: "&#5AFFD2"
     lore:
-      - "&8Legendary Dragon Greatsword"
+      - "&8Legendary Reaper Blade"
       - ""
-      - "&#3DE08APassive &8» &f{venom-fang.name}"
-      - "&7Every hit poisons the target."
+      - "&#5AFFD2Passive &8» &f{execution.name}"
+      - "&7More damage to players below {execution.below} hearts."
       - ""
-      - "&#3DE08A{key} &8» &f{wyrm-lunge.name} &8({wyrm-lunge.cooldown})"
-      - "&7Leap forward. The first enemy you reach"
-      - "&7is seized, thrown up and slowed."
-      - ""
-      - "&#3DE08A{sneak-key} &8» &f{dragons-breath.name} &8({dragons-breath.cooldown})"
-      - "&7Breathe green dragon fire where you look,"
-      - "&7burning and poisoning everyone in it."
+      - "&#5AFFD2{sneak-key} &8» &f{reap.name} &8({reap.cooldown})"
+      - "&7Your next full-strength hit on a player below"
+      - "&7{reap.below} hearts reaps them for heavy damage."
       - ""
       - "{attack}"
     abilities:
-      wyrm-lunge:
-        cooldown: 25s
-        # How hard the leap throws you forward and up (no fall damage after it), and how long
-        # it can seize someone for.
-        forward: 1.5
-        up: 0.45
-        reach-time: 1.25s
-        # Whoever is seized: damage, how high they are thrown and Slowness (level 0 = none).
-        damage: 10
-        launch: 0.8
-        slow-level: 3
-        slow-duration: 2s
-      dragons-breath:
-        cooldown: 33s
-        # The fire reaches range blocks in a cone of angle degrees either side of where you
-        # look (it does not go through walls). Everyone in it takes damage every interval.
-        duration: 2s
-        range: 8
-        angle: 35
-        interval: 0.25s
-        damage: 1.25
-        poison-level: 2
-        poison-duration: 3s
-      venom-fang:
-        # Passive: Poison for whoever a sword hit lands on (level 0 = none).
-        poison-level: 2
-        poison-duration: 2s
-
-  gravebreaker:
-    name: "<gradient:#E2E2E2:#E0475A>&lGravebreaker</gradient>"
-    custom-model-data: 1004
-    item-model: "legendary:gravebreaker"
-    tooltip-style: "legendary:gravebreaker"
-    glint: true
-    unbreakable: true
-    enchantments:
-      sharpness: 7
-      efficiency: 5
-      fortune: 3
-    boss-bar:
-      color: yellow
-      text: "&#FF8A3D"
-    lore:
-      - "&8Legendary Battle Axe"
-      - ""
-      - "&#FF8A3DPassive &8» &f{headsman.name}"
-      - "&7More damage to weak players. Kills"
-      - "&7give you Regeneration."
-      - ""
-      - "&#FF8A3D{key} &8» &f{earthsplitter.name} &8({earthsplitter.cooldown})"
-      - "&7Split the ground in front of you. Rocks"
-      - "&7burst up and throw everyone in the way."
-      - ""
-      - "&#FF8A3D{sneak-key} &8» &f{iron-bastion.name} &8({iron-bastion.cooldown})"
-      - "&7Brace: take less damage and no knockback."
-      - "&7Then release it all as a shockwave."
-      - ""
-      - "{attack}"
-    abilities:
-      earthsplitter:
-        cooldown: 23s
-        # The crack runs range blocks forward along the ground. Everyone within width of it
-        # is hit once, thrown up and slowed (level 0 = none).
-        range: 14
-        width: 1.6
-        damage: 10
-        launch: 1.0
-        slow-level: 2
-        slow-duration: 2s
-      iron-bastion:
-        cooldown: 33s
-        # For duration you have Resistance (level 0 = none) and cannot be knocked back. The
-        # damage you take is stored (up to stored-cap) and added to the shockwave at the end.
-        # Press again to release it early.
-        duration: 4s
-        resistance-level: 3
-        radius: 6
-        damage: 6.25
-        stored-cap: 6.25
-        knockback: 1.0
-        lift: 0.5
-      headsman:
-        # Passive: axe hits on players below threshold of their health (0.4 = 40%) do bonus
-        # more damage (0.3 = +30%). Killing a player with the axe in hand gives Regeneration.
-        threshold: 0.4
-        bonus: 0.3
-        regen-level: 2
-        regen-duration: 4s
-
-  starforged:
-    name: "<gradient:#FFE29A:#6FD6FF:#8A5CFF>&lStarforged</gradient>"
-    custom-model-data: 1005
-    item-model: "legendary:starforged"
-    tooltip-style: "legendary:starforged"
-    glint: true
-    unbreakable: true
-    enchantments:
-      sharpness: 7
-      efficiency: 5
-      fortune: 3
-    boss-bar:
-      color: blue
-      text: "&#6FD6FF"
-    lore:
-      - "&8Legendary Celestial Axe"
-      - ""
-      - "&#6FD6FFPassive &8» &f{starlight.name}"
-      - "&7More damage to enemies in the air."
-      - ""
-      - "&#6FD6FF{key} &8» &f{star-lance.name} &8({star-lance.cooldown})"
-      - "&7Throw a star. The first enemy it hits is"
-      - "&7pinned, slowed and lit up for everyone."
-      - ""
-      - "&#6FD6FF{sneak-key} &8» &f{celestial-prison.name} &8({celestial-prison.cooldown})"
-      - "&7Trap everyone near you in a ring of stars."
-      - "&7No escape, then the stars come crashing in."
-      - ""
-      - "{attack}"
-    abilities:
-      star-lance:
-        cooldown: 29s
-        # How far the star flies and how fast (blocks per tick). It bursts at walls.
-        range: 30
-        speed: 2
-        damage: 11.25
-        # Slowness for whoever it hits (level 0 = none), and how long they glow (seen through
-        # walls by everyone).
-        slow-level: 4
-        slow-duration: 2s
-        glow: 5s
-      celestial-prison:
-        cooldown: 40s
-        # Everyone within radius is trapped for duration: walking out pushes them back in, and
-        # ender pearls and chorus fruit cannot take them out. Then the stars collapse: damage
-        # and a launch for everyone still inside.
-        radius: 6
-        duration: 3s
-        damage: 12.5
-        launch: 0.7
-      starlight:
-        # Passive: axe hits on an enemy that is in the air do bonus more damage (0.3 = +30%).
-        bonus: 0.3
+      execution:
+        # Passive: hits on a player below below hearts do damage hearts more.
+        below: 6
+        damage: 0.75
+      reap:
+        cooldown: 30s
+        # For window, the next full-strength hit on a player below below hearts does damage
+        # hearts more. Hits on healthier players do not use it up. It is ordinary damage: it
+        # never kills outright and totems still save.
+        window: 8s
+        below: 8
+        damage: 3.5
 
 # Sounds: "<sound> [volume] [pitch]" (vanilla Minecraft sounds, so everyone hears them, pack or
-# not). Only one sound when an ability is used and one for its big moment. Hits, bleeding and
-# taking a weapon in hand make no sound. Set one to [] to silence it, or add your own: several
-# play together.
+# not). One sound when an ability is used and one when it lands; hits, bleeding and taking a
+# weapon in hand make no sound. Set one to [] to silence it, or add your own: several play
+# together.
 sounds:
-  phantom-step: ["entity.player.attack.sweep 1 0.7"]
-  crimson-tempest: ["item.trident.return 0.9 0.7"]
-  candy-reaper: ["item.trident.throw 1 0.8"]
-  sugar-rush: ["entity.breeze.wind_burst 0.9 1.1"]
-  wyrm-lunge: ["entity.ender_dragon.flap 1 1.2"]
-  dragons-breath: ["entity.ender_dragon.shoot 1 0.9"]
-  earthsplitter: ["item.mace.smash_ground_heavy 1 0.8"]
-  iron-bastion: ["item.armor.equip_netherite 1 0.6"]
-  iron-bastion-release: ["entity.generic.explode 0.8 0.9"]
-  star-lance: ["block.beacon.activate 0.9 1.6"]
-  celestial-prison: ["block.respawn_anchor.charge 1 0.8"]
-  celestial-prison-collapse: ["entity.firework_rocket.large_blast 1 0.8"]
+  draw: ["item.armor.equip_chain 1 0.6"]
+  draw-strike: ["item.trident.hit 1 0.7"]
+  sugar-trap: ["block.honey_block.place 1 1.3"]
+  sugar-trap-trigger: ["block.honey_block.break 1 1.1"]
+  crush: ["item.armor.equip_netherite 1 0.6"]
+  crush-impact: ["item.mace.smash_ground_heavy 1 0.8"]
+  reap: ["particle.soul_escape 1 0.7"]
+  reap-strike: ["entity.player.attack.sweep 1 0.5"]
   # Getting a legendary.
   received: ["ui.toast.challenge_complete 0.6 1.2"]
 
@@ -420,6 +301,8 @@ messages:
   lore-attack-damage: " &2{damage} Attack Damage"
   lore-attack-speed: " &2{speed} Attack Speed"
   # In chat.
+  no-room: "&7There is no room for a trap here."
+  retired: "&c{weapon} &cno longer exists and was taken away. Ask staff for a new legendary."
   storage-blocked: "&cLegendaries can't go in containers."
   placing-blocked: "&cLegendaries can't be placed there."
   bundle-blocked: "&cLegendaries can't go in bundles."

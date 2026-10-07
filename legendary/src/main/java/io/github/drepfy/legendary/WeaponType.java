@@ -2,35 +2,42 @@ package io.github.drepfy.legendary;
 
 import org.bukkit.Material;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
-/** The five legendary weapons. F (or right-click) uses the first ability, Shift + F the second. */
+/**
+ * The four legendary weapons. Each has one ability, used with Shift + F (or sneak + right-click),
+ * and one passive that works on its own.
+ */
 public enum WeaponType {
 
-    KUROGANE("kurogane", Material.NETHERITE_SWORD, Ability.PHANTOM_STEP, Ability.CRIMSON_TEMPEST, Ability.CRIMSON_HUNGER),
-    SUGARCRASH("sugarcrash", Material.NETHERITE_SWORD, Ability.CANDY_REAPER, Ability.SUGAR_RUSH, Ability.SUGAR_HIGH),
-    /** Took the Riftblade's place in 2.0: every Riftblade became a Wyrmfang. */
-    WYRMFANG("wyrmfang", Material.NETHERITE_SWORD, Ability.WYRM_LUNGE, Ability.DRAGONS_BREATH, Ability.VENOM_FANG),
-    GRAVEBREAKER("gravebreaker", Material.NETHERITE_AXE, Ability.EARTHSPLITTER, Ability.IRON_BASTION, Ability.HEADSMAN),
-    STARFORGED("starforged", Material.NETHERITE_AXE, Ability.STAR_LANCE, Ability.CELESTIAL_PRISON, Ability.STARLIGHT);
+    KATANA("katana", Material.NETHERITE_SWORD, Ability.DRAW, Ability.BLEED),
+    CANDY_CANE("candycane", Material.NETHERITE_SWORD, Ability.SUGAR_TRAP, Ability.STICKY_SWEET),
+    CRUSH("crush", Material.NETHERITE_AXE, Ability.CRUSH, Ability.HEAVY),
+    REAPER("reaper", Material.NETHERITE_SWORD, Ability.REAP, Ability.EXECUTION);
 
-    /** Weapons that were replaced: their items and registry entries are read as the new one. */
-    private static final java.util.Map<String, String> REPLACED = java.util.Map.of("riftblade", "wyrmfang");
+    /**
+     * Weapons of older versions that live on as one of these (3.0): their items and registry
+     * entries are read as the new weapon, which takes over the same id and holder.
+     */
+    private static final Map<String, String> REPLACED = Map.of(
+            "kurogane", "katana", "sugarcrash", "candycane", "gravebreaker", "crush",
+            "wyrmfang", "reaper", "riftblade", "reaper");
+
+    /** Weapons of older versions that have no successor: their items are taken away. */
+    private static final Set<String> RETIRED = Set.of("starforged");
 
     private final String key;
     private final Material material;
-    private final Ability primary;
-    private final Ability secondary;
+    private final Ability active;
     private final Ability passive;
 
-    WeaponType(String key, Material material, Ability primary, Ability secondary, Ability passive) {
+    WeaponType(String key, Material material, Ability active, Ability passive) {
         this.key = key;
         this.material = material;
-        this.primary = primary;
-        this.secondary = secondary;
+        this.active = active;
         this.passive = passive;
     }
 
@@ -52,43 +59,29 @@ public enum WeaponType {
         return material == Material.NETHERITE_AXE ? 1.0 : 1.6;
     }
 
-    /** F, or right-click. */
-    public Ability primary() {
-        return primary;
+    /** The ability (Shift + F). */
+    public Ability active() {
+        return active;
     }
 
-    /** Shift + F, or sneak + right-click; the weapons with one ability use it for both. */
-    public Ability secondary() {
-        return secondary != null ? secondary : primary;
-    }
-
-    public boolean hasSecondary() {
-        return secondary != null;
-    }
-
-    /** May be null. */
     public Ability passive() {
         return passive;
     }
 
-    /** The abilities used with a key, in order. */
+    /** The abilities used with a key (one per weapon). */
     public List<Ability> actives() {
-        return secondary == null ? List.of(primary) : List.of(primary, secondary);
+        return List.of(active);
     }
 
     public List<Ability> abilities() {
-        List<Ability> all = new ArrayList<>(actives());
-        if (passive != null) {
-            all.add(passive);
-        }
-        return Collections.unmodifiableList(all);
+        return List.of(active, passive);
     }
 
     public static WeaponType byKey(String key) {
-        if (key == null) {
+        String wanted = normal(key);
+        if (wanted == null) {
             return null;
         }
-        String wanted = key.trim().toLowerCase(Locale.ROOT).replace("_", "-");
         wanted = REPLACED.getOrDefault(wanted, wanted);
         for (WeaponType type : values()) {
             if (type.key.equals(wanted)) {
@@ -96,6 +89,17 @@ public enum WeaponType {
             }
         }
         return null;
+    }
+
+    /** Whether this was a weapon of an older version that no longer exists (its items are taken away). */
+    public static boolean retired(String key) {
+        String wanted = normal(key);
+        return wanted != null && RETIRED.contains(wanted);
+    }
+
+    /** "Candy Cane", "candy-cane" and "candy_cane" all mean candycane. */
+    private static String normal(String key) {
+        return key == null ? null : key.trim().toLowerCase(Locale.ROOT).replace("_", "").replace("-", "").replace(" ", "");
     }
 
     public static boolean isWeaponMaterial(Material material) {

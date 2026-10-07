@@ -7,15 +7,9 @@ import org.bukkit.GameMode;
 import org.bukkit.damage.DamageSource;
 import org.bukkit.damage.DamageType;
 import org.bukkit.enchantments.Enchantment;
-import org.bukkit.Location;
-import org.bukkit.World;
-import org.bukkit.entity.ArmorStand;
-import org.bukkit.entity.ComplexEntityPart;
-import org.bukkit.entity.Enemy;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
-import org.bukkit.entity.Tameable;
 import org.bukkit.inventory.EntityEquipment;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.event.EventHandler;
@@ -25,25 +19,24 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
-import org.bukkit.util.BoundingBox;
-import org.bukkit.util.Vector;
 
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.EnumMap;
-import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 
 /**
- * Ability damage that plays by the server's rules.
+ * The extra damage of the abilities and passives, played by the server's rules.
  *
- * <p>Every hit is dealt in the attacker's name, like a sword hit, so protection plugins
- * (no-PvP regions, claims, spawn), PvP being off, combat tagging, kill credit and death
- * messages all work as usual. With true-damage on (the default) it goes straight through
- * armour and the Protection enchantment: 6 damage takes 3 hearts whatever the target wears
- * (Resistance and absorption hearts still count). Knockback and effects are only applied when
- * the hit was allowed: a player standing in a protected area is never pushed, slowed or pulled.
+ * <p>The weapons only ever affect players: players in creative or spectator mode, players the
+ * attacker cannot see and everyone in a world with PvP off are left alone, and before a player
+ * is trapped or slowed, protection plugins (no-PvP regions, claims, spawn) are asked as for an
+ * attack. Extra damage always follows a sword or axe hit that landed (or a bleed that one
+ * started), so kill credit, combat tags and Lifesteal hearts go to the attacker as usual.
+ *
+ * <p>With true-damage on (the default) the extra damage goes straight through armour and the
+ * Protection enchantment: 1 heart takes 1 heart whatever the target wears (Resistance, absorption
+ * hearts and totems still count). It never knocks the target back and never gives them extra
+ * time without damage, so it does not get in the way of the next sword hit.
  */
 public final class Hits implements Listener {
 
@@ -59,11 +52,7 @@ public final class Hits implements Listener {
 
     public Hits(Supplier<Settings> settings) {
         this.settings = settings;
-        this.damager = (target, amount, attacker) -> {
-            if (!settings.get().trueDamage() || !dealTrue(target, amount, attacker)) {
-                target.damage(amount, attacker); // A hit like a sword's: armour reduces it.
-            }
-        };
+        this.damager = (target, amount, attacker) -> deal(target, amount, settings.get().trueDamage());
     }
 
     public void setDamager(Damager damager) {
@@ -71,92 +60,90 @@ public final class Hits implements Listener {
     }
 
     private static final class Hit {
-        final Player attacker;
         final Entity target;
         boolean landed;
 
-        Hit(Player attacker, Entity target) {
-            this.attacker = attacker;
+        Hit(Entity target) {
             this.target = target;
         }
     }
 
     /**
      * True while protection plugins are only being asked whether an attack would be allowed: the
-     * attack event then is not a real attack, and counters and dodges must ignore it.
+     * attack event then is not a real attack.
      */
     public boolean probing() {
         return probing;
     }
 
-    /** True while an ability hit is being dealt (so it is not mistaken for a sword hit). */
+    /** True while extra damage is being dealt (so it is not mistaken for a sword hit). */
     public boolean inAbility() {
         return pending != null;
     }
 
-    /** Whether abilities may hit this entity at all. */
+    /** Whether the weapons may affect this entity at all: other players only, never in creative or spectator. */
     public boolean canTarget(Player attacker, Entity entity) {
-        if (!(entity instanceof LivingEntity living) || entity.equals(attacker) || living.isDead()
-                || entity instanceof ArmorStand || entity instanceof ComplexEntityPart) {
+        if (!(entity instanceof Player player) || entity.equals(attacker) || player.isDead() || !player.isOnline()) {
             return false;
         }
-        if (entity instanceof Player player) {
-            GameMode mode = player.getGameMode();
-            return mode != GameMode.CREATIVE && mode != GameMode.SPECTATOR && attacker.canSee(player)
-                    && attacker.getWorld().getPVP();
-        }
-        return switch (settings.get().hitMobs()) {
-            case NONE -> false;
-            case HOSTILE -> entity instanceof Enemy;
-            case ALL -> !(entity instanceof Tameable pet && pet.isTamed() && attacker.equals(pet.getOwner()));
-        };
+        GameMode mode = player.getGameMode();
+        return mode != GameMode.CREATIVE && mode != GameMode.SPECTATOR && attacker.canSee(player)
+                && attacker.getWorld().equals(player.getWorld()) && attacker.getWorld().getPVP();
     }
 
     /**
-     * Hurts the target in the attacker's name.
+     * Extra damage (health points) for the attacker's target. The target keeps the time without
+     * damage it had and is not knocked back.
      *
-     * @return whether the hit was allowed (no plugin cancelled it); only then may it be pushed,
-     *         slowed or pulled
+     * @return whether it was dealt (no plugin cancelled it)
      */
     public boolean hurt(Player attacker, LivingEntity target, double amount) {
-        if (!canTarget(attacker, target)) {
+        if (amount <= 0 || !canTarget(attacker, target)) {
             return false;
         }
         int invulnerable = target.getNoDamageTicks();
-        // A sword hit just before would otherwise swallow the ability. Each ability hits a
-        // target once per use, so this cannot be used to stack hits.
+        double lastDamage = lastDamage(target);
         target.setNoDamageTicks(0);
         Hit outer = pending;
-        Hit hit = new Hit(attacker, target);
+        Hit hit = new Hit(target);
         pending = hit;
         try {
             damager.damage(target, amount, attacker);
         } finally {
             pending = outer;
         }
-        if (!hit.landed && target.isValid() && !target.isDead()) {
+        if (target.isValid() && !target.isDead()) {
+            // As if this damage had not happened as far as the next sword hit is concerned.
             target.setNoDamageTicks(invulnerable);
+            if (!Double.isNaN(lastDamage)) {
+                target.setLastDamage(lastDamage);
+            }
         }
         return hit.landed;
     }
 
+    /** The damage of the target's last hit (what a hit in its time without damage must beat), or NaN if unknown. */
+    private static double lastDamage(LivingEntity target) {
+        try {
+            return target.getLastDamage();
+        } catch (RuntimeException | LinkageError e) {
+            return Double.NaN; // The simulated server in the tests does not keep it.
+        }
+    }
+
     /**
-     * Damage that ignores armour, dealt in the attacker's name (kill credit, combat tags and
-     * "was killed by ... using Kurogane" death messages, like any hit). Magic damage goes through
-     * armour but not Protection, so it is raised to make up for it.
-     *
-     * @return false on servers too old for damage sources (then it is dealt like a sword hit)
+     * Damage without a position, so nothing is knocked back. True damage is magic damage (it goes
+     * through armour), raised to make up for the Protection enchantment.
      */
-    private static boolean dealTrue(LivingEntity target, double amount, Player attacker) {
+    private static void deal(LivingEntity target, double amount, boolean trueDamage) {
         DamageSource source;
         try {
-            source = DamageSource.builder(DamageType.INDIRECT_MAGIC).withCausingEntity(attacker)
-                    .withDirectEntity(attacker).build();
+            source = DamageSource.builder(trueDamage ? DamageType.MAGIC : DamageType.GENERIC).build();
         } catch (RuntimeException | LinkageError e) {
-            return false;
+            target.damage(amount); // Before 1.20.5: no damage sources.
+            return;
         }
-        target.damage(throughProtection(target, amount), source);
-        return true;
+        target.damage(trueDamage ? throughProtection(target, amount) : amount, source);
     }
 
     /**
@@ -181,65 +168,16 @@ public final class Hits implements Listener {
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
-    public void onDamage(EntityDamageByEntityEvent event) {
+    public void onDamage(EntityDamageEvent event) {
         Hit hit = pending;
-        if (hit != null && event.getEntity().equals(hit.target) && event.getDamager().equals(hit.attacker)) {
+        if (hit != null && event.getEntity().equals(hit.target)) {
             hit.landed = !event.isCancelled();
         }
     }
 
-    /** Everything abilities may hit within a radius of a point (a sphere around the body's middle). */
-    public List<LivingEntity> around(Player attacker, Location center, double radius) {
-        List<LivingEntity> found = new ArrayList<>();
-        World world = center.getWorld();
-        if (world == null) {
-            return found;
-        }
-        for (Entity entity : world.getNearbyEntities(center, radius + 1, radius + 2, radius + 1)) {
-            if (entity instanceof LivingEntity living && canTarget(attacker, entity)) {
-                Location middle = entity.getLocation().add(0, entity.getHeight() / 2.0, 0);
-                double reach = radius + entity.getWidth() / 2.0;
-                if (middle.distanceSquared(center) <= reach * reach) {
-                    found.add(living);
-                }
-            }
-        }
-        found.sort(Comparator.comparingDouble(e -> e.getLocation().distanceSquared(center)));
-        return found;
-    }
-
-    /** Everything abilities may hit along a line (within {@code reach} of it), nearest the start first. */
-    public List<LivingEntity> along(Player attacker, Location from, Location to, double reach) {
-        List<LivingEntity> found = new ArrayList<>();
-        World world = from.getWorld();
-        if (world == null) {
-            return found;
-        }
-        BoundingBox box = BoundingBox.of(from, to).expand(reach + 1.0, 2.0, reach + 1.0);
-        Vector a = from.toVector();
-        Vector ab = to.toVector().subtract(a);
-        double lengthSquared = Math.max(1.0E-6, ab.lengthSquared());
-        for (Entity entity : world.getNearbyEntities(box)) {
-            if (!(entity instanceof LivingEntity living) || !canTarget(attacker, entity)) {
-                continue;
-            }
-            Vector middle = entity.getLocation().toVector().add(new Vector(0, entity.getHeight() / 2.0, 0));
-            double t = Math.max(0.0, Math.min(1.0, middle.clone().subtract(a).dot(ab) / lengthSquared));
-            Vector closest = a.clone().add(ab.clone().multiply(t));
-            double dx = middle.getX() - closest.getX();
-            double dz = middle.getZ() - closest.getZ();
-            double flat = Math.sqrt(dx * dx + dz * dz);
-            if (flat <= reach + entity.getWidth() / 2.0 && Math.abs(middle.getY() - closest.getY()) <= 1.6) {
-                found.add(living);
-            }
-        }
-        found.sort(Comparator.comparingDouble(e -> e.getLocation().distanceSquared(from)));
-        return found;
-    }
-
     /**
-     * Whether the attacker may affect the target at all here (pulling it, swapping places), asked
-     * without hurting it: protection plugins see an attack and may refuse it.
+     * Whether the attacker may affect the target at all here (a trap, a slow), asked without
+     * hurting it: protection plugins see an attack and may refuse it.
      */
     public boolean allowed(Player attacker, LivingEntity target) {
         if (!canTarget(attacker, target)) {
@@ -247,14 +185,14 @@ public final class Hits implements Listener {
         }
         Hit outer = pending;
         boolean outerProbing = probing;
-        pending = new Hit(attacker, target);
+        pending = new Hit(target);
         probing = true;
         try {
             EntityDamageByEntityEvent probe = probe(attacker, target);
             Bukkit.getPluginManager().callEvent(probe);
             return !probe.isCancelled();
         } catch (RuntimeException | LinkageError e) {
-            return false; // Could not ask: better not to pull anyone out of a protected area.
+            return false; // Could not ask: better not to trap anyone in a protected area.
         } finally {
             pending = outer;
             probing = outerProbing;
@@ -305,17 +243,5 @@ public final class Hits implements Listener {
         if (type != null) {
             target.addPotionEffect(new PotionEffect(type, ticks, level - 1, false, true, true));
         }
-    }
-
-    /**
-     * Pushes along a flat direction and lifts. Knockback resistance (netherite armour) softens
-     * the push like it does for a sword hit, but not the lift.
-     */
-    public static void knock(LivingEntity target, Vector direction, double strength, double lift) {
-        Vector flat = direction.clone().setY(0);
-        if (flat.lengthSquared() > 1.0E-6) {
-            flat.normalize().multiply(strength * (1.0 - Compat.knockbackResistance(target)));
-        }
-        target.setVelocity(flat.setY(lift));
     }
 }

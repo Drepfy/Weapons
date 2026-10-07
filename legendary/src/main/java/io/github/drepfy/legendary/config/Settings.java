@@ -15,7 +15,7 @@ public record Settings(
         Alts alts,
         List<String> blockedCommands,
         Controls controls,
-        HitMobs hitMobs,
+        boolean fullStrengthHits,
         boolean trueDamage,
         double meleeDamage,
         boolean bossBars,
@@ -49,9 +49,9 @@ public record Settings(
 
     /** Which keys use the abilities. */
     public enum Controls {
-        /** F (the swap-offhand key) and Shift + F. */
+        /** Shift + F (F being the swap-offhand key). */
         OFFHAND("F", "Shift + F"),
-        /** Right-click and sneak + right-click. */
+        /** Sneak + right-click. */
         RIGHT_CLICK("Right-click", "Sneak + right-click"),
         /** Both of the above. */
         BOTH("F", "Shift + F");
@@ -72,20 +72,15 @@ public record Settings(
             return this != OFFHAND;
         }
 
-        /** How the first ability's key reads in lore and help: {key}. */
+        /** The key without sneaking: {key}. */
         public String key() {
             return key;
         }
 
-        /** And the second's: {sneak-key}. */
+        /** The ability's key: {sneak-key}. */
         public String sneakKey() {
             return sneakKey;
         }
-    }
-
-    /** Which mobs the abilities hit besides players. */
-    public enum HitMobs {
-        HOSTILE, ALL, NONE
     }
 
     /**

@@ -95,10 +95,12 @@ def env(r):
     return sky + 2.6 * smooth(0.82, 0.95, box) + 1.0 * smooth(0.87, 0.96, rim)
 
 
-def shade(albedo, n, metal=0.0, gloss=0.3, spec=0.5, sheen=0.0, occl=1.0):
+def shade(albedo, n, metal=0.0, gloss=0.3, spec=0.5, sheen=0.0, occl=1.0, coat=0.0):
     """Lights one texel. albedo: sRGB floats; n: unit surface normal. Returns linear RGB.
     metal 0..1 (reflects the studio instead of scattering light), gloss 0..1 (how tight the
-    highlight is), spec (how strong), sheen: extra reflected light painted on (streaks)."""
+    highlight is), spec (how strong), sheen: extra reflected light painted on (streaks), coat
+    0..1: a clear glossy coat over the colour that reflects the studio untinted (black glass,
+    hard candy, lacquer)."""
     a = lin(albedo)
     nx, ny, nz = n
     nl = nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2]
@@ -111,11 +113,16 @@ def shade(albedo, n, metal=0.0, gloss=0.3, spec=0.5, sheen=0.0, occl=1.0):
     if metal:
         r = (2 * nz * nx, 2 * nz * ny, 2 * nz * nz - 1)
         reflect = (env(r) + sheen) * (0.35 + 0.65 * occl)
+    clear = 0.0
+    if coat:
+        r = (2 * nz * nx, 2 * nz * ny, 2 * nz * nz - 1)
+        fresnel = 0.06 + 0.5 * (1 - max(0.0, nz)) ** 5
+        clear = coat * (fresnel * 2.2 * env(r) + 0.3 * max(0.0, sheen)) * (0.35 + 0.65 * occl)
     out = []
     for c in a:
         v = c * diffuse * (1 - metal) + c * reflect * metal
         v += s * ((1 - metal) + metal * (0.35 + 0.65 * c))
-        out.append(v)
+        out.append(v + clear)
     return out
 
 

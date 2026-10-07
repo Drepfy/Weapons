@@ -47,7 +47,7 @@ class Sample:
 
 class Part:
     def __init__(self, name, colour, height=None, relief=1.0, metal=0.0, gloss=0.3, spec=0.5, sheen=None,
-                 glow=None, glow_colours=None, glow_strength=1.0, emissive=False):
+                 glow=None, glow_colours=None, glow_strength=1.0, emissive=False, bloom=1.0, coat=0.0):
         self.name = name
         self.colour = colour            # Sample -> (r, g, b) 0..1, or a hex code
         self.height = height            # Sample -> units: the surface's shape, for the light
@@ -60,6 +60,8 @@ class Part:
         self.glow_colours = glow_colours or paint.ramp('#000000', '#ffffff')
         self.glow_strength = glow_strength
         self.emissive = emissive        # lit up in the dark without being animated
+        self.bloom = bloom              # how strongly the glow lights up the surfaces round it
+        self.coat = coat                # 0..1: a clear glossy coat (glass, hard candy, lacquer)
 
     def get(self, attr, s):
         v = getattr(self, attr)
@@ -291,6 +293,7 @@ class Baked:
         self.base = {}
         self.glowing = {}               # texel -> [(part index, weight, x, y)] for the animation
         emit = [[[0.0, 0.0, 0.0] for _ in range(W)] for _ in range(H)]
+        spill = [[[0.0, 0.0, 0.0] for _ in range(W)] for _ in range(H)]
         for (i, j), parts in cover.items():
             col = [0.0, 0.0, 0.0]
             alpha = 0.0
@@ -299,7 +302,8 @@ class Baked:
                 s = Sample(x, y, ras.d(x, y))
                 n = _normal_sheet(part, ras, x, y, s)
                 c = paint.shade(part.albedo(s), n, part.get('metal', s), part.get('gloss', s),
-                                part.get('spec', s), part.get('sheen', s) or 0.0, occl[(i, j)])
+                                part.get('spec', s), part.get('sheen', s) or 0.0, occl[(i, j)],
+                                part.get('coat', s))
                 for q in range(3):
                     col[q] += c[q] * w
                 alpha += w
@@ -311,15 +315,17 @@ class Baked:
                         for q in range(3):
                             e[q] += ef[q] / FRAMES
                     cell = emit[j - by0][i - bx0]
+                    out = spill[j - by0][i - bx0]
                     for q in range(3):
                         cell[q] += e[q] * w
+                        out[q] += e[q] * w * part.bloom
             if alpha:
                 col = [c / alpha for c in col]
             self.base[(i, j)] = (col, alpha)
         # bloom: glowing parts light up the surfaces round them
         self.halo = {}
         if self.glowing:
-            chans = [[[emit[b][a][q] for a in range(W)] for b in range(H)] for q in range(3)]
+            chans = [[[spill[b][a][q] for a in range(W)] for b in range(H)] for q in range(3)]
             soft = [paint.blur(c, 4) for c in chans]
             wide = [paint.blur(c, 12) for c in chans]
             for (i, j) in cover:
@@ -729,7 +735,8 @@ class Baked:
 
         def put(group):
             rects = [(jobs[k][4] + 2, jobs[k][5] + 2) for k in group]
-            width = max(64, max(r[0] for r in rects))
+            # a strip 64 texels wide, or just as wide as a patch on its own (it fits in smaller gaps)
+            width = max(r[0] for r in rects) if len(group) == 1 else max(64, max(r[0] for r in rects))
             where, height = _skyline(rects, width)
             try:
                 bx, by = packer.place(width, height)
@@ -1015,7 +1022,7 @@ def _bake_face(rod, tl, tr, bl, w, h, cap, e):
                     tu = (math.cos(th), 0.0, -math.sin(th))
                     n = paint.norm((n[0] - gu * tu[0], n[1] - gv, n[2] - gu * tu[2]))
             c = paint.shade(rod.albedo(s), n, rod.get('metal', s), rod.get('gloss', s), rod.get('spec', s),
-                            rod.get('sheen', s) or 0.0)
+                            rod.get('sheen', s) or 0.0, coat=rod.get('coat', s))
             if rod.glow is not None:
                 em = rod.emission(s, 0.0)
                 c = [c[q] + em[q] for q in range(3)]

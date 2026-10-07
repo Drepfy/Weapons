@@ -1,4 +1,4 @@
-"""The five legendary weapons: smooth 3D models with high-resolution textures baked for them,
+"""The four legendary weapons: smooth 3D models with high-resolution textures baked for them,
 built in code (no image libraries, no Blender needed).
 
 Each weapon has its own file in models/ that describes its parts: flat parts with any outline
@@ -18,19 +18,17 @@ import sys
 from functools import lru_cache
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models'))
+import candycane  # noqa: E402
 import common  # noqa: E402
+import crush  # noqa: E402
 import forge  # noqa: E402
-import gravebreaker  # noqa: E402
-import kurogane  # noqa: E402
+import katana  # noqa: E402
 import png  # noqa: E402
+import reaper  # noqa: E402
 import render  # noqa: E402
-import starforged  # noqa: E402
-import sugarcrash  # noqa: E402
-import wyrmfang  # noqa: E402
 
 WEAPONS = {
-    'kurogane': kurogane.build, 'sugarcrash': sugarcrash.build, 'wyrmfang': wyrmfang.build,
-    'gravebreaker': gravebreaker.build, 'starforged': starforged.build,
+    'katana': katana.build, 'candycane': candycane.build, 'crush': crush.build, 'reaper': reaper.build,
 }
 FRAME_TIME = 3          # ticks per frame of the glow animation (blended smoothly between frames)
 
@@ -84,7 +82,7 @@ def gui_image(name, size, ss=4):
 
 
 def preview(path, size=420):
-    """The showcase: all five standing in 3D on dark grey, and below them as they look in the
+    """The showcase: all four standing in 3D on dark grey, and below them as they look in the
     inventory."""
     shows, slots = [], []
     for name in WEAPONS:
