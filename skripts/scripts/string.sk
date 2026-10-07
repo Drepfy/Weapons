@@ -1,0 +1,39 @@
+# ============================================================
+#  STRING - /string fills every empty slot of your inventory with string
+#  (stacks of 64; string you already carry is topped up too).
+#  Cooldown: {cfg::string-cooldown} in settings.sk (30 seconds).
+#  Staff with smp.string.bypass have no cooldown.
+# ============================================================
+
+command /string:
+    description: Fill every empty slot of your inventory with string.
+    trigger:
+        set {_prefix} to {cfg::prefix} ? "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ &8» &7"
+        set {_uuid} to uuid of player
+        set {_now} to unix timestamp of now
+        set {_cooldown} to {cfg::string-cooldown} ? 30
+        if player doesn't have permission "smp.string.bypass":
+            set {_left} to ceil(({-string::used::%{_uuid}%} ? 0) + {_cooldown} - {_now})
+            if {_left} > 0:
+                send "%{_prefix}%&cYou can use &f/string &cagain in &f%{_left}%s&c."
+                stop
+
+        set {_before} to number of string in player's inventory
+        loop 36 times:
+            if player doesn't have enough space for 64 string:
+                exit loop
+            give 64 string to player
+        set {_added} to (number of string in player's inventory) - {_before}
+
+        if {_added} <= 0:
+            send "%{_prefix}%&cYour inventory is full: there is no room for string."
+            stop
+        set {-string::used::%{_uuid}%} to {_now}
+        send "%{_prefix}%&aFilled your inventory with &f%{_added}% &astring."
+
+on quit:
+    # Only kept while it matters (a rejoin within the cooldown still has to wait it out).
+    set {_used} to {-string::used::%uuid of player%}
+    if {_used} is set:
+        if (unix timestamp of now) - {_used} >= ({cfg::string-cooldown} ? 30):
+            delete {-string::used::%uuid of player%}

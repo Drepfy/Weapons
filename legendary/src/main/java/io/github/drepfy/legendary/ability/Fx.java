@@ -23,24 +23,15 @@ public final class Fx {
     public static final double RANGE = 48.0;
 
     public static final Particle DUST = Compat.particle("DUST", "REDSTONE");
-    public static final Particle SWEEP = Compat.particle("SWEEP_ATTACK");
     public static final Particle CRIT = Compat.particle("CRIT");
-    public static final Particle MAGIC_CRIT = Compat.particle("ENCHANTED_HIT", "CRIT_MAGIC");
     public static final Particle END_ROD = Compat.particle("END_ROD");
-    public static final Particle PORTAL = Compat.particle("PORTAL");
-    public static final Particle REVERSE_PORTAL = Compat.particle("REVERSE_PORTAL");
     public static final Particle DRAGON_BREATH = Compat.particle("DRAGON_BREATH");
     public static final Particle FIREWORK = Compat.particle("FIREWORK", "FIREWORKS_SPARK");
-    public static final Particle FLASH = Compat.particle("FLASH");
     public static final Particle EXPLOSION = Compat.particle("EXPLOSION", "EXPLOSION_LARGE");
-    public static final Particle SPARK = Compat.particle("ELECTRIC_SPARK", "FIREWORK", "FIREWORKS_SPARK");
-    public static final Particle INK = Compat.particle("SQUID_INK");
     public static final Particle BLOCK = Compat.particle("BLOCK", "BLOCK_CRACK");
-    public static final Particle WITCH = Compat.particle("WITCH", "SPELL_WITCH");
     public static final Particle SOUL = Compat.particle("SOUL");
     public static final Particle CLOUD = Compat.particle("CLOUD");
     public static final Particle FLAME = Compat.particle("FLAME");
-    public static final Particle SONIC_BOOM = Compat.particle("SONIC_BOOM", "EXPLOSION", "EXPLOSION_LARGE");
 
     private final Supplier<Settings> settings;
     private int crackIds = 0x4C470000;

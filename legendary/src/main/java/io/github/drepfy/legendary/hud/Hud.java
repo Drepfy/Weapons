@@ -2,7 +2,6 @@ package io.github.drepfy.legendary.hud;
 
 import io.github.drepfy.legendary.Ability;
 import io.github.drepfy.legendary.LegendaryPlugin;
-import io.github.drepfy.legendary.WeaponType;
 import io.github.drepfy.legendary.config.AbilitySettings;
 import io.github.drepfy.legendary.config.Settings;
 import io.github.drepfy.legendary.item.WeaponItems;
@@ -42,8 +41,6 @@ public final class Hud {
     private final LegendaryPlugin plugin;
     /** player → (weapon:ability → its bar), in the order they appeared. */
     private final Map<UUID, Map<String, Shown>> bars = new HashMap<>();
-    /** The legendary each player held last time (for the sound when one is taken in hand). */
-    private final Map<UUID, WeaponType> holding = new HashMap<>();
     /** player → the legendaries in their inventory, looked up every {@link #CARRIED_EVERY} ticks. */
     private final Map<UUID, List<WeaponItems.Tag>> carried = new HashMap<>();
     /** player:ability → the tick its flash ends. */
@@ -91,7 +88,6 @@ public final class Hud {
                 it.remove();
             }
         }
-        holding.keySet().removeIf(id -> Bukkit.getPlayer(id) == null);
         carried.keySet().removeIf(id -> Bukkit.getPlayer(id) == null);
         shakes.values().removeIf(until -> until <= now);
     }
@@ -100,11 +96,6 @@ public final class Hud {
         Settings settings = plugin.settings();
         UUID id = player.getUniqueId();
         WeaponItems.Tag tag = player.isDead() ? null : plugin.items().read(player.getInventory().getItemInMainHand());
-        WeaponType held = tag == null ? null : tag.type();
-        WeaponType before = held == null ? holding.remove(id) : holding.put(id, held);
-        if (held != null && held != before) {
-            plugin.fx().sound(player.getLocation(), held.key() + "-equip"); // Drawn.
-        }
         if (!settings.bossBars() || player.isDead()) {
             hide(player);
             return;
@@ -209,7 +200,6 @@ public final class Hud {
     }
 
     public void clearAll() {
-        holding.clear();
         carried.clear();
         for (Map<String, Shown> shown : bars.values()) {
             shown.values().forEach(bar -> bar.bar().removeAll());

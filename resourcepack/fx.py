@@ -1,12 +1,11 @@
-"""The abilities' effect textures and models (slashes, rune circles, a rift, stars, a black
-hole...), painted in code like the weapons. The plugin shows them with display entities
+"""The abilities' effect textures and models (slashes, claw marks, rune circles, rings, dragon
+fire, stars...), painted in code like the weapons. The plugin shows them with display entities
 (legendary:fx/<name>) and animates them.
 
 Kinds of model:
     flat     lying on the ground, seen from above (texture top = north, bottom = the way it faces)
     upright  standing, facing the viewer (south); billboards always turn to face the camera
     streak   standing along its length (the plane runs north-south), for a dash trail
-    stone    a small 3D gravestone
 
     python3 fx.py out.png      a contact sheet of every effect
 """
@@ -251,74 +250,6 @@ def candy_burst(u, v):
     return mix(col, (1, 1, 1), clamp(core + sparkle)) + (alpha,)
 
 
-def _hook_path():
-    """The candy cane: a shaft up, then the crook curling over to the left."""
-    pts = []
-    for k in range(24):
-        pts.append((0.18, 0.92 - k * (1.1 / 23)))                 # the shaft, bottom to top
-    cx, cy, r = -0.17, -0.18, 0.35
-    for k in range(1, 33):
-        ang = math.pi * k / 32                                    # over the top, right to left
-        pts.append((cx + r * math.cos(ang), cy - r * math.sin(ang)))
-    for k in range(1, 7):
-        pts.append((cx - r + 0.01 * k, cy + 0.035 * k))            # a little barb at the tip
-    return pts
-
-
-HOOK = _hook_path()
-HOOK_LENGTHS = [0.0]
-for _k in range(1, len(HOOK)):
-    HOOK_LENGTHS.append(HOOK_LENGTHS[-1] + math.dist(HOOK[_k - 1], HOOK[_k]))
-
-
-def candy_hook(u, v):
-    """A glossy red-and-white candy-cane hook with a pink glow."""
-    best, along, side = 9.0, 0.0, 0.0
-    for k in range(len(HOOK) - 1):
-        (x0, y0), (x1, y1) = HOOK[k], HOOK[k + 1]
-        dx, dy = x1 - x0, y1 - y0
-        seg = dx * dx + dy * dy
-        t = clamp(((u - x0) * dx + (v - y0) * dy) / seg) if seg > 0 else 0.0
-        px, py = x0 + dx * t, y0 + dy * t
-        d = math.hypot(u - px, v - py)
-        if d < best:
-            best = d
-            along = HOOK_LENGTHS[k] + math.sqrt(seg) * t
-            side = ((u - px) * -dy + (v - py) * dx) / max(1e-6, math.sqrt(seg))
-    width = 0.085 if along < HOOK_LENGTHS[-1] - 0.06 else 0.06
-    if best < width:
-        stripe = ((along * 5.5 + side * 2.5) % 1.0) < 0.5
-        col = hexrgb('#e8153c') if stripe else hexrgb('#fff4f7')
-        q = side / width                                           # -1..1 across the cane
-        col = mix(col, hexrgb('#5a0418'), clamp(-q) * 0.45)         # shaded side
-        col = mix(col, (1, 1, 1), _glow(q - 0.45, 0.18) * 0.7)       # gloss
-        return col + (smooth(width, width - 0.015, best),)
-    halo = _glow(best - width, 0.07) * 0.55
-    return hexrgb('#ff6fb5') + (halo,)
-
-
-def stun_ring(u, v):
-    """Dizzy candy stars circling a head, seen a little from above: an ellipse of five stars,
-    the ones in front brighter."""
-    ring = _glow(math.hypot(u / 0.86, v / 0.3) - 1.0, 0.05) * 0.35
-    best, col = 0.0, (1, 1, 1)
-    for k in range(5):
-        ang = TAU * k / 5 + 0.3
-        cx, cy = 0.86 * math.cos(ang), 0.3 * math.sin(ang)
-        front = 0.55 + 0.45 * math.sin(ang)                        # lower on the ellipse = in front
-        dx, dy = u - cx, v - cy
-        r, a = math.hypot(dx, dy), math.atan2(dy, dx)
-        size = 0.09 + 0.05 * front
-        spikes = size * (0.55 + 0.45 * math.cos(a * 5) ** 2)
-        star_a = smooth(spikes + 0.02, spikes - 0.01, r) * (0.55 + 0.45 * front)
-        glow = _glow(r, size * 1.6) * 0.35 * front
-        val = max(star_a, glow)
-        if val > best:
-            best = val
-            col = mix(hexrgb(CANDY[k % len(CANDY)]), (1, 1, 1), _glow(r, size * 0.45) * 0.8)
-    return col + (clamp(max(best, ring)),)
-
-
 def candy_ring(u, v):
     r, a = _polar(u, v)
     band = smooth(0.66, 0.72, r) * smooth(0.97, 0.9, r)
@@ -333,44 +264,54 @@ def candy_ring(u, v):
     return col + (clamp(band * (0.75 + 0.25 * edge) + glow),)
 
 
-# ---- Riftblade ------------------------------------------------------------------------------------------
+# ---- Wyrmfang ------------------------------------------------------------------------------------------
 
 
-def rift(u, v):
-    """A tall jagged tear: starry void inside, violet-white burning edges, a haze round it."""
-    centre = 0.06 * math.sin(v * 7.0) + 0.035 * math.sin(v * 19.0 + 1.3)
-    half = 0.2 * clamp(1 - abs(v) ** 2.2) + 0.015 * math.sin(v * 41)
-    d = abs(u - centre) - half                           # < 0 inside the tear
-    if d < 0:
-        star = 1.0 if noise(u * 40, v * 40, 9) > 0.86 else 0.0
-        depth = smooth(0.0, -half, d)
-        c = mix(hexrgb('#2a0a52'), hexrgb('#05010c'), depth)
-        c = mix(c, hexrgb('#e8d6ff'), star * 0.8)
-        return c + (1.0,)
-    edge = _glow(d, 0.02)
-    haze = _glow(d, 0.14) * 0.55 * clamp(1 - abs(v) ** 3)
-    c = mix(hexrgb('#9a4dff'), hexrgb('#ffffff'), edge)
-    return c + (clamp(edge + haze),)
+def wyrm_slash(u, v):
+    """A wide jade crescent bulging towards the bottom (the way it faces): a pale-green burning
+    leading edge, venom green inside, with a gold glint at its heart."""
+    co, ro = (0.0, -0.3), 1.0
+    ci, ri = (0.0, -0.78), 1.08
+    do = ro - math.hypot(u - co[0], v - co[1])
+    di = math.hypot(u - ci[0], v - ci[1]) - ri
+    tips = smooth(1.0, 0.5, abs(u))
+    if do >= 0 and di >= 0:
+        q = do / max(do + di, 1e-6)                      # 0 on the leading edge, 1 inside
+        c = _ramp(q, [(0, '#f2fff6'), (0.12, '#b8ffd0'), (0.4, '#2fd47a'), (1, '#063a1e')])
+        c = mix(c, hexrgb('#ffd56a'), 0.35 * _glow(u, 0.18) * _glow(q - 0.25, 0.12))
+        return c + ((1 - 0.5 * q) * tips,)
+    halo = _glow(max(-do, 0) + max(-di, 0), 0.06) * tips * 0.6
+    return hexrgb('#3de08a') + (halo,)
 
 
-def void_portal(u, v):
+def wyrm_claw(u, v):
+    """Three parallel claw gashes, pale green at their cores, fading at both ends."""
+    best = 0.0
+    for k in (-1, 0, 1):
+        along = v + 0.08 * k * k
+        across = u - 0.3 * k - 0.12 * v * v
+        width = 0.055 * clamp(1 - (along / (0.9 - 0.12 * abs(k))) ** 2)
+        if width > 0:
+            best = max(best, _glow(across, width + 1e-3))
+    halo = best ** 0.5 * 0.45
+    c = mix(hexrgb('#1fae5e'), hexrgb('#f0fff4'), best ** 2)
+    return c + (max(best, halo),)
+
+
+def dragon_flame(u, v):
+    """A puff of green dragon fire: a white-hot core, tongues of venom-green flame licking
+    outwards (furthest upwards), thinning to nothing at their tips."""
     r, a = _polar(u, v)
-    swirl = 0.5 + 0.5 * math.sin(5 * a + 11 * r)
-    core = smooth(0.32, 0.12, r)
-    rim = _glow(r - 0.78, 0.08)
-    body = smooth(0.95, 0.75, r)
-    c = _ramp(swirl * 0.7 + rim * 0.3, [(0, '#12021f'), (0.5, '#5a16b8'), (0.85, '#b37aff'), (1, '#ffffff')])
-    c = mix(c, hexrgb('#000000'), core)
-    return c + (clamp(body * (0.55 + 0.45 * swirl) + core + rim * 0.6),)
-
-
-def void_burst(u, v):
-    r, a = _polar(u, v)
-    jag = 0.03 * math.sin(a * 13) + 0.02 * math.sin(a * 29 + 2)
-    ring = _glow(r - 0.78 - jag, 0.06)
-    fill = 0.18 * smooth(0.8, 0.2, r)
-    c = mix(hexrgb('#7a2be0'), hexrgb('#f3e6ff'), ring ** 2)
-    return c + (clamp(ring + fill),)
+    lick = 0.24 * fbm(a * 2.6 + 3, r * 3.2, 6) + 0.1 * math.sin(a * 7 + r * 9)
+    edge = 0.62 + lick - 0.16 * v                        # v grows downwards: taller on top
+    if r > edge + 0.1:
+        return (0.0, 0.0, 0.0, 0.0)
+    heat = clamp(1 - r / max(edge, 1e-3))
+    swirl = fbm(u * 4 + 7, v * 4 - 2, 9)
+    c = _ramp(heat * 0.9 + swirl * 0.2, [(0, '#0b5a2c'), (0.3, '#22c76a'), (0.6, '#7dff9e'),
+                                          (0.82, '#d9ffb0'), (1, '#ffffff')])
+    alpha = smooth(edge + 0.1, edge - 0.12, r) * (0.35 + 0.65 * heat ** 0.6) * (0.65 + 0.35 * swirl)
+    return c + (clamp(alpha * 1.3),)
 
 
 # ---- Gravebreaker ---------------------------------------------------------------------------------------
@@ -407,33 +348,6 @@ def ember_ring(u, v):
     flicker = 0.75 + 0.25 * noise(a * 6, 3, 4)
     c = mix(hexrgb('#ff5a0a'), hexrgb('#fff0b0'), _glow(r - 0.86, 0.02))
     return c + (clamp(ring * flicker),)
-
-
-def gravestone_texture(size=64):
-    """Stone with an engraved cross, worn edges and moss near the ground. The left half is the
-    front, the right half the sides."""
-    rows = []
-    for j in range(size):
-        row = []
-        for i in range(size):
-            x, y = i / size, j / size
-            n = fbm(x * 9, y * 9, 13)
-            base = mix(hexrgb('#4b4d55'), hexrgb('#8a8d96'), 0.35 + 0.5 * n)
-            if i < size // 2:
-                fx, fy = (x - 0.25) / 0.25, (y - 0.42) / 0.42      # front face, -1..1
-                engraved = (abs(fx) < 0.12 and -0.7 < fy < 0.55) or (abs(fy + 0.25) < 0.1 and abs(fx) < 0.45)
-                if engraved:
-                    base = mix(base, hexrgb('#1c1d22'), 0.75)
-                    if noise(x * 30, y * 30, 3) > 0.7:
-                        base = mix(base, hexrgb('#7c2a8a'), 0.5)     # a faint soul glow
-                crack = abs(fx - 0.6 - 0.1 * math.sin(fy * 6)) < 0.04 and fy > 0.2
-                if crack:
-                    base = mix(base, hexrgb('#24252b'), 0.7)
-            moss = smooth(0.7, 0.98, y) * smooth(0.45, 0.7, fbm(x * 14, y * 14, 21))
-            base = mix(base, hexrgb('#3d5a2a'), moss * 0.8)
-            row.append(tuple(int(round(255 * clamp(c))) for c in base) + (255,))
-        rows.append(row)
-    return rows
 
 
 # ---- Starforged -----------------------------------------------------------------------------------------
@@ -482,25 +396,6 @@ def nova(u, v):
     return c + (clamp(ring + inner + sparks),)
 
 
-def black_hole(u, v):
-    r, a = _polar(u, v)
-    if r < 0.38:
-        return hexrgb('#020005') + (1.0,)
-    photon = _glow(r - 0.42, 0.035)
-    lens = _glow(r - 0.5, 0.2) * 0.55
-    c = _ramp(photon, [(0, '#3b1a8a'), (0.5, '#ff9a3c'), (1, '#fff6e0')])
-    return c + (clamp(photon + lens + smooth(0.45, 0.38, r)),)
-
-
-def accretion(u, v):
-    r, a = _polar(u, v)
-    band = smooth(0.3, 0.42, r) * smooth(0.98, 0.75, r)
-    spiral = 0.5 + 0.5 * math.sin(a * 3 + math.log(max(r, 1e-3)) * 9)
-    heat = smooth(0.95, 0.35, r)
-    c = _ramp(heat * 0.8 + spiral * 0.2, [(0, '#3b1a8a'), (0.4, '#8a5cff'), (0.7, '#ff9a3c'), (1, '#fff3c4')])
-    return c + (clamp(band * (0.35 + 0.65 * spiral)),)
-
-
 # ---- the list --------------------------------------------------------------------------------------------
 
 EFFECTS = {
@@ -509,21 +404,16 @@ EFFECTS = {
     'crimson_streak': (crimson_streak, 128, 'streak'),
     'crimson_cut': (crimson_cut, 128, 'upright'),
     'rune_crimson': (rune_crimson, 256, 'flat'),
-    'candy_hook': (candy_hook, 128, 'upright'),
-    'stun_ring': (stun_ring, 128, 'upright'),
     'candy_burst': (candy_burst, 128, 'flat'),
     'candy_ring': (candy_ring, 256, 'flat'),
-    'rift': (rift, 128, 'upright'),
-    'void_portal': (void_portal, 128, 'upright'),
-    'void_burst': (void_burst, 128, 'upright'),
+    'wyrm_slash': (wyrm_slash, 128, 'flat'),
+    'wyrm_claw': (wyrm_claw, 128, 'upright'),
+    'dragon_flame': (dragon_flame, 128, 'upright'),
     'shockwave': (shockwave, 256, 'flat'),
     'ember_ring': (ember_ring, 128, 'flat'),
-    'gravestone': (None, 64, 'stone'),
     'rune_star': (rune_star, 256, 'flat'),
     'star': (star, 64, 'upright'),
     'nova': (nova, 128, 'flat'),
-    'black_hole': (black_hole, 128, 'upright'),
-    'accretion': (accretion, 256, 'flat'),
 }
 
 
@@ -534,27 +424,22 @@ BOLD = {
     'crimson_streak': (1, 0.7, 5, 1.7),
     'crimson_cut': (2, 0.7, 4, 1.7),
     'rune_crimson': (1, 0.6, 5, 1.6),
-    'candy_hook': (0, 0.4, 3, 1.2),
-    'stun_ring': (1, 0.6, 3, 1.6),
     'candy_burst': (2, 0.6, 4, 1.6),
     'candy_ring': (0, 0.4, 4, 1.4),
-    'rift': (0, 0.5, 4, 1.3),
-    'void_portal': (0, 0.3, 3, 1.4),
-    'void_burst': (2, 0.6, 4, 1.6),
+    'wyrm_slash': (0, 0.55, 4, 1.5),
+    'wyrm_claw': (2, 0.7, 4, 1.7),
+    'dragon_flame': (0, 0.35, 3, 1.2),
     'shockwave': (2, 0.5, 5, 1.7),
     'ember_ring': (1, 0.4, 3, 1.4),
     'rune_star': (2, 0.6, 5, 1.6),
     'star': (0, 0.7, 3, 1.6),
     'nova': (1, 0.4, 4, 1.4),
-    'accretion': (0, 0.3, 4, 1.4),
 }
 
 
 def texture(name):
     """RGBA rows."""
     painter, size, kind = EFFECTS[name]
-    if kind == 'stone':
-        return gravestone_texture(size)
     rows = _paint(size, painter)
     if name in BOLD:
         rows = bold(rows, *BOLD[name])
@@ -578,23 +463,9 @@ def model(name):
     elif kind == 'upright':
         elements = [{'from': [0, 0, 8], 'to': [16, 16, 8], 'shade': False, 'light_emission': 15,
                      'faces': {'south': _face(full), 'north': _face(full, flip=True)}}]
-    elif kind == 'streak':
+    else:
         elements = [{'from': [8, 0, 0], 'to': [8, 16, 16], 'shade': False, 'light_emission': 15,
                      'faces': {'east': _face(full), 'west': _face(full, flip=True)}}]
-    else:
-        # a gravestone: plinth, slab and a rounded top; the front shows the engraving
-        front = [0, 0, 8, 16]
-        side = [8, 0, 16, 16]
-        elements = []
-        for a, b in (([2, 0, 5.5], [14, 1.5, 10.5]), ([3, 1.5, 6.5], [13, 11, 9.5]),
-                     ([4, 11, 6.5], [12, 12.5, 9.5]), ([5.5, 12.5, 6.5], [10.5, 13.5, 9.5])):
-            faces = {}
-            for face in ('north', 'south'):
-                faces[face] = {'uv': [front[0] + (a[0] - 2) / 12 * 8, 16 - b[1] * 16 / 13.5,
-                                      front[0] + (b[0] - 2) / 12 * 8, 16 - a[1] * 16 / 13.5], 'texture': '#0'}
-            for face in ('east', 'west', 'up', 'down'):
-                faces[face] = {'uv': side, 'texture': '#0'}
-            elements.append({'from': a, 'to': b, 'faces': faces})
     return {'textures': {'0': texture_id, 'particle': texture_id}, 'elements': elements}
 
 

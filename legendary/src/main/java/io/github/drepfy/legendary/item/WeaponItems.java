@@ -225,8 +225,16 @@ public final class WeaponItems {
         return lines;
     }
 
-    /** What a fully charged hit does before armour: the weapon's own damage plus Sharpness. */
-    public static double attackDamage(WeaponType type, Settings.Look look) {
+    /**
+     * What a fully charged hit does before armour: the weapon's own damage plus Sharpness, times
+     * the legendary melee bonus ({@code melee-damage}).
+     */
+    public double attackDamage(WeaponType type, Settings.Look look) {
+        return baseAttackDamage(type, look) * settings.get().meleeDamage();
+    }
+
+    /** The weapon's own damage plus Sharpness, as vanilla counts it. */
+    public static double baseAttackDamage(WeaponType type, Settings.Look look) {
         int sharpness = 0;
         for (Map.Entry<String, Integer> enchantment : look.enchantments().entrySet()) {
             String key = enchantment.getKey();
@@ -287,7 +295,8 @@ public final class WeaponItems {
         return Integer.toHexString((current.look(type).toString() + placeholders(type, id)
                 + current.message("lore-enchantment") + current.message("lore-separator")
                 + current.message("lore-unbreakable") + current.message("lore-attack-header")
-                + current.message("lore-attack-damage") + current.message("lore-attack-speed") + "/3").hashCode());
+                + current.message("lore-attack-damage") + current.message("lore-attack-speed") + current.meleeDamage()
+                + "/4").hashCode());
     }
 
     private static String fill(String text, Map<String, String> values) {

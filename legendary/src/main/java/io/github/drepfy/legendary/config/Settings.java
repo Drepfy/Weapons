@@ -17,6 +17,7 @@ public record Settings(
         Controls controls,
         HitMobs hitMobs,
         boolean trueDamage,
+        double meleeDamage,
         boolean bossBars,
         boolean barsWhenReady,
         Map<WeaponType, Look> looks,

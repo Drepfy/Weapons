@@ -41,7 +41,7 @@ interface Kit {
     default void landed(Player attacker, LivingEntity target, WeaponItems.Tag weapon) {
     }
 
-    /** Ticks an ability is still running for (Blood Moon, a cyclone, a falling star...), or 0. */
+    /** Ticks an ability is still running for (Crimson Tempest, Dragon's Breath, a prison...), or 0. */
     default long active(Player player, WeaponItems.Tag weapon, Ability ability, long now) {
         return 0;
     }

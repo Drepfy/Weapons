@@ -24,7 +24,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 /**
- * The abilities' 3D effects: slashes, rifts, rune circles, stars, a black hole... Each is a
+ * The abilities' 3D effects: slashes, rune circles, rings, stars, dragon fire... Each is a
  * model from the resource pack ({@code legendary:fx/<name>}) shown by a display entity. The
  * server only says where it starts and where it ends up; the players' game animates it smoothly
  * in between. Effects are never saved with the world and are cleared when the plugin stops.
@@ -88,6 +88,11 @@ public final class Visuals {
 
     /** A model effect at a place. */
     public Effect spawn(String model, Location at) {
+        return model("legendary:fx/" + model, at);
+    }
+
+    /** Any item model at a place, e.g. {@code legendary:sugarcrash} for a thrown weapon. */
+    public Effect model(String itemModel, Location at) {
         World world = at.getWorld();
         if (world == null) {
             return Effect.NONE;
@@ -96,7 +101,7 @@ public final class Visuals {
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             try {
-                meta.setItemModel(NamespacedKey.fromString("legendary:fx/" + model));
+                meta.setItemModel(NamespacedKey.fromString(itemModel));
             } catch (RuntimeException | LinkageError ignored) {
                 // Before 1.21.2 there are no item models: the effect shows as paper.
             }
@@ -222,6 +227,13 @@ public final class Visuals {
             return this;
         }
 
+        /** Any orientation (a weapon thrown flat and spinning); replaces facing, turn and tilt. */
+        public Effect orient(Quaternionf orientation) {
+            rotation.set(orientation);
+            spin.identity();
+            return this;
+        }
+
         public Effect offset(double x, double y, double z) {
             translation.set((float) x, (float) y, (float) z);
             return this;
@@ -268,6 +280,15 @@ public final class Visuals {
                 } catch (RuntimeException | LinkageError ignored) {
                     // Effects are only for show.
                 }
+            }
+            return this;
+        }
+
+        /** Glides to a place over {@code ticks}, starting {@code delay} ticks from now (at least 1). */
+        public Effect glide(int delay, Location to, int ticks) {
+            if (display != null) {
+                Location target = to.clone();
+                visuals.later(delay, () -> moveTo(target, ticks));
             }
             return this;
         }

@@ -22,7 +22,7 @@ import make_heart  # noqa: E402
 OUT = os.path.join(ROOT, 'release', 'VanillaSMP-ResourcePack.zip')
 
 # custom-model-data in Legendary's config.yml (1001-1005) and Lifesteal's (1001 on red dye).
-SWORDS = [(1001, 'kurogane'), (1002, 'sugarcrash'), (1003, 'riftblade')]
+SWORDS = [(1001, 'kurogane'), (1002, 'sugarcrash'), (1003, 'wyrmfang')]
 AXES = [(1004, 'gravebreaker'), (1005, 'starforged')]
 
 

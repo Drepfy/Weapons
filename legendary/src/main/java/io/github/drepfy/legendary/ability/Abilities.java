@@ -50,7 +50,7 @@ public final class Abilities implements Listener {
 
     public Abilities(LegendaryPlugin plugin) {
         this.plugin = plugin;
-        for (Kit kit : List.of(new Kurogane(plugin), new Sugarcrash(plugin), new Riftblade(plugin),
+        for (Kit kit : List.of(new Kurogane(plugin), new Sugarcrash(plugin), new Wyrmfang(plugin),
                 new Gravebreaker(plugin), new Starforged(plugin))) {
             kits.put(kit.type(), kit);
         }
@@ -175,11 +175,6 @@ public final class Abilities implements Listener {
         }
     }
 
-    /** Starts an ability's cooldown now (for abilities that wait for a recast first). */
-    public void startCooldown(java.util.UUID weapon, Ability ability) {
-        cooldowns.start(weapon, ability, plugin.tick(), plugin.settings().ability(ability).ticks("cooldown"));
-    }
-
     /** No fall damage for this long (a leap, a grapple, a dash off a ledge). */
     public void softLanding(Player player, int ticks) {
         softLandings.merge(player.getUniqueId(), plugin.tick() + ticks, Math::max);
@@ -200,7 +195,7 @@ public final class Abilities implements Listener {
         return cooldowns.remaining(tag.id(), ability, now);
     }
 
-    /** Ticks an ability is still running for (Sugar Rush, a rift mark, a gravity well). */
+    /** Ticks an ability is still running for (Sugar Rush, Iron Bastion, a Celestial Prison). */
     public long active(Player player, WeaponItems.Tag tag, Ability ability, long now) {
         return kits.get(tag.type()).active(player, tag, ability, now);
     }
@@ -239,6 +234,11 @@ public final class Abilities implements Listener {
     public void onMelee(EntityDamageByEntityEvent event) {
         WeaponItems.Tag tag = melee(event);
         if (tag != null) {
+            // Legendary hits are stronger than the bare netherite weapon (melee-damage in config.yml).
+            double multiplier = plugin.settings().meleeDamage();
+            if (multiplier != 1.0) {
+                event.setDamage(event.getDamage() * multiplier);
+            }
             kits.get(tag.type()).melee(event, (Player) event.getDamager(), (LivingEntity) event.getEntity(), tag);
         }
     }
@@ -248,7 +248,6 @@ public final class Abilities implements Listener {
         WeaponItems.Tag tag = melee(event);
         if (tag != null && event.getFinalDamage() > 0) {
             kits.get(tag.type()).landed((Player) event.getDamager(), (LivingEntity) event.getEntity(), tag);
-            plugin.fx().sound(event.getEntity().getLocation(), tag.type().key() + "-melee");
         }
     }
 

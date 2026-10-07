@@ -282,6 +282,35 @@ and Flight never flagged. Cause, found by making the tests behave like Paper:
 - Skripts: every syntax checked against the current Skript (2.16) and SkBee sources.
 - Tests: Vigil 180, Lifesteal 37, Combat 39, Legendary 65.
 
+## Legendary 2.0.0: new abilities, the Wyrmfang, harder hits
+
+- Every ability was replaced (Altar-style, our own designs): Kurogane Phantom Step, Crimson
+  Tempest, Crimson Hunger; Sugarcrash Candy Reaper (the thrown scythe comes back), Sugar
+  Rush, Sugar High; Wyrmfang Wyrm Lunge, Dragon's Breath, Venom Fang; Gravebreaker
+  Earthsplitter, Iron Bastion, Headsman; Starforged Star Lance, Celestial Prison, Starlight.
+  Every cooldown is 5 seconds longer than the old ones.
+- The Riftblade was replaced by the **Wyrmfang**, a jade dragon greatsword with its own 3D
+  model and tooltip frame. Riftblades already out become Wyrmfangs (`WeaponType.byKey`
+  alias): the same id and holder, with the new look as soon as they are in an inventory.
+- `melee-damage: 1.25`: legendary sword and axe hits do 1.25x damage; the lore's attack line
+  shows 15 (swords) and 17.5 (axes).
+- Fewer sounds: one per ability and one per big moment, nothing on hits or equipping.
+- Config version 6: the old abilities, sounds and messages are removed, the new ones written
+  in with their comments, lore naming old abilities reset; a weapon section missing from the
+  config no longer gets saved as an empty `enchantments: {}` (Bukkit creates empty sections
+  for paths that only exist in the defaults).
+- A protected player (no-PvP region) no longer stops Wyrm Lunge or Star Lance: they go past.
+  Crimson Tempest's crescents stop at walls, and a sword hit another plugin cancels leaves
+  nothing queued (its bleed or crescent used to fire on a later hit).
+- Pack: Wyrmfang model, new effects (jade crescent, dragon claw marks, dragon fire), 8 unused
+  effects removed; `check.py` now also reports effects nothing uses.
+- Skripts: `/string` fills every empty inventory slot with string (30 s cooldown,
+  `string-cooldown`, `smp.string.bypass`).
+- Discord: new rules, information, modifications and booster-perk posts (not kept in the repo;
+  the webhooks are secrets).
+- Tests: Legendary 68 (every new ability, the Riftblade conversion, the 2.0 config upgrade,
+  1.25x hits). Compiled against Paper 1.21.11.
+
 ## Remaining / next steps
 
 - Validate on a live server with a hacked client on an alt (see the README

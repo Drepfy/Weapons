@@ -78,6 +78,31 @@ public final class Compat {
         return null;
     }
 
+    /**
+     * Makes an entity immune to knockback (Iron Bastion), or takes that away again. The modifier is
+     * transient on Paper, so it is never saved with the player even if the server stops meanwhile.
+     */
+    public static void unshakable(LivingEntity entity, org.bukkit.NamespacedKey key, boolean on) {
+        try {
+            AttributeInstance instance = KNOCKBACK_RESISTANCE == null ? null : entity.getAttribute(KNOCKBACK_RESISTANCE);
+            if (instance == null) {
+                return;
+            }
+            instance.removeModifier(key);
+            if (on) {
+                org.bukkit.attribute.AttributeModifier modifier = new org.bukkit.attribute.AttributeModifier(key, 1.0,
+                        org.bukkit.attribute.AttributeModifier.Operation.ADD_NUMBER);
+                try {
+                    instance.addTransientModifier(modifier);
+                } catch (LinkageError | UnsupportedOperationException e) {
+                    instance.addModifier(modifier);
+                }
+            }
+        } catch (RuntimeException | LinkageError ignored) {
+            // Knockback is then not changed.
+        }
+    }
+
     /** 0 (pushed fully) to 1 (not pushed at all); netherite armour gives 0.1 a piece. */
     public static double knockbackResistance(LivingEntity entity) {
         if (KNOCKBACK_RESISTANCE == null) {

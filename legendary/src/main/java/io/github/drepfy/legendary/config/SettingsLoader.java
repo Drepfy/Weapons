@@ -55,6 +55,7 @@ public final class SettingsLoader {
         Settings.Controls controls = in.choice("controls", Settings.Controls.class);
         Settings.HitMobs hitMobs = in.choice("hit-mobs", Settings.HitMobs.class);
         boolean trueDamage = in.bool("true-damage");
+        double meleeDamage = in.number("melee-damage", 0.1, 10);
         boolean bossBars = in.bool("display.boss-bars");
         boolean barsWhenReady = in.bool("display.boss-bars-when-ready");
 
@@ -101,7 +102,7 @@ public final class SettingsLoader {
             }
         }
         return new Settings(prefix, oneOfEach, markLost, dropOnDeath, alts, List.copyOf(blocked), controls, hitMobs,
-                trueDamage, bossBars, barsWhenReady, looks, abilities, sounds, messages, List.copyOf(warnings));
+                trueDamage, meleeDamage, bossBars, barsWhenReady, looks, abilities, sounds, messages, List.copyOf(warnings));
     }
 
     private static Settings.Look look(Reader in, String base, List<String> warnings) {

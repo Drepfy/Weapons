@@ -307,14 +307,6 @@ public final class Hits implements Listener {
         }
     }
 
-    /** Stunned: too slow to walk anywhere for a moment (they can still turn and swing). */
-    public static void stun(LivingEntity target, int ticks) {
-        effect(target, "slowness", 7, ticks);
-        if (target instanceof Player player) {
-            player.setSprinting(false);
-        }
-    }
-
     /**
      * Pushes along a flat direction and lifts. Knockback resistance (netherite armour) softens
      * the push like it does for a sword hit, but not the lift.

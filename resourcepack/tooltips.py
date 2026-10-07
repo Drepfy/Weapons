@@ -17,7 +17,7 @@ SIZE = 100
 STYLES = {
     'kurogane': ('#1c0a10', '#0a0408', '#ff4d6a', '#8a1022', '#ffffff'),
     'sugarcrash': ('#210c19', '#0e050b', '#ff9ad2', '#ff2d55', '#ffffff'),
-    'riftblade': ('#160a28', '#070410', '#c77dff', '#4a0f8a', '#ecdcff'),
+    'wyrmfang': ('#08190f', '#030a06', '#7dffb0', '#0f6b38', '#ffd36b'),
     'gravebreaker': ('#1c130d', '#0b0706', '#ff9a4a', '#7a141e', '#ffd36b'),
     'starforged': ('#0b1128', '#05070f', '#ffd36b', '#6fd6ff', '#ffffff'),
 }

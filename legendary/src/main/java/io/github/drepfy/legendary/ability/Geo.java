@@ -4,7 +4,6 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
-import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
 
 /** Directions, line of sight and finding the ground, using only block types (works on every server). */
@@ -61,38 +60,6 @@ final class Geo {
     }
 
     /**
-     * Where the player looks, on the ground: the first solid block within {@code range}
-     * blocks, then down to the floor under that point. Null when there is nothing in range.
-     */
-    static Location target(Player player, double range) {
-        Location eye = player.getEyeLocation();
-        World world = eye.getWorld();
-        Vector direction = eye.getDirection().normalize();
-        Vector point = eye.toVector();
-        Vector step = direction.clone().multiply(0.25);
-        for (double travelled = 0; travelled <= range; travelled += 0.25) {
-            Vector next = point.clone().add(step);
-            if (solid(world, next.getX(), next.getY(), next.getZ())) {
-                Location floor = floorBelow(world, point.getX(), point.getY(), point.getZ(), 6);
-                return floor != null ? floor : new Location(world, point.getX(), point.getY(), point.getZ());
-            }
-            point = next;
-        }
-        return null;
-    }
-
-    /** Standing position on the first solid block at or below the point (up to {@code depth} blocks). */
-    static Location floorBelow(World world, double x, double y, double z, int depth) {
-        int top = (int) Math.floor(y);
-        for (int by = top; by >= top - depth && by >= world.getMinHeight(); by--) {
-            if (world.getBlockAt((int) Math.floor(x), by, (int) Math.floor(z)).getType().isSolid()) {
-                return new Location(world, x, by + 1.0, z);
-            }
-        }
-        return null;
-    }
-
-    /**
      * The ground under a column for a wave rolling along it: one block up a step, or up to
      * three blocks down. {@link Integer#MIN_VALUE} when there is a wall or a drop.
      */
@@ -144,21 +111,6 @@ final class Geo {
             last = point.clone();
         }
         return last;
-    }
-
-    /** Room for a player to stand: feet, body and head clear. */
-    static boolean standable(Location at) {
-        World world = at.getWorld();
-        return world != null && !solid(world, at.getX(), at.getY() + 0.1, at.getZ())
-                && !solid(world, at.getX(), at.getY() + 1.0, at.getZ())
-                && !solid(world, at.getX(), at.getY() + 1.7, at.getZ());
-    }
-
-    /** A random spot within a radius of a centre, on the same level. */
-    static Location scatter(Location center, double radius, java.util.Random random) {
-        double angle = random.nextDouble() * Math.PI * 2;
-        double distance = Math.sqrt(random.nextDouble()) * radius;
-        return center.clone().add(Math.cos(angle) * distance, 0, Math.sin(angle) * distance);
     }
 
     static double flatDistance(Location a, Location b) {

@@ -12,6 +12,7 @@ Skript add-ons for the server, one file per feature:
 | `scripts/teleport.sk` | `/tpa`, `/tpahere`, `/tpaccept`, `/tpdeny`, `/tpacancel`, `/tptoggle`, `/rtp`, `/spawn`, `/setspawn`. A teleport is cancelled if the player gets into combat during the warmup |
 | `scripts/market.sk` | `/market` 6-row GUI shop with stock that resets every hour (countdown on the clock), `/marketadmin` |
 | `scripts/ah.sk` | `/ah` auction house: players sell items to each other (`/ah sell 1k` ... up to 10m) |
+| `scripts/string.sk` | `/string`: fills every empty inventory slot with string (30 second cooldown) |
 
 `all-in-one/VanillaSMP.sk` is all of the above in one file (made with `python3 build.py`).
 `all-in-one/tpa-rtp-spawn.sk` is only the teleports, for servers without the other scripts.
@@ -48,3 +49,4 @@ After changing `settings.sk`, run `/sk reload settings`.
 | `/ah mine` | Only your listings: click one to take it back |
 | `/ah collect` | Get back items that did not sell (and items you took back with a full inventory) |
 | Sneak-click a listing | Staff (`ah.admin`): take it off the auction house; it goes back to the seller |
+| `/string` | Fill every empty slot of your inventory with string (stacks of 64). Once every 30 seconds (`string-cooldown` in `settings.sk`); `smp.string.bypass` has no cooldown |

@@ -41,6 +41,11 @@ on load:
     # /rtp never lands within this many blocks of another player
     set {cfg::rtp-player-distance} to 250
 
+    # --- /string ---
+    # Seconds between uses of /string (fills every empty inventory slot with string).
+    # Staff with smp.string.bypass have no cooldown.
+    set {cfg::string-cooldown} to 30
+
     # --- Ranks (shown in /ranks, NOT buyable with in-game money) ---
     # Give a rank with /setrank <player> <id> or the permission smp.rank.<id>.
     # Multiply the money you get from mob and player kills.

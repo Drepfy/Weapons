@@ -24,12 +24,12 @@ import gravebreaker  # noqa: E402
 import kurogane  # noqa: E402
 import png  # noqa: E402
 import render  # noqa: E402
-import riftblade  # noqa: E402
 import starforged  # noqa: E402
 import sugarcrash  # noqa: E402
+import wyrmfang  # noqa: E402
 
 WEAPONS = {
-    'kurogane': kurogane.build, 'sugarcrash': sugarcrash.build, 'riftblade': riftblade.build,
+    'kurogane': kurogane.build, 'sugarcrash': sugarcrash.build, 'wyrmfang': wyrmfang.build,
     'gravebreaker': gravebreaker.build, 'starforged': starforged.build,
 }
 FRAME_TIME = 3          # ticks per frame of the glow animation (blended smoothly between frames)

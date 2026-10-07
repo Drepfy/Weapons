@@ -35,7 +35,7 @@ import java.util.Map;
 import java.util.function.LongSupplier;
 
 /**
- * Five legendary netherite weapons (Kurogane, Sugarcrash, Riftblade, Gravebreaker and
+ * Five legendary netherite weapons (Kurogane, Sugarcrash, Wyrmfang, Gravebreaker and
  * Starforged), each with its own abilities, tracked one by one so they cannot be duplicated,
  * stored or passed between alt accounts.
  */

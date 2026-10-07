@@ -1,7 +1,8 @@
 """Checks the server pack against the Legendary plugin: every JSON parses, every model, texture
-and effect the weapons and abilities use exists, every texture an item model uses is in a folder
-the block atlas loads (item/ or block/), or it shows as the purple and black missing texture,
-and config.yml plays no pack sound (the abilities' sounds are vanilla sounds).
+and effect the weapons and abilities use exists (and no effect is left in that none uses), every
+texture an item model uses is in a folder the block atlas loads (item/ or block/), or it shows as
+the purple and black missing texture, and config.yml plays no pack sound (the abilities' sounds
+are vanilla sounds).
 
     python3 resourcepack/check.py      (after build.py)
 """
@@ -64,7 +65,11 @@ fx = sorted(set(re.findall(r'spawn\("([a-z_]+)"', src)))
 for e in fx:
     if f'assets/legendary/items/fx/{e}.json' not in names:
         problems.append(f'effect {e} missing')
-for w in ['kurogane', 'sugarcrash', 'riftblade', 'gravebreaker', 'starforged']:
+for n in sorted(names):
+    m = re.match(r'assets/legendary/items/fx/([a-z_]+)\.json$', n)
+    if m and m.group(1) not in fx:
+        problems.append(f'effect {m.group(1)} is in the pack but no ability shows it')
+for w in ['kurogane', 'sugarcrash', 'wyrmfang', 'gravebreaker', 'starforged']:
     for f in [f'assets/legendary/items/{w}.json', f'assets/legendary/textures/gui/sprites/tooltip/{w}_frame.png',
               f'assets/legendary/textures/gui/sprites/tooltip/{w}_background.png']:
         if f not in names:

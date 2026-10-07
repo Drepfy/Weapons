@@ -2,7 +2,7 @@
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ORDER = ['settings', 'economy', 'scoreboard', 'killrewards', 'market', 'baltop', 'ranks', 'teleport', 'ah']
+ORDER = ['settings', 'economy', 'scoreboard', 'killrewards', 'market', 'baltop', 'ranks', 'teleport', 'ah', 'string']
 HEADER = """# ============================================================
 #  VANILLA SMP - every script in one file
 #  Requires Skript 2.7+ and SkBee. Put ONLY this file in plugins/Skript/scripts/

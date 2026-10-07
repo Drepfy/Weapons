@@ -10,11 +10,15 @@ import java.util.Locale;
 /** The five legendary weapons. F (or right-click) uses the first ability, Shift + F the second. */
 public enum WeaponType {
 
-    KUROGANE("kurogane", Material.NETHERITE_SWORD, Ability.CRIMSON_FLASH, Ability.IAIDO, Ability.CRIMSON_EDGE),
-    SUGARCRASH("sugarcrash", Material.NETHERITE_SWORD, Ability.CANDY_HOOK, Ability.CANDY_CYCLONE, Ability.SUGAR_HIGH),
-    RIFTBLADE("riftblade", Material.NETHERITE_SWORD, Ability.VOID_REND, Ability.RIFT_SWAP, Ability.PHASE_SHIFT),
-    GRAVEBREAKER("gravebreaker", Material.NETHERITE_AXE, Ability.EXECUTIONERS_LEAP, Ability.GRAVE_RISE, Ability.LAST_RITES),
-    STARFORGED("starforged", Material.NETHERITE_AXE, Ability.STARFALL, Ability.SINGULARITY, Ability.STARSTRUCK);
+    KUROGANE("kurogane", Material.NETHERITE_SWORD, Ability.PHANTOM_STEP, Ability.CRIMSON_TEMPEST, Ability.CRIMSON_HUNGER),
+    SUGARCRASH("sugarcrash", Material.NETHERITE_SWORD, Ability.CANDY_REAPER, Ability.SUGAR_RUSH, Ability.SUGAR_HIGH),
+    /** Took the Riftblade's place in 2.0: every Riftblade became a Wyrmfang. */
+    WYRMFANG("wyrmfang", Material.NETHERITE_SWORD, Ability.WYRM_LUNGE, Ability.DRAGONS_BREATH, Ability.VENOM_FANG),
+    GRAVEBREAKER("gravebreaker", Material.NETHERITE_AXE, Ability.EARTHSPLITTER, Ability.IRON_BASTION, Ability.HEADSMAN),
+    STARFORGED("starforged", Material.NETHERITE_AXE, Ability.STAR_LANCE, Ability.CELESTIAL_PRISON, Ability.STARLIGHT);
+
+    /** Weapons that were replaced: their items and registry entries are read as the new one. */
+    private static final java.util.Map<String, String> REPLACED = java.util.Map.of("riftblade", "wyrmfang");
 
     private final String key;
     private final Material material;
@@ -85,6 +89,7 @@ public enum WeaponType {
             return null;
         }
         String wanted = key.trim().toLowerCase(Locale.ROOT).replace("_", "-");
+        wanted = REPLACED.getOrDefault(wanted, wanted);
         for (WeaponType type : values()) {
             if (type.key.equals(wanted)) {
                 return type;
