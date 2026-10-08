@@ -157,23 +157,34 @@ final class Katana implements Kit {
     private void drawCut(Player attacker, Player target) {
         Location at = Geo.middle(target);
         plugin.fx().sound(at, "draw-strike");
-        plugin.visuals().spawn("katana_cut", at).billboard().tilt(-26).size(0.5, 0.2, 0.5).send(0)
-                .animate(1, 2, e -> e.size(4.4, 1.3, 4.4))
-                .vanish(5, 4);
+        cut(at, -24, 4.6);
         plugin.visuals().later(2, () -> {
             if (!target.isValid()) {
                 return;
             }
             Location now = Geo.middle(target);
-            plugin.visuals().spawn("katana_cut", now).billboard().tilt(34).size(0.5, 0.2, 0.5).send(0)
-                    .animate(1, 2, e -> e.size(3.8, 1.2, 3.8))
-                    .vanish(4, 4);
+            cut(now, 180 + 30, 4.2);                   // back the other way, crossing the first
             Fx.View view = plugin.fx().view(now);
-            view.particle(Fx.SWEEP, now, 1, 0, 0, 0, 0);
-            view.dust(now, CRIMSON, 1.5f, 16, 0.4);
-            view.particle(Fx.DRIP, now, 10, 0.3, 0.35, 0.3, 0, blood());
-            view.particle(Fx.CRIT, now, 8, 0.3, 0.4, 0.3, 0.3);
+            view.dust(now, CRIMSON, 1.0f, 8, 0.35);
+            view.particle(Fx.DRIP, now, 8, 0.3, 0.35, 0.3, 0, blood());
+            view.particle(Fx.CRIT, now, 6, 0.3, 0.4, 0.3, 0.3);
         });
+    }
+
+    /**
+     * One cut, as quick and thin as a real one: a razor line sweeps across in two ticks (its
+     * start held still while its end runs out), then closes up to nothing in two more. It faces
+     * whoever looks at it, at {@code angle} degrees on their screen.
+     */
+    private void cut(Location at, double angle, double length) {
+        double rad = Math.toRadians(angle);
+        double first = 0.3 * length;
+        double back = (length - first) / 2;
+        plugin.visuals().spawn("katana_cut", at).billboard().tilt(angle)
+                .shift(-Math.cos(rad) * back, -Math.sin(rad) * back, 0).size(first, 0.3, 1).send(0)
+                .animate(1, 2, e -> e.shift(0, 0, 0).size(length, 0.26, 1))
+                .animate(3, 2, e -> e.size(length * 1.04, 0.015, 1))
+                .life(6);
     }
 
     private static org.bukkit.block.data.BlockData blood;

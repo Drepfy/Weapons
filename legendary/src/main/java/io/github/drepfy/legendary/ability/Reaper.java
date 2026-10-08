@@ -16,9 +16,10 @@ import java.util.UUID;
 
 /**
  * The Reaper: the finisher. It is strongest against players who are already low. Its look is
- * souls and a spectral scythe: souls are drawn into the blade, the low are marked for the reaper
- * alone, and a reap is a ghostly scythe circling the victim before it cuts, their soul torn
- * upwards in a spiral.
+ * souls: they are drawn into the blade, the low are marked for the reaper alone, and the heart
+ * of a reap is the victim's soul torn out of them, spiralling up round them in glowing wisps
+ * until it breaks free above their head. A small spectral scythe circling them and its cut
+ * lead into it, kept quiet so the soul stands out.
  * <ul>
  *   <li><b>Execution</b> (passive): hits on a player below 6 hearts do a little extra damage.</li>
  *   <li><b>Reap</b> (Shift + F): the next full-strength hit on a player below 8 hearts reaps them
@@ -30,9 +31,11 @@ import java.util.UUID;
 final class Reaper implements Kit {
 
     private static final Color SOUL = Color.fromRGB(90, 255, 210);
-    private static final Color DUSK = Color.fromRGB(70, 40, 110);
     /** How far the reaper senses players low enough to reap (blocks). */
     private static final double SENSE = 24.0;
+    /** The wisps of a reaped soul, and how long they take to spiral up out of the victim (ticks). */
+    private static final int STRANDS = 3;
+    private static final int RISE = 26;
 
     private final LegendaryPlugin plugin;
     private final Armed reaps = new Armed();
@@ -85,15 +88,15 @@ final class Reaper implements Kit {
         plugin.fx().sound(player.getLocation(), "reap");
         Location hand = Geo.hand(player);
         Fx.View view = plugin.fx().view(hand);
-        for (int k = 0; k < 14; k++) {
+        for (int k = 0; k < 9; k++) {
             double a = Math.toRadians(k * 137.5);
-            double y = 1 - 2 * (k + 0.5) / 14;
+            double y = 1 - 2 * (k + 0.5) / 9;
             double r = Math.sqrt(1 - y * y);
             Vector out = new Vector(Math.cos(a) * r, y * 0.6, Math.sin(a) * r).normalize();
             Location from = hand.clone().add(out.clone().multiply(2.4));
             view.fly(Fx.SOUL, from, out.multiply(-1), 0.14, null);
         }
-        view.particle(Fx.SCULK_SOUL, hand, 4, 0.15, 0.2, 0.15, 0.02);
+        view.particle(Fx.SCULK_SOUL, hand, 2, 0.15, 0.2, 0.15, 0.02);
         return Result.FIRED;
     }
 
@@ -167,56 +170,102 @@ final class Reaper implements Kit {
     }
 
     /**
-     * The reap, round the victim: a spectral scythe circles them (following them as they move),
-     * sweeps through them, and their soul is torn upwards in a spiral.
+     * The reap, round the victim: a small spectral scythe circles them (following them as they
+     * move) and cuts, and their soul is torn out of them.
      */
     private void harvest(Player attacker, Player target) {
         Vector from = Geo.middle(attacker).toVector().subtract(Geo.middle(target).toVector());
         double start = Math.atan2(from.getZ(), from.getX());
-        Location first = orbit(target, start, 0);
-        Visuals.Effect scythe = plugin.visuals().spawn("reap_scythe", first).billboard().size(0.5).send(0)
-                .animate(1, 3, e -> e.size(2.0));
-        int laps = 10;
+        Visuals.Effect scythe = plugin.visuals().spawn("reap_scythe", orbit(target, start, 0)).billboard().size(0.4)
+                .send(0).animate(1, 3, e -> e.size(1.3));
+        int laps = 7;
         for (int t = 1; t <= laps; t++) {
             int step = t;
             plugin.visuals().later(t, () -> {
                 if (target.isValid()) {
-                    scythe.moveTo(orbit(target, start + step * Math.toRadians(40), step), 1);
+                    scythe.moveTo(orbit(target, start + step * Math.toRadians(45), step), 1);
                 }
             });
-            scythe.animate(t, 1, e -> e.tilt(-35 + 14 * step));
+            scythe.animate(t, 1, e -> e.tilt(-35 + 16 * step));
         }
-        scythe.vanish(laps + 1, 3);
-        plugin.visuals().later(laps - 3, () -> {
+        scythe.vanish(laps + 1, 2);
+        plugin.visuals().later(laps - 2, () -> {
             if (!target.isValid()) {
                 return;
             }
             Location at = Geo.middle(target);
             plugin.fx().sound(at, "reap-strike");
-            plugin.visuals().spawn("reap_slash", at).billboard().tilt(-20).size(0.6).send(0)
-                    .animate(1, 3, e -> e.size(4.0).tilt(10))
-                    .vanish(8, 5);
-            Fx.View view = plugin.fx().view(at);
-            view.particle(Fx.SCULK_SOUL, at, 8, 0.3, 0.5, 0.3, 0.05);
-            view.dust(at, SOUL, 1.5f, 14, 0.4);
-            view.dust(at, DUSK, 1.5f, 10, 0.45);
+            plugin.visuals().spawn("reap_slash", at).billboard().tilt(-20).size(0.5).send(0)
+                    .animate(1, 2, e -> e.size(2.0).tilt(10))
+                    .vanish(4, 3);
+            plugin.fx().view(at).particle(Fx.SCULK_SOUL, at, 2, 0.25, 0.4, 0.25, 0.02);
+            soulSpiral(target);
         });
-        for (int t = 0; t < 16; t++) {
+    }
+
+    /**
+     * The heart of a reap: the victim's soul torn out of them. Three glowing wisps of it spiral
+     * up round them (following them as they move), closing in as they climb and each leaving a
+     * ribbon of soul-light behind it; above their head they meet, and the soul breaks free and
+     * rises away.
+     */
+    private void soulSpiral(Player target) {
+        Visuals.Effect[] wisps = new Visuals.Effect[STRANDS];
+        for (int s = 0; s < STRANDS; s++) {
+            wisps[s] = plugin.visuals().spawn("reap_soul", spiral(target, s, 0)).billboard().size(0.1).send(0)
+                    .animate(1, 4, e -> e.size(0.5));
+        }
+        for (int t = 1; t <= RISE; t++) {
             int step = t;
-            plugin.visuals().later(laps - 3 + t, () -> {
+            plugin.visuals().later(t, () -> {
                 if (!target.isValid()) {
                     return;
                 }
-                Location feet = target.getLocation();
-                Fx.View view = plugin.fx().view(feet);
-                for (int strand = 0; strand < 2; strand++) {
-                    double a = step * Math.toRadians(50) + strand * Math.PI;
-                    double r = 0.65 - step * 0.025;
-                    Location p = feet.clone().add(Math.cos(a) * r, 0.2 + step * 0.14, Math.sin(a) * r);
-                    view.particle(Fx.SOUL, p, 1, 0, 0, 0, 0.0);
+                Fx.View view = plugin.fx().view(target.getLocation());
+                for (int s = 0; s < STRANDS; s++) {
+                    Location was = spiral(target, s, step - 1);
+                    Location now = spiral(target, s, step);
+                    wisps[s].moveTo(now, 1);
+                    Vector gap = now.toVector().subtract(was.toVector());
+                    for (int k = 0; k < 3; k++) {
+                        view.dust(was.clone().add(gap.clone().multiply(k / 3.0)), SOUL, 0.8f, 1, 0.0);
+                    }
+                    if ((step + s) % 3 == 0) {
+                        view.particle(Fx.SOUL_FLAME, now, 1, 0.02, 0.02, 0.02, 0.005);
+                    }
                 }
             });
         }
+        plugin.visuals().later(RISE + 1, () -> {
+            if (!target.isValid()) {
+                for (Visuals.Effect wisp : wisps) {
+                    wisp.vanish(0, 3);
+                }
+                return;
+            }
+            Location crown = target.getLocation().add(0, target.getHeight() + 1.5, 0);
+            plugin.fx().sound(crown, "reap-soul");
+            Fx.View view = plugin.fx().view(crown);
+            view.particle(Fx.SOUL, crown, 6, 0.15, 0.15, 0.15, 0.04);
+            view.particle(Fx.SCULK_SOUL, crown, 3, 0.1, 0.1, 0.1, 0.03);
+            for (Visuals.Effect wisp : wisps) {
+                wisp.moveTo(crown, 2);
+            }
+            wisps[1].vanish(2, 2);
+            wisps[2].vanish(2, 2);
+            wisps[0].animate(2, 10, e -> e.size(0.9))           // the soul, whole again, rises away
+                    .glide(3, crown.clone().add(0, 1.8, 0), 12)
+                    .vanish(12, 5);
+        });
+    }
+
+    /** Where wisp {@code strand} of a reaped soul is, {@code step} ticks into its climb. */
+    private static Location spiral(Player target, int strand, int step) {
+        double f = (double) step / RISE;
+        double angle = strand * 2 * Math.PI / STRANDS + step * Math.toRadians(26);
+        double radius = 0.9 * Math.pow(1 - f, 0.8) + 0.12;
+        double up = 0.15 + Math.pow(f, 1.3) * (target.getHeight() + 1.5);
+        return target.getLocation().add(Math.cos(angle) * radius, up, Math.sin(angle) * radius);
     }
 
     /** A point on the scythe's circle round the victim, at chest height and gently rising. */

@@ -4,7 +4,7 @@
 # Shift + F (F is the swap-offhand key) uses the weapon's ability; plain F swaps hands as usual.
 # The passive works on its own on every hit. The weapons only ever affect other players.
 # Times: 8s, 2.5s, 1m, 30d. Damage and health: in hearts (1 = one heart).
-config-version: 8
+config-version: 9
 prefix: "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ » &r"
 
 # Which key uses the ability:
@@ -288,9 +288,10 @@ sounds:
   crush-hit: ["block.anvil.land 0.5 1.5", "entity.lightning_bolt.impact 0.35 1.8"]
   crush-impact: ["item.mace.smash_ground_heavy 1 0.8", "entity.generic.explode 0.45 0.6"]
   heavy-thud: ["item.mace.smash_ground 0.7 1.0"]
-  # Reaper: calling the souls, and the reap.
+  # Reaper: calling the souls, the reap, and the soul breaking free above the victim.
   reap: ["particle.soul_escape 1 0.6", "entity.vex.charge 0.7 0.5"]
   reap-strike: ["entity.warden.attack_impact 0.8 1.3", "entity.player.attack.sweep 1 0.5"]
+  reap-soul: ["particle.soul_escape 1 0.9", "block.sculk_catalyst.bloom 0.8 1.3"]
   # Getting a legendary.
   received: ["ui.toast.challenge_complete 0.6 1.2"]
 

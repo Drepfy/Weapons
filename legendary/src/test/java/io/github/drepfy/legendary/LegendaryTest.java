@@ -15,6 +15,7 @@ import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BossBar;
 import org.bukkit.damage.DamageSource;
 import org.bukkit.damage.DamageType;
+import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.ItemDisplay;
@@ -1008,6 +1009,33 @@ class LegendaryTest {
     }
 
     @Test
+    void steppingInAPuddleSquashesItBeforeItBursts() {
+        PlayerMock steve = player("Steve", 0, 0);
+        PlayerMock alex = player("Alex", 9, 9);
+        give(steve, WeaponType.CANDY_CANE);
+        sneakUseKey(steve);
+        tick(20);
+        Location spot = trapSpot(0);
+        alex.teleport(spot.clone().add(0.6, 0, 0));          // stepping in from the east
+        tick(1);
+        assertTrue(alex.hasPotionEffect(PotionEffectType.POISON), "caught");
+        ItemDisplay puddle = world.getEntitiesByClass(ItemDisplay.class).stream()
+                .min(java.util.Comparator.comparingDouble(d -> d.getLocation().distanceSquared(spot))).orElseThrow();
+        // (The simulated server reads a display's shape back only roughly, so this checks that the
+        // puddle keeps changing shape, squashed unevenly, not the exact way it is squashed.)
+        List<org.joml.Vector3f> shapes = new ArrayList<>();
+        for (int t = 0; t < 10; t++) {
+            tick(1);
+            assertTrue(puddle.isValid(), "it squashes, springs back and wobbles before it bursts");
+            shapes.add(puddle.getTransformation().getScale());
+        }
+        assertTrue(shapes.stream().anyMatch(size -> Math.abs(size.x() - size.z()) > 0.3), "squashed unevenly: " + shapes);
+        assertTrue(shapes.stream().distinct().count() >= 3, "and it moves: " + shapes);
+        tick(20);
+        assertFalse(puddle.isValid(), "then it is gone");
+    }
+
+    @Test
     void sugarTrapsNeedGroundAndNothingIsSpentWithout() {
         PlayerMock steve = player("Steve", 0, 0);
         ItemStack cane = give(steve, WeaponType.CANDY_CANE);
@@ -1120,6 +1148,32 @@ class LegendaryTest {
         melee(steve, alex, AXE);
         tick(1);
         assertEquals(18.5, alex.getHealth(), 1.0E-6, "after 10 seconds it is gone (only Heavy's knock-down)");
+    }
+
+    @Test
+    void crushThrowsUpPiecesOfTheExactBlockTheyLandOn() {
+        PlayerMock steve = player("Steve", 0, 0);
+        PlayerMock alex = player("Alex", 0, 2);
+        org.bukkit.block.data.BlockData slab = Material.SMOOTH_STONE_SLAB.createBlockData();
+        world.getBlockAt(0, 64, 2).setBlockData(slab);
+        give(steve, WeaponType.CRUSH);
+        sneakUseKey(steve);
+        lift(alex, 3);
+        melee(steve, alex, AXE);
+        tick(1);
+        alex.teleport(new Location(world, 0.5, 64.5, 2.5));   // landed on the slab
+        tick(1);
+        List<BlockDisplay> pieces = world.getEntitiesByClass(BlockDisplay.class).stream().toList();
+        assertFalse(pieces.isEmpty(), "pieces of the ground are thrown up");
+        for (BlockDisplay piece : pieces) {
+            assertEquals(slab, piece.getBlock(), "pieces of the very block they landed on");
+            assertFalse(piece.isPersistent(), "never saved with the world");
+        }
+        assertTrue(world.getEntitiesByClass(ItemDisplay.class).stream()
+                .anyMatch(d -> Math.abs(d.getLocation().getY() - 64.53) < 0.01), "the cracks lie on top of the slab");
+        assertEquals(slab, world.getBlockAt(0, 64, 2).getBlockData(), "the block itself is untouched");
+        tick(40);
+        assertTrue(world.getEntitiesByClass(BlockDisplay.class).isEmpty(), "the pieces are gone again");
     }
 
     // ---- Reaper -----------------------------------------------------------------------------------------
@@ -1439,6 +1493,70 @@ class LegendaryTest {
         assertTrue(world.getEntitiesByClass(ItemDisplay.class).isEmpty());
     }
 
+    /** The effects on show with this model (all of them where item models are not known). */
+    private List<ItemDisplay> shown(String model) {
+        List<ItemDisplay> all = new ArrayList<>(world.getEntitiesByClass(ItemDisplay.class));
+        if (models().contains("null")) {
+            return all;
+        }
+        all.removeIf(d -> !("legendary:fx/" + model).equals(String.valueOf(d.getItemStack().getItemMeta().getItemModel())));
+        return all;
+    }
+
+    @Test
+    void drawCutsAreRazorThinAndGoneInAnInstant() {
+        PlayerMock steve = player("Steve", 0, 0);
+        PlayerMock alex = player("Alex", 0, 2);
+        give(steve, WeaponType.KATANA);
+        sneakUseKey(steve);
+        tick(20);
+        melee(steve, alex, SWORD);
+        tick(3);
+        List<ItemDisplay> cuts = shown("katana_cut");
+        assertEquals(2, cuts.size(), "two cuts crossing");
+        boolean full = false;
+        for (ItemDisplay cut : cuts) {
+            org.joml.Vector3f size = cut.getTransformation().getScale();
+            assertTrue(size.y() < 0.35, "razor thin: " + size);
+            full |= size.x() > 4.0;
+        }
+        assertTrue(full, "a long cut right across them");
+        tick(6);
+        assertTrue(world.getEntitiesByClass(ItemDisplay.class).isEmpty(), "gone in an instant, like a real cut");
+    }
+
+    @Test
+    void aReapTearsTheSoulOutOfTheVictimInASpiral() {
+        PlayerMock bob = player("Bob", 0, 0);
+        PlayerMock alex = player("Alex", 0, 3);
+        alex.setHealth(10.0);
+        give(bob, WeaponType.REAPER);
+        sneakUseKey(bob);
+        melee(bob, alex, SWORD);
+        tick(7);
+        List<ItemDisplay> souls = shown("reap_soul");
+        if (!models().contains("null")) {
+            assertEquals(3, souls.size(), "three wisps of the soul");
+        }
+        souls = shown("reap_soul");
+        double low = souls.stream().mapToDouble(d -> d.getLocation().getY()).max().orElseThrow();
+        tick(12);
+        Location feet = alex.getLocation();
+        for (ItemDisplay soul : shown("reap_soul")) {
+            assertTrue(soul.getLocation().getY() > low, "spiralling up");
+            assertTrue(Math.hypot(soul.getLocation().getX() - feet.getX(), soul.getLocation().getZ() - feet.getZ()) < 1.1,
+                    "round the victim");
+        }
+        alex.teleport(new Location(world, 5.5, 64, 7.5));
+        tick(1);
+        for (ItemDisplay soul : shown("reap_soul")) {
+            assertTrue(Math.hypot(soul.getLocation().getX() - 5.5, soul.getLocation().getZ() - 7.5) < 1.1,
+                    "it follows them");
+        }
+        tick(60);
+        assertTrue(world.getEntitiesByClass(ItemDisplay.class).isEmpty(), "the soul is gone and so is everything else");
+    }
+
     @Test
     void everySoundIsARealMinecraftSound() {
         for (Map.Entry<String, List<io.github.drepfy.legendary.config.Settings.SoundSpec>> entry
@@ -1517,6 +1635,21 @@ class LegendaryTest {
         assertEquals(List.of("block.bell.use 1 1"), saved.getStringList("sounds.reap"), "their own sound is kept");
         assertEquals(fresh.getStringList("sounds.crush-hit"), saved.getStringList("sounds.crush-hit"), "new sounds added");
         assertEquals("&cMy Katana", saved.getString("weapons.katana.name"), "the weapons are left alone");
+    }
+
+    @Test
+    void aConfigFrom31GetsTheSoulSound() {
+        org.bukkit.configuration.file.FileConfiguration config = plugin.getConfig();
+        config.set("config-version", 8);
+        config.set("sounds.reap-soul", null);
+        config.set("sounds.reap", List.of("block.bell.use 1 1"));                    // their own
+        plugin.saveConfig();
+
+        assertEquals(List.of(), plugin.reload(), "nothing left to warn about");
+        org.bukkit.configuration.file.YamlConfiguration saved = savedConfig();
+        assertEquals(io.github.drepfy.legendary.config.ConfigUpgrade.VERSION, saved.getInt("config-version"));
+        assertEquals(bundledConfig().getStringList("sounds.reap-soul"), saved.getStringList("sounds.reap-soul"));
+        assertEquals(List.of("block.bell.use 1 1"), saved.getStringList("sounds.reap"), "their own sound is kept");
     }
 
     @Test

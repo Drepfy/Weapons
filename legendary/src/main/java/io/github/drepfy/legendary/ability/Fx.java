@@ -36,7 +36,6 @@ public final class Fx {
     public static final Particle ITEM = Compat.particle("ITEM", "ITEM_CRACK");
     public static final Particle SPARK = Compat.particle("ELECTRIC_SPARK");
     public static final Particle PILLAR = Compat.particle("DUST_PILLAR");
-    public static final Particle SWEEP = Compat.particle("SWEEP_ATTACK");
     public static final Particle SHINE = Compat.particle("ENCHANTED_HIT", "CRIT_MAGIC");
 
     private final Supplier<Settings> settings;

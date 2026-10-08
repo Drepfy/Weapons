@@ -201,9 +201,13 @@ final class Crush implements Kit, Listener {
             Player target = landing.target();
             if (!target.isOnline() || target.isDead()) {
                 it.remove();
-            } else if (height(target) <= 0.15 || now >= landing.until()) {
+                continue;
+            }
+            if (height(target) <= 0.15) {
                 it.remove();
                 impact(target, landing.big());
+            } else if (now >= landing.until()) {
+                it.remove();                                   // never came down: nothing to crack
             } else if (landing.big() && now % 2 == 0) {
                 Location at = Geo.middle(target);              // sparks trail them down
                 plugin.fx().view(at).particle(Fx.SPARK, at, 3, 0.2, 0.3, 0.2, 0.02);
@@ -230,11 +234,10 @@ final class Crush implements Kit, Listener {
      * block is changed.
      */
     private void impact(Player target, boolean big) {
-        Location feet = target.getLocation();
-        Location ground = feet.clone();
-        ground.setY(Math.floor(feet.getY() - height(target) + 1.0E-3));
-        Location at = ground.clone().add(0, 0.03, 0);
-        BlockData block = groundBlock(ground);
+        Location at = target.getLocation();
+        at.setY(at.getY() - height(target));                  // the top of what they land on
+        BlockData block = groundBlock(target, at.getY());
+        at.add(0, 0.03, 0);
         double size = big ? 4.4 : 2.4;
         plugin.visuals().spawn("crush_crater", at).turn(Math.floorMod(target.getEntityId() * 37, 360)).size(0.5).send(0)
                 .animate(1, 2, e -> e.size(size))
@@ -269,10 +272,39 @@ final class Crush implements Kit, Listener {
         }
     }
 
-    private static BlockData groundBlock(Location ground) {
-        Block below = ground.clone().subtract(0, 0.5, 0).getBlock();
-        Material type = below.getType();
-        return (type.isSolid() ? type : Material.STONE).createBlockData();
+    /**
+     * The block they landed on exactly as it is, its state too (a slab, a log lying on its side,
+     * grass under snow, a carpet...), so the pieces thrown up are pieces of it. The block under
+     * the middle of them first, then under their corners (at the edge of a block); a block the
+     * game draws as an entity (a chest, a bed, a sign...) cannot be shown as a piece, so the one
+     * under it is used.
+     */
+    static BlockData groundBlock(Player player, double surface) {
+        Location feet = player.getLocation();
+        World world = feet.getWorld();
+        if (world != null) {
+            double half = Math.min(0.3, player.getWidth() / 2.0);
+            double[][] spots = {{0, 0}, {-half, -half}, {half, -half}, {-half, half}, {half, half}};
+            int top = (int) Math.floor(surface - 1.0E-3);
+            for (int y = top; y >= Math.max(world.getMinHeight(), top - 2); y--) {
+                for (double[] spot : spots) {
+                    Block block = world.getBlockAt((int) Math.floor(feet.getX() + spot[0]), y,
+                            (int) Math.floor(feet.getZ() + spot[1]));
+                    if (block.getType().isSolid() && shownAsPiece(block.getType())) {
+                        return block.getBlockData().clone();
+                    }
+                }
+            }
+        }
+        return Material.STONE.createBlockData();
+    }
+
+    /** Whether a block display can show it (not one the game draws as an entity: those vanish). */
+    private static boolean shownAsPiece(Material type) {
+        String name = type.name();
+        return !(name.endsWith("CHEST") || name.endsWith("SHULKER_BOX") || name.endsWith("_BED")
+                || name.endsWith("SIGN") || name.endsWith("BANNER") || name.endsWith("_HEAD")
+                || name.endsWith("_SKULL") || name.equals("DECORATED_POT") || name.equals("CONDUIT"));
     }
 
     /**

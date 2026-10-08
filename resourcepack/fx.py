@@ -208,27 +208,27 @@ def katana_glint(u, v):
 
 
 def katana_cut(u, v):
-    """One razor cut: a hair-fine, white-hot edge along a shallow arc, needle-sharp at both ends,
-    and a crimson smear streaking off behind it. It is shown stretched wide and thin."""
-    d = 1.95 - math.hypot(u, v + 1.72)                  # > 0 behind the edge, < 0 in front of it
+    """One sword cut as it is made: a razor-thin, white-hot line along a faint curve, needle-sharp
+    at both ends and brightest towards the end the blade finished at (the right), with a thin
+    crimson trail just behind it. The plugin shows it about 4.5 blocks wide and only a quarter of
+    a block tall, so the curve here is far deeper than it looks in game, and every thickness is
+    measured straight up and down (that is what stays thin when it is squashed)."""
     s = (u + 0.97) / 1.94                                # 0..1 along the cut
     if not 0.0 < s < 1.0:
         return (0.0, 0.0, 0.0, 0.0)
-    body = math.sin(math.pi * s ** 0.8) ** 1.4           # thickest a little past the middle
-    core = _glow(d, 0.006 + 0.016 * math.sin(math.pi * s) ** 0.7) * smooth(0.0, 0.05, s) * smooth(1.0, 0.95, s)
-    deep = 0.42 * body
-    smear, q = 0.0, 1.0
-    if 0.0 <= d < deep:
-        q = d / deep
-        streaks = 0.45 + 0.55 * fbm(s * 2.2 + 3.0, q * 10.0, 51)
-        fray = smooth(0.0, 0.25, s) * smooth(1.0, 0.7, s)        # the smear breaks up at the ends
-        smear = (1 - q) ** 1.4 * body * streaks * (0.55 + 0.45 * fray)
-    front = 0.6 * _glow(d, 0.03) * body if d < 0 else 0.0
-    c = _ramp(q, [(0, '#ffe8ec'), (0.1, '#ff5a73'), (0.3, '#ff1f45'), (0.65, '#c4062a'), (1, '#7a0018')])
-    if d < 0:
-        c = hexrgb('#ff3a5a')
-    c = mix(c, (1.0, 1.0, 1.0), clamp(core * 1.2))
-    return c + (clamp(max(core, smear, front)),)
+    dv = v - (0.42 - 0.84 * u * u)                       # < 0 behind the cut (above), > 0 in front
+    reach = math.sin(math.pi * s) ** 0.55 * (0.35 + 0.65 * s ** 0.8)   # thin needle ends; the tail fades
+    core = _glow(dv, 0.008 + 0.06 * reach) * reach
+    edge = 0.6 * _glow(dv, 0.03 + 0.13 * reach) * reach
+    trail = 0.0
+    deep = 0.5 * reach
+    if -deep < dv < 0.0:
+        q = -dv / deep
+        streaks = 0.5 + 0.5 * fbm(s * 2.6 + 3.0, q * 7.0, 51)
+        trail = (1 - q) ** 2.2 * reach * streaks * 0.75
+    c = mix(hexrgb('#b8001c'), hexrgb('#ff2448'), clamp(edge * 1.6))
+    c = mix(c, (1.0, 1.0, 1.0), clamp(core * 1.5) ** 1.5)
+    return c + (clamp(max(core, edge, trail)),)
 
 
 # ---- Candy Cane ----------------------------------------------------------------------------------------
@@ -594,6 +594,30 @@ def reap_scythe(u, v):
     return c + (clamp(max(halo, trail)),)
 
 
+def reap_soul(u, v):
+    """A wisp of a reaped soul (three spiral up round the victim): a bright round heart of
+    soul-light with a flickering flame-tail streaming down behind it as it rises, white at its
+    heart, soul-green, fading to violet at the tip of the tail."""
+    hy = -0.32
+    r = math.hypot(u, v - hy)
+    head = smooth(0.32, 0.16, r)
+    t = (v - hy) / 1.2                                   # 0 at the heart .. 1 at the tip of the tail
+    tail, fade = 0.0, 0.0
+    if 0.0 < t < 1.0:
+        cx = 0.14 * math.sin(t * 5.5 + 0.4) * t          # it wavers like a flame
+        w = 0.26 * (1 - t) ** 1.3 + 0.012
+        flicker = 0.7 + 0.3 * fbm(u * 4 + 2, v * 3 - 1, 81)
+        tail = smooth(w, w * 0.25, abs(u - cx)) * (1 - t) ** 0.7 * flicker
+        fade = t
+    core = _glow(r, 0.1)
+    light = clamp(core * 1.2 + 0.5 * head + 0.5 * tail)
+    c = _ramp(light, [(0, '#2ee6b0'), (0.5, '#3dffc0'), (0.8, '#d8fff2'), (1, '#ffffff')])
+    if tail > head:
+        c = mix(c, hexrgb('#7a4ad0'), fade ** 1.5)                         # violet at the tip of the tail
+    halo = 0.5 * _glow(r, 0.4)
+    return c + (clamp(max(0.95 * head, tail, core, halo)),)
+
+
 def reap_slash(u, v):
     """A scythe's sweep: a long crescent, thick at one end and drawn out to a fine hooked point
     at the other, white at its cutting edge, spectral green, with wisps trailing behind it."""
@@ -627,6 +651,7 @@ EFFECTS = {
     'crush_crater': (crush_crater, 256, 'flat'),
     'reap_scythe': (reap_scythe, 128, 'upright'),
     'reap_slash': (reap_slash, 128, 'upright'),
+    'reap_soul': (reap_soul, 128, 'upright'),
 }
 
 # Textures only particles use: an effect's particles (the goo flying off the Sugar Trap is the
@@ -640,9 +665,10 @@ PARTICLES = {
 # glow width in texels, solidness). Shaded ones (the goo, the broken ground) are left as painted.
 BOLD = {
     'katana_glint': (0, 0.6, 4, 1.4),
-    'katana_cut': (1, 0.5, 5, 1.4),
+    'katana_cut': (0, 0.3, 3, 1.2),
     'reap_scythe': (0, 0.45, 3, 1.3),
     'reap_slash': (0, 0.6, 4, 1.5),
+    'reap_soul': (0, 0.5, 4, 1.3),
 }
 
 

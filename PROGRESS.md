@@ -374,6 +374,31 @@ and Flight never flagged. Cause, found by making the tests behave like Paper:
   clean-up, the scythe following its victim, the 3.0 config upgrade). Compiled against Paper
   1.21.11.
 
+## Legendary 3.1.1: sharper cuts, squishier goo, exact ground, the soul as the centrepiece
+
+- Katana: the two cuts are razor-thin hairlines that sweep across in two ticks (the start held
+  still, the end running out, done with display translation) and close to nothing in two more;
+  the second sweeps back the other way. New `katana_cut` texture painted for a 4.5 x 0.25 block
+  display (thicknesses measured vertically so they stay thin when squashed).
+- Candy Cane: stepping in a puddle squashes it out along the way the player stepped in (the
+  display's size is stretched along a world direction: left rotation = that direction, right
+  rotation = its inverse times the puddle's own turn), springs back, wobbles and bursts, with
+  goo squirting out from under the foot. `Effect.stop()` drops animations planned earlier (the
+  idle wobble) so they cannot fight the squish.
+- Crush: the pieces are the exact block state they land on (slabs, logs, snowy grass,
+  carpets), found under their middle then their corners; blocks the game draws as entities
+  are skipped for the one beneath. The cracks lie on the block's real top (on a slab, not
+  inside it). A slam that never comes down no longer cracks ground far below.
+- Reaper: the soul spiral is the centrepiece: three `reap_soul` wisps spiral up round the
+  victim on display entities moved every tick (following them), leaving ribbons of
+  soul-light, meeting above their head and rising away with the new `reap-soul` sound. The
+  scythe is smaller and quicker, the slash smaller, the bursts and the calling souls fewer.
+- Glint unchanged: the vanilla enchantment glint on every weapon.
+- Config version 9 adds `reap-soul`. Tests: 59 (cuts thin and gone in an instant, the puddle
+  squashing before it bursts, exact-block pieces on a slab, the soul spiral rising and
+  following, the 3.1.0 config). MockBukkit reads a display's transformation back only
+  roughly (it rebuilds it from the matrix), so the squash direction itself is not asserted.
+
 ## Remaining / next steps
 
 - Validate on a live server with a hacked client on an alt (see the README

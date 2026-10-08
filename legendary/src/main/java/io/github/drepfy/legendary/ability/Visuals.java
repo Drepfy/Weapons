@@ -179,6 +179,10 @@ public final class Visuals {
         final Quaternionf spin = new Quaternionf();
         /** A block display: its corner is at its position, so it is moved to turn round its middle. */
         boolean centred;
+        /** Set by {@link #stretch}: the flat direction its size is stretched along. */
+        private Quaternionf along;
+        /** Bumped by {@link #stop}: what was planned before it is dropped. */
+        private int plan;
 
         Effect(Visuals visuals, Display display) {
             this.visuals = visuals;
@@ -233,6 +237,31 @@ public final class Visuals {
             return this;
         }
 
+        /** Moved off its position by this much (blocks; for a billboard, across the screen). */
+        public Effect shift(double x, double y, double z) {
+            translation.set((float) x, (float) y, (float) z);
+            return this;
+        }
+
+        /**
+         * From now on its size stretches it along a flat direction in the world (size z along
+         * it, x across it) instead of along its own sides: a puddle squashed out the way it was
+         * stepped in, whichever way the puddle itself is turned.
+         */
+        public Effect stretch(Vector flat) {
+            along = new Quaternionf().rotateY((float) Math.atan2(flat.getX(), flat.getZ()));
+            return this;
+        }
+
+        /**
+         * Drops everything planned for it so far: animations, glides and its removal (so plan a
+         * new one, e.g. with {@link #vanish}).
+         */
+        public Effect stop() {
+            plan++;
+            return this;
+        }
+
         /** Tumbled freely (a shard flying through the air): turns about all three axes. */
         public Effect tumble(double x, double y, double z) {
             spin.identity().rotateXYZ((float) Math.toRadians(x), (float) Math.toRadians(y), (float) Math.toRadians(z));
@@ -245,15 +274,18 @@ public final class Visuals {
                 return this;
             }
             try {
-                Quaternionf left = new Quaternionf(rotation).mul(spin);
+                Quaternionf turned = new Quaternionf(rotation).mul(spin);
                 Vector3f move = new Vector3f(translation);
                 if (centred) {
                     // turn and scale a block round its middle, not its corner
-                    move.sub(left.transform(new Vector3f(scale).mul(0.5f)));
+                    move.sub(turned.transform(new Vector3f(scale).mul(0.5f)));
                 }
+                // the game draws translation * left * scale * right
+                Quaternionf left = along == null ? turned : new Quaternionf(along);
+                Quaternionf right = along == null ? new Quaternionf() : new Quaternionf(along).conjugate().mul(turned);
                 display.setInterpolationDelay(0);
                 display.setInterpolationDuration(Math.max(0, ticks));
-                display.setTransformation(new Transformation(move, left, new Vector3f(scale), new Quaternionf()));
+                display.setTransformation(new Transformation(move, left, new Vector3f(scale), right));
             } catch (RuntimeException | LinkageError ignored) {
                 // Effects are only for show.
             }
@@ -265,9 +297,12 @@ public final class Visuals {
             if (display == null) {
                 return this;
             }
+            int planned = plan;
             visuals.later(delay, () -> {
-                change.accept(this);
-                send(ticks);
+                if (planned == plan) {
+                    change.accept(this);
+                    send(ticks);
+                }
             });
             return this;
         }
@@ -296,7 +331,12 @@ public final class Visuals {
         public Effect glide(int delay, Location to, int ticks) {
             if (display != null) {
                 Location target = to.clone();
-                visuals.later(delay, () -> moveTo(target, ticks));
+                int planned = plan;
+                visuals.later(delay, () -> {
+                    if (planned == plan) {
+                        moveTo(target, ticks);
+                    }
+                });
             }
             return this;
         }
@@ -319,7 +359,12 @@ public final class Visuals {
         /** Removed {@code ticks} from now. */
         public Effect life(int ticks) {
             if (display != null) {
-                visuals.later(ticks, this::remove);
+                int planned = plan;
+                visuals.later(ticks, () -> {
+                    if (planned == plan) {
+                        remove();
+                    }
+                });
             }
             return this;
         }

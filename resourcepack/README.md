@@ -81,12 +81,13 @@ shown, and `models/render.py` draws the showcase. `python3 textures.py --preview
   faint glow at the edge, and a thin frame shading from one colour to another with small gems
   in the corners. Nine-sliced like the vanilla one, so it fits any length of lore. Drawn by
   `tooltips.py`.
-- **Ability effects** (`items/fx/*.json`, `models/fx`, `textures/item/fx`): 7 effects the
+- **Ability effects** (`items/fx/*.json`, `models/fx`, `textures/item/fx`): 8 effects the
   abilities show with display entities, each weapon in its own style and none shared:
   - Katana: `katana_glint` (a fine white line with a four-pointed flare, fringed crimson: the
-    blade catching the light as Draw is used) and `katana_cut` (a hair-fine white-hot edge
-    along a shallow arc with a streaked crimson smear behind it, shown stretched wide and thin;
-    two cross through the target).
+    blade catching the light as Draw is used) and `katana_cut` (a razor-thin white-hot line
+    along a faint curve, needle-sharp ends, brightest where the blade finished, a thin crimson
+    trail behind it). It is painted for being shown about 4.5 blocks wide and a quarter of a
+    block tall: the plugin sweeps it across in two ticks and closes it up in two more.
   - Candy Cane: `candy_goo` (a glossy glob of pink goo with a lump pulling away and drops
     strung out behind; flung out to make the traps) and `candy_puddle` (the trap: a wet,
     glossy puddle of pink candy goo lying on the ground, marbled, with bubbles, sprinkles and
@@ -97,9 +98,10 @@ shown, and `models/render.py` draws the showcase. `python3 textures.py --preview
     azure, cracks splitting out past them, grit and dust thrown out in streaks). It darkens
     and lightens the real ground under it rather than covering it, and the plugin adds chunks
     of the real block thrown up (block displays). No block is ever changed.
-  - Reaper: `reap_scythe` (a spectral scythe: a dark shaft and a long ghostly blade, white at
-    its edge and burning soul-green into violet, smoke streaming off its back; it circles the
-    victim) and `reap_slash` (the scythe's sweep as it cuts).
+  - Reaper: `reap_soul` (the centrepiece: a wisp of a reaped soul, a bright round heart of
+    soul-light with a flickering flame-tail, three of them spiral up round the victim),
+    `reap_scythe` (a small spectral scythe: a dark shaft and a ghostly blade, white at its edge
+    and burning soul-green into violet; it circles the victim) and `reap_slash` (its cut).
 
   Each is painted at 128 or 256 pixels by `fx.py` (flat ones lie on the ground, upright ones
   stand facing the viewer), lit at full brightness. The goo and the broken ground are shaded

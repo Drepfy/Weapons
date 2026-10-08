@@ -16,7 +16,7 @@ import java.util.Map;
  */
 public final class ConfigUpgrade {
 
-    public static final int VERSION = 8;
+    public static final int VERSION = 9;
 
     /** Paths whose explanation changed: the new one is written over it. */
     private static final List<String> NEW_COMMENTS = List.of("config-version", "controls", "true-damage", "weapons",

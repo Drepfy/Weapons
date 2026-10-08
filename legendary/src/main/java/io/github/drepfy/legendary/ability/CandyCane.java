@@ -265,11 +265,27 @@ final class CandyCane implements Kit {
         Hits.effect(victim, "poison", settings.whole("poison-level"), settings.ticks("poison-duration"));
         Hits.effect(victim, "nausea", 1, settings.ticks("nausea-duration"));
         Hits.effect(victim, "slowness", settings.whole("slow-level"), settings.ticks("slow-duration"));
-        trap.model.animate(1, 2, e -> e.size(1.6, 1, 1.6)).vanish(3, 3);
+        // The foot sinks in: the goo squashes out along the way they stepped in, springs back
+        // the other way, wobbles once more, and bursts.
+        Vector way = victim.getLocation().toVector().subtract(trap.at.toVector()).setY(0);
+        if (way.lengthSquared() < 1.0E-4) {
+            way = Geo.flat(victim.getLocation());
+        }
+        way.normalize();
+        trap.model.stop().stretch(way).size(1.05, 1, 1.05).send(0)
+                .animate(1, 2, e -> e.size(0.82, 1, 1.62))
+                .animate(3, 3, e -> e.size(1.44, 1, 0.96))
+                .animate(6, 3, e -> e.size(1.1, 1, 1.36))
+                .animate(9, 3, e -> e.size(1.28, 1, 1.18))
+                .vanish(12, 4);
         Location at = trap.at.clone().add(0, 0.2, 0);
         plugin.fx().sound(at, "sugar-trap-trigger");
         Fx.View view = plugin.fx().view(at);
-        view.particle(Fx.ITEM, at, 18, 0.3, 0.15, 0.3, 0.28, goo());
+        view.particle(Fx.ITEM, at, 14, 0.3, 0.15, 0.3, 0.28, goo());
+        for (int k = 0; k < 6; k++) {                   // goo squirting out from under the foot
+            Vector out = way.clone().multiply(k % 2 == 0 ? 1 : -1).add(new Vector(0, 0.55 + 0.12 * k, 0));
+            view.fly(Fx.ITEM, at, out, 0.22 + 0.03 * k, goo());
+        }
         view.dust(at.clone().add(0, 0.4, 0), PINK, 1.5f, 12, 0.45);
         view.dust(at.clone().add(0, 0.4, 0), SUGAR, 1.1f, 6, 0.4);
         int stuckFor = Math.max(settings.ticks("slow-duration"), 20);
