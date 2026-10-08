@@ -4,6 +4,8 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.World;
+import org.bukkit.block.data.BlockData;
+import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.ItemDisplay;
@@ -22,8 +24,10 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 /**
- * The abilities' 3D effects: slashes, rune circles, rings, stars, dragon fire... Each is a
- * model from the resource pack ({@code legendary:fx/<name>}) shown by a display entity. The
+ * The abilities' 3D effects: the Katana's cuts, the Candy Cane's sticky puddles, Crush's
+ * cracked ground and flying shards, the Reaper's spectral scythe... Each is a model from the
+ * resource pack ({@code legendary:fx/<name>}) or a piece of a real block, shown by a display
+ * entity. The
  * server only says where it starts and where it ends up; the players' game animates it smoothly
  * in between. Effects are never saved with the world and are cleared when the plugin stops.
  *
@@ -120,6 +124,32 @@ public final class Visuals {
         }
     }
 
+    /**
+     * A small piece of a real block (a shard of the ground thrown up by an impact). Shown by a
+     * block display: no block in the world is ever placed or changed.
+     */
+    public Effect block(BlockData block, Location at) {
+        World world = at.getWorld();
+        if (world == null || block == null) {
+            return Effect.NONE;
+        }
+        Location place = at.clone();
+        place.setYaw(0f);
+        place.setPitch(0f);
+        try {
+            BlockDisplay display = world.spawn(place, BlockDisplay.class, d -> {
+                d.setBlock(block);
+                setup(d);
+                d.setBrightness(null);                    // lit like the world round it
+            });
+            Effect effect = track(display);
+            effect.centred = true;
+            return effect;
+        } catch (RuntimeException | LinkageError e) {
+            return Effect.NONE;
+        }
+    }
+
     private static void setup(Display d) {
         d.setPersistent(false);
         d.setBrightness(GLOW);
@@ -147,6 +177,8 @@ public final class Visuals {
         final Quaternionf rotation = new Quaternionf();
         final Vector3f scale = new Vector3f(1f, 1f, 1f);
         final Quaternionf spin = new Quaternionf();
+        /** A block display: its corner is at its position, so it is moved to turn round its middle. */
+        boolean centred;
 
         Effect(Visuals visuals, Display display) {
             this.visuals = visuals;
@@ -201,6 +233,12 @@ public final class Visuals {
             return this;
         }
 
+        /** Tumbled freely (a shard flying through the air): turns about all three axes. */
+        public Effect tumble(double x, double y, double z) {
+            spin.identity().rotateXYZ((float) Math.toRadians(x), (float) Math.toRadians(y), (float) Math.toRadians(z));
+            return this;
+        }
+
         /** Sends the changes now, played smoothly over {@code ticks}. */
         public Effect send(int ticks) {
             if (!exists()) {
@@ -208,10 +246,14 @@ public final class Visuals {
             }
             try {
                 Quaternionf left = new Quaternionf(rotation).mul(spin);
+                Vector3f move = new Vector3f(translation);
+                if (centred) {
+                    // turn and scale a block round its middle, not its corner
+                    move.sub(left.transform(new Vector3f(scale).mul(0.5f)));
+                }
                 display.setInterpolationDelay(0);
                 display.setInterpolationDuration(Math.max(0, ticks));
-                display.setTransformation(new Transformation(new Vector3f(translation), left, new Vector3f(scale),
-                        new Quaternionf()));
+                display.setTransformation(new Transformation(move, left, new Vector3f(scale), new Quaternionf()));
             } catch (RuntimeException | LinkageError ignored) {
                 // Effects are only for show.
             }
@@ -235,6 +277,10 @@ public final class Visuals {
             if (exists()) {
                 try {
                     display.setTeleportDuration(Math.max(0, Math.min(59, ticks)));
+                } catch (RuntimeException | LinkageError ignored) {
+                    // Without smooth teleports it jumps there instead.
+                }
+                try {
                     Location place = to.clone();
                     place.setYaw(0f);
                     place.setPitch(0f);

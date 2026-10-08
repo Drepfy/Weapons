@@ -81,18 +81,33 @@ shown, and `models/render.py` draws the showcase. `python3 textures.py --preview
   faint glow at the edge, and a thin frame shading from one colour to another with small gems
   in the corners. Nine-sliced like the vanilla one, so it fits any length of lore. Drawn by
   `tooltips.py`.
-- **Ability effects** (`items/fx/*.json`, `models/fx`, `textures/item/fx`): 9 glowing effects the
-  abilities show with display entities: the Katana's draw sigil (a crimson brush-stroke circle
-  that follows you while Draw waits), crimson slash and the small cut of Bleed; the Candy Cane's
-  sugar traps (peppermints on the ground) and the candy burst when one is stepped on; Crush's
-  azure ring while it waits and the cracked crater where a slammed player lands (only shown: no
-  block is changed); the Reaper's ring of soul-fire while Reap waits and the spectral scythe
-  sweep of a reap. Each is painted with soft edges at 128 or 256 pixels by `fx.py` (flat ones
-  lie on the ground, upright ones stand facing the viewer), lit at full brightness so they glow
-  at night. Thin lines are thickened and every effect has a soft glow of its own colour round
-  it, so they stand out in daylight and from afar too (`BOLD` in `fx.py`). Without the pack
-  they show as paper.
-- **No sounds:** the abilities play a few vanilla sounds (one per ability), so everyone hears
+- **Ability effects** (`items/fx/*.json`, `models/fx`, `textures/item/fx`): 7 effects the
+  abilities show with display entities, each weapon in its own style and none shared:
+  - Katana: `katana_glint` (a fine white line with a four-pointed flare, fringed crimson: the
+    blade catching the light as Draw is used) and `katana_cut` (a hair-fine white-hot edge
+    along a shallow arc with a streaked crimson smear behind it, shown stretched wide and thin;
+    two cross through the target).
+  - Candy Cane: `candy_goo` (a glossy glob of pink goo with a lump pulling away and drops
+    strung out behind; flung out to make the traps) and `candy_puddle` (the trap: a wet,
+    glossy puddle of pink candy goo lying on the ground, marbled, with bubbles, sprinkles and
+    splashes round its edge). The goo's particles are vanilla item particles of `candy_goo`,
+    and they show its particle texture `candy_goo_bits` (little glossy goo blobs), so the
+    spray is the same goo.
+  - Crush: `crush_crater` (the ground broken into tipped plates round a hollow still glowing
+    azure, cracks splitting out past them, grit and dust thrown out in streaks). It darkens
+    and lightens the real ground under it rather than covering it, and the plugin adds chunks
+    of the real block thrown up (block displays). No block is ever changed.
+  - Reaper: `reap_scythe` (a spectral scythe: a dark shaft and a long ghostly blade, white at
+    its edge and burning soul-green into violet, smoke streaming off its back; it circles the
+    victim) and `reap_slash` (the scythe's sweep as it cuts).
+
+  Each is painted at 128 or 256 pixels by `fx.py` (flat ones lie on the ground, upright ones
+  stand facing the viewer), lit at full brightness. The goo and the broken ground are shaded
+  like real surfaces (a height field lit from high in the north, so a wet highlight and
+  rounded edges); the glowing ones have a soft glow of their own colour round them so they
+  stand out in daylight and from afar too (`BOLD` in `fx.py`). Without the pack they show as
+  paper. `python3 fx.py out.png` draws a sheet of them all.
+- **No sounds:** the abilities play vanilla sounds (each weapon its own), so everyone hears
   them, pack or not, and the pack holds no sound files.
 
 After `build.py`, `python3 check.py` checks the pack against the plugin: every file parses,

@@ -88,6 +88,8 @@ def files():
         out[f'assets/legendary/textures/item/fx/{name}.png'] = textures.png.encode(fx.texture(name))
         out[f'assets/legendary/models/fx/{name}.json'] = as_json(fx.model(name))
         out[f'assets/legendary/items/fx/{name}.json'] = as_json(fx.item(name))
+    for name, rows in fx.particle_textures().items():
+        out[f'assets/legendary/textures/item/fx/{name}.png'] = textures.png.encode(rows)
     return out
 
 

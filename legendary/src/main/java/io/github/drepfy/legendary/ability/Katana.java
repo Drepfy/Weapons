@@ -18,7 +18,9 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * The Katana: precision and bleeding.
+ * The Katana: precision and bleeding. Its look is steel and crimson: a glint of light when the
+ * blade is drawn, blossom petals while the cut waits, thin crossing cuts when it lands, blood
+ * dripping while they bleed.
  * <ul>
  *   <li><b>Bleed</b> (passive): every hit on a player makes them bleed for a few seconds. Hitting
  *   them again starts it over; it never stacks.</li>
@@ -80,24 +82,40 @@ final class Katana implements Kit {
 
     // ---- Draw ------------------------------------------------------------------------------------------------
 
+    /**
+     * The blade is half drawn: a flash of light runs along the steel, a line of glints follows
+     * the edge, and while the cut waits a few blossom petals drift from the holder.
+     */
     @Override
     public Result use(Player player, WeaponItems.Tag weapon) {
-        AbilitySettings settings = plugin.settings().ability(Ability.DRAW);
-        int window = settings.ticks("window");
-        Visuals.Effect ring = plugin.visuals().spawn("draw_sigil", player.getLocation().add(0, 0.06, 0)).size(0.4).send(0)
-                .animate(1, 4, e -> e.size(2.6).turn(90))
-                .follow(player, new Vector(0, 0.06, 0), window);
-        for (int t = 8; t < window; t += 8) {
-            int step = t / 8;
-            ring.animate(t, 8, e -> e.turn(90 + step * 45));
-        }
-        draws.arm(player, plugin.tick() + window, ring);
+        int window = plugin.settings().ability(Ability.DRAW).ticks("window");
+        draws.arm(player, plugin.tick() + window);
         plugin.fx().sound(player.getLocation(), "draw");
-        Location at = player.getLocation().add(0, 1.0, 0);
-        Fx.View view = plugin.fx().view(at);
-        view.dust(at, CRIMSON, 1.4f, 24, 0.6);
-        view.dust(at, STEEL, 1.0f, 10, 0.5);
+        Location hand = Geo.hand(player);
+        plugin.visuals().spawn("katana_glint", hand).billboard().size(0.15).send(0)
+                .animate(1, 2, e -> e.size(1.6))
+                .animate(3, 3, e -> e.size(2.2, 0.35, 2.2))
+                .vanish(6, 3);
+        Vector along = Geo.flat(player.getLocation()).add(new Vector(0, 0.55, 0)).normalize();
+        Fx.View view = plugin.fx().view(hand);
+        for (int k = 1; k <= 6; k++) {
+            Location p = hand.clone().add(along.clone().multiply(0.22 * k));
+            view.dust(p, k % 2 == 0 ? STEEL : CRIMSON, 0.7f, 1, 0.0);
+        }
+        view.particle(Fx.SHINE, hand, 6, 0.15, 0.25, 0.15, 0.05);
         return Result.FIRED;
+    }
+
+    /** While a Draw waits: blossom petals drift down round the holder and the blade glints. */
+    private void waiting(Player player, long now) {
+        Location at = player.getLocation();
+        Fx.View view = plugin.fx().view(at);
+        if (now % 5 == 0) {
+            view.particle(Fx.PETAL, at.clone().add(0, 1.9, 0), 1, 0.45, 0.2, 0.45, 0.0);
+        }
+        if (now % 4 == 0) {
+            view.dust(Geo.hand(player), CRIMSON, 0.6f, 1, 0.04);
+        }
     }
 
     /** Draw's extra damage: a share of the health the target has left, between min and max (hearts). */
@@ -132,22 +150,40 @@ final class Katana implements Kit {
         });
     }
 
-    /** The draw cut: a wide crimson crescent through the target and a flash of steel. */
+    /**
+     * The draw cut, the way an iai cut lands: a razor-thin flash of steel through the target, a
+     * second cut crossing it an instant later, then the crimson.
+     */
     private void drawCut(Player attacker, Player target) {
         Location at = Geo.middle(target);
-        Vector direction = Geo.flat(attacker.getLocation());
-        plugin.visuals().spawn("crimson_slash", at.clone().add(direction.clone().multiply(-0.3))).facing(direction)
-                .tilt(-22).size(0.8).send(0)
-                .animate(1, 3, e -> e.size(4.4))
-                .vanish(8, 6);
-        plugin.visuals().spawn("crimson_cut", at).billboard().tilt(30).size(0.5).send(0)
-                .animate(1, 2, e -> e.size(3.0))
-                .vanish(9, 6);
         plugin.fx().sound(at, "draw-strike");
-        Fx.View view = plugin.fx().view(at);
-        view.dust(at, CRIMSON, 1.6f, 20, 0.45);
-        view.particle(Fx.CRIT, at, 18, 0.35, 0.5, 0.35, 0.35);
-        view.particle(Fx.BLOCK, at, 16, 0.25, 0.4, 0.25, 0.1, Material.REDSTONE_BLOCK.createBlockData());
+        plugin.visuals().spawn("katana_cut", at).billboard().tilt(-26).size(0.5, 0.2, 0.5).send(0)
+                .animate(1, 2, e -> e.size(4.4, 1.3, 4.4))
+                .vanish(5, 4);
+        plugin.visuals().later(2, () -> {
+            if (!target.isValid()) {
+                return;
+            }
+            Location now = Geo.middle(target);
+            plugin.visuals().spawn("katana_cut", now).billboard().tilt(34).size(0.5, 0.2, 0.5).send(0)
+                    .animate(1, 2, e -> e.size(3.8, 1.2, 3.8))
+                    .vanish(4, 4);
+            Fx.View view = plugin.fx().view(now);
+            view.particle(Fx.SWEEP, now, 1, 0, 0, 0, 0);
+            view.dust(now, CRIMSON, 1.5f, 16, 0.4);
+            view.particle(Fx.DRIP, now, 10, 0.3, 0.35, 0.3, 0, blood());
+            view.particle(Fx.CRIT, now, 8, 0.3, 0.4, 0.3, 0.3);
+        });
+    }
+
+    private static org.bukkit.block.data.BlockData blood;
+
+    /** Blood drips: falling dust of red concrete. */
+    static org.bukkit.block.data.BlockData blood() {
+        if (blood == null) {
+            blood = Material.RED_CONCRETE.createBlockData();
+        }
+        return blood;
     }
 
     // ---- Bleed (passive) ---------------------------------------------------------------------------------------
@@ -168,14 +204,15 @@ final class Katana implements Kit {
         bleeds.put(target.getUniqueId(), new Bleed(attacker.getUniqueId(), target, now + duration,
                 now + Math.max(1, settings.ticks("interval"))));
         Location at = Geo.middle(target);
-        plugin.visuals().spawn("crimson_cut", at).billboard().tilt(-35).size(0.3).send(0)
-                .animate(1, 2, e -> e.size(1.8))
-                .vanish(6, 5);
+        plugin.fx().view(at).particle(Fx.DRIP, at, 4, 0.2, 0.3, 0.2, 0, blood());
     }
 
     @Override
     public void tick(long now) {
         draws.expire(now);
+        for (Player player : draws.waiting()) {
+            waiting(player, now);
+        }
         AbilitySettings settings = plugin.settings().ability(Ability.BLEED);
         for (Iterator<Bleed> it = bleeds.values().iterator(); it.hasNext(); ) {
             Bleed bleed = it.next();
@@ -185,8 +222,8 @@ final class Katana implements Kit {
                 continue;
             }
             Fx.View view = plugin.fx().view(target.getLocation());
-            if (now % 4 == 0) {
-                view.dust(Geo.middle(target), CRIMSON, 1.0f, 2, 0.25);
+            if (now % 6 == 0) {
+                view.particle(Fx.DRIP, Geo.middle(target), 1, 0.2, 0.3, 0.2, 0, blood());
             }
             if (now < bleed.next) {
                 continue;
@@ -198,7 +235,9 @@ final class Katana implements Kit {
                 continue;
             }
             if (plugin.hits().hurt(attacker, target, settings.num("damage") * 2.0)) {
-                view.particle(Fx.BLOCK, Geo.middle(target), 8, 0.2, 0.3, 0.2, 0.1, Material.REDSTONE_BLOCK.createBlockData());
+                Location body = Geo.middle(target);
+                view.particle(Fx.DRIP, body, 5, 0.22, 0.35, 0.22, 0, blood());
+                view.dust(body, CRIMSON, 1.0f, 2, 0.25);
             }
         }
     }

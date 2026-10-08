@@ -1,28 +1,25 @@
 package io.github.drepfy.legendary.ability;
 
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 /**
  * An ability that waits for the player's next full-strength hit on a player (Draw, Crush, Reap):
- * who is waiting until when, and the ring round their feet that shows it.
+ * who is waiting, and until when. Each weapon shows the wait its own way.
  */
 final class Armed {
 
-    private record State(long until, Visuals.Effect ring) {
-    }
+    private final Map<UUID, Long> until = new HashMap<>();
 
-    private final Map<UUID, State> states = new HashMap<>();
-
-    void arm(Player player, long until, Visuals.Effect ring) {
-        State old = states.put(player.getUniqueId(), new State(until, ring));
-        if (old != null && old.ring() != null) {
-            old.ring().remove();
-        }
+    void arm(Player player, long until) {
+        this.until.put(player.getUniqueId(), until);
     }
 
     boolean armed(Player player, long now) {
@@ -31,35 +28,33 @@ final class Armed {
 
     /** Ticks left to land the hit, or 0. */
     long left(Player player, long now) {
-        State state = states.get(player.getUniqueId());
-        return state == null ? 0 : Math.max(0, state.until() - now);
+        Long end = until.get(player.getUniqueId());
+        return end == null ? 0 : Math.max(0, end - now);
     }
 
-    /** The hit landed: the ability is used up and its ring flares out. */
+    /** The hit landed: the ability is used up. */
     void spend(Player player) {
-        State state = states.remove(player.getUniqueId());
-        if (state != null && state.ring() != null) {
-            state.ring().animate(1, 3, e -> e.size(4.2)).vanish(4, 4);
-        }
+        until.remove(player.getUniqueId());
     }
 
-    /** Lets go of everyone whose time ran out (their ring fades). */
+    /** Lets go of everyone whose time ran out. */
     void expire(long now) {
-        for (Iterator<State> it = states.values().iterator(); it.hasNext(); ) {
-            State state = it.next();
-            if (now >= state.until()) {
-                if (state.ring() != null) {
-                    state.ring().vanish(0, 5);
-                }
-                it.remove();
+        until.values().removeIf(end -> now >= end);
+    }
+
+    /** The players (online) who are waiting to land their hit. */
+    List<Player> waiting() {
+        List<Player> out = new ArrayList<>();
+        for (Iterator<UUID> it = until.keySet().iterator(); it.hasNext(); ) {
+            Player player = Bukkit.getPlayer(it.next());
+            if (player != null && player.isOnline()) {
+                out.add(player);
             }
         }
+        return out;
     }
 
     void forget(Player player) {
-        State state = states.remove(player.getUniqueId());
-        if (state != null && state.ring() != null) {
-            state.ring().remove();
-        }
+        until.remove(player.getUniqueId());
     }
 }

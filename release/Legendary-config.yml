@@ -4,7 +4,7 @@
 # Shift + F (F is the swap-offhand key) uses the weapon's ability; plain F swaps hands as usual.
 # The passive works on its own on every hit. The weapons only ever affect other players.
 # Times: 8s, 2.5s, 1m, 30d. Damage and health: in hearts (1 = one heart).
-config-version: 7
+config-version: 8
 prefix: "&b&lᴠᴀɴɪʟʟᴀ sᴍᴘ » &r"
 
 # Which key uses the ability:
@@ -271,18 +271,26 @@ weapons:
         damage: 3.5
 
 # Sounds: "<sound> [volume] [pitch]" (vanilla Minecraft sounds, so everyone hears them, pack or
-# not). One sound when an ability is used and one when it lands; hits, bleeding and taking a
-# weapon in hand make no sound. Set one to [] to silence it, or add your own: several play
-# together.
+# not). Each weapon sounds like itself: the Katana rings like steel, the Candy Cane squelches,
+# Crush booms and the Reaper whispers. Ordinary hits and bleeding make no sound of their own. Set
+# one to [] to silence it, or add your own: several play together.
 sounds:
-  draw: ["item.armor.equip_chain 1 0.6"]
-  draw-strike: ["item.trident.hit 1 0.7"]
-  sugar-trap: ["block.honey_block.place 1 1.3"]
-  sugar-trap-trigger: ["block.honey_block.break 1 1.1"]
-  crush: ["item.armor.equip_netherite 1 0.6"]
-  crush-impact: ["item.mace.smash_ground_heavy 1 0.8"]
-  reap: ["particle.soul_escape 1 0.7"]
-  reap-strike: ["entity.player.attack.sweep 1 0.5"]
+  # Katana: drawing the blade, and the cut landing.
+  draw: ["item.armor.equip_chain 1 1.8", "block.note_block.chime 0.25 2.0"]
+  draw-strike: ["entity.player.attack.sweep 1 1.4", "item.trident.hit 1 1.25"]
+  # Candy Cane: flinging the goo, a blob landing, a trap bursting, and Sticky Sweet sticking.
+  sugar-trap: ["entity.slime.squish_small 1 0.8", "block.honey_block.place 0.8 1.3"]
+  sugar-trap-splat: ["entity.slime.jump_small 0.6 1.4"]
+  sugar-trap-trigger: ["entity.slime.squish 1 1.3", "block.honey_block.break 1 1.5"]
+  sticky-sweet: ["entity.slime.squish_small 0.5 1.7"]
+  # Crush: charging the axe, the hit, the slam into the ground, and Heavy knocking a player down.
+  crush: ["block.respawn_anchor.charge 0.8 0.7", "item.armor.equip_netherite 0.8 0.6"]
+  crush-hit: ["block.anvil.land 0.5 1.5", "entity.lightning_bolt.impact 0.35 1.8"]
+  crush-impact: ["item.mace.smash_ground_heavy 1 0.8", "entity.generic.explode 0.45 0.6"]
+  heavy-thud: ["item.mace.smash_ground 0.7 1.0"]
+  # Reaper: calling the souls, and the reap.
+  reap: ["particle.soul_escape 1 0.6", "entity.vex.charge 0.7 0.5"]
+  reap-strike: ["entity.warden.attack_impact 0.8 1.3", "entity.player.attack.sweep 1 0.5"]
   # Getting a legendary.
   received: ["ui.toast.challenge_complete 0.6 1.2"]
 

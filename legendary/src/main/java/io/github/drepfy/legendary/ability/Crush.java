@@ -26,12 +26,14 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Crush, the war axe: timing. It rewards catching players in the air.
+ * Crush, the war axe: timing. It rewards catching players in the air. Its look is weight and
+ * azure power: the charged axe crackles, and a slam ends in a real impact where the player
+ * lands: cracked ground, a column of dust, shards of the ground thrown up.
  * <ul>
  *   <li><b>Heavy</b> (passive): axe hits knock players back a little further, and a full-strength
  *   hit on a player in the air knocks them down and does a little extra damage.</li>
  *   <li><b>Crush</b> (Shift + F): the next full-strength hit on a player is an impact: they are
- *   slammed into the ground, taking more damage the higher up they were, and the ground cracks
+ *   slammed into the ground, taking more damage the higher up they were, and the ground breaks
  *   where they land.</li>
  * </ul>
  */
@@ -90,23 +92,30 @@ final class Crush implements Kit, Listener {
 
     // ---- Crush -------------------------------------------------------------------------------------------------
 
+    /** The axe is charged: azure sparks crackle off its head and a deep hum builds. */
     @Override
     public Result use(Player player, WeaponItems.Tag weapon) {
         int window = plugin.settings().ability(Ability.CRUSH).ticks("window");
-        Visuals.Effect ring = plugin.visuals().spawn("crush_ring", player.getLocation().add(0, 0.06, 0)).size(0.4).send(0)
-                .animate(1, 4, e -> e.size(2.4))
-                .follow(player, new Vector(0, 0.06, 0), window);
-        for (int t = 10; t < window; t += 10) {
-            int step = t / 10;
-            ring.animate(t, 10, e -> e.size(step % 2 == 0 ? 2.4 : 2.7).turn(step * 30));
-        }
-        crushes.arm(player, plugin.tick() + window, ring);
+        crushes.arm(player, plugin.tick() + window);
         plugin.fx().sound(player.getLocation(), "crush");
-        Location at = player.getLocation().add(0, 1.0, 0);
-        Fx.View view = plugin.fx().view(at);
-        view.dust(at, AZURE, 1.4f, 20, 0.6);
-        view.dust(at, STEEL, 1.0f, 10, 0.5);
+        Location hand = Geo.hand(player).add(0, 0.35, 0);
+        Fx.View view = plugin.fx().view(hand);
+        view.particle(Fx.SPARK, hand, 16, 0.25, 0.3, 0.25, 0.15);
+        view.dust(hand, AZURE, 1.2f, 8, 0.25);
+        view.dust(hand, STEEL, 0.9f, 4, 0.2);
         return Result.FIRED;
+    }
+
+    /** While a Crush waits: the axe head keeps crackling. */
+    private void charged(Player player, long now) {
+        Location hand = Geo.hand(player).add(0, 0.35, 0);
+        Fx.View view = plugin.fx().view(hand);
+        if (now % 3 == 0) {
+            view.particle(Fx.SPARK, hand, 2, 0.15, 0.2, 0.15, 0.05);
+        }
+        if (now % 8 == 0) {
+            view.dust(hand, AZURE, 0.8f, 1, 0.1);
+        }
     }
 
     /** Extra damage of a Crush on a player this high above the ground (health points). */
@@ -149,7 +158,7 @@ final class Crush implements Kit, Listener {
             AbilitySettings settings = plugin.settings().ability(Ability.CRUSH);
             damage = crushDamage(impact.height());
             slam = settings.num("slam");
-            plugin.fx().sound(target.getLocation(), "crush-impact");
+            plugin.fx().sound(target.getLocation(), "crush-hit");
         } else {
             AbilitySettings settings = plugin.settings().ability(Ability.HEAVY);
             damage = settings.num("damage") * 2.0;
@@ -183,6 +192,9 @@ final class Crush implements Kit, Listener {
     @Override
     public void tick(long now) {
         crushes.expire(now);
+        for (Player player : crushes.waiting()) {
+            charged(player, now);
+        }
         shoves.values().removeIf(shove -> shove.tick() < now);
         for (Iterator<Landing> it = landings.iterator(); it.hasNext(); ) {
             Landing landing = it.next();
@@ -191,39 +203,70 @@ final class Crush implements Kit, Listener {
                 it.remove();
             } else if (height(target) <= 0.15 || now >= landing.until()) {
                 it.remove();
-                crater(target, landing.big());
+                impact(target, landing.big());
+            } else if (landing.big() && now % 2 == 0) {
+                Location at = Geo.middle(target);              // sparks trail them down
+                plugin.fx().view(at).particle(Fx.SPARK, at, 3, 0.2, 0.3, 0.2, 0.02);
             }
         }
     }
 
     // ---- looks ------------------------------------------------------------------------------------------------
 
-    /** The moment of the hit: a flash of azure and steel. */
+    /** The moment of the hit: azure sparks and a flash of steel. */
     private void hitFx(Player target, boolean big) {
         Location at = Geo.middle(target);
         Fx.View view = plugin.fx().view(at);
-        view.dust(at, AZURE, big ? 1.8f : 1.3f, big ? 22 : 10, 0.4);
-        view.particle(Fx.CRIT, at, big ? 20 : 8, 0.35, 0.5, 0.35, 0.4);
+        view.particle(Fx.SPARK, at, big ? 24 : 8, 0.35, 0.45, 0.35, 0.25);
+        view.particle(Fx.CRIT, at, big ? 14 : 6, 0.35, 0.5, 0.35, 0.4);
         if (big) {
-            view.particle(Fx.EXPLOSION, at, 1, 0, 0, 0, 0);
+            view.dust(at, AZURE, 1.6f, 14, 0.4);
         }
     }
 
-    /** They hit the ground: a cracked crater (only shown: no block is changed). */
-    private void crater(Player target, boolean big) {
+    /**
+     * They hit the ground: the ground cracks open round them, a column of dust and stone bursts
+     * up, and shards of the ground itself are thrown into the air and fall back. Only shown: no
+     * block is changed.
+     */
+    private void impact(Player target, boolean big) {
         Location feet = target.getLocation();
         Location ground = feet.clone();
         ground.setY(Math.floor(feet.getY() - height(target) + 1.0E-3));
-        Location at = ground.clone().add(0, 0.04, 0);
-        double size = big ? 4.2 : 2.4;
-        plugin.visuals().spawn("crush_crater", at).turn(Math.floorMod(target.getEntityId() * 37, 360)).size(0.6).send(0)
-                .animate(1, 3, e -> e.size(size))
-                .vanish(big ? 26 : 16, 8);
-        Fx.View view = plugin.fx().view(at);
+        Location at = ground.clone().add(0, 0.03, 0);
         BlockData block = groundBlock(ground);
-        view.debris(at.clone().add(0, 0.1, 0), block, big ? 50 : 20, size / 4);
-        view.particle(Fx.CLOUD, at.clone().add(0, 0.2, 0), big ? 10 : 4, size / 5, 0.05, size / 5, 0.03);
-        view.dust(at.clone().add(0, 0.3, 0), AZURE, 1.4f, big ? 14 : 6, size / 4);
+        double size = big ? 4.4 : 2.4;
+        plugin.visuals().spawn("crush_crater", at).turn(Math.floorMod(target.getEntityId() * 37, 360)).size(0.5).send(0)
+                .animate(1, 2, e -> e.size(size))
+                .vanish(big ? 36 : 20, 10);
+        Fx.View view = plugin.fx().view(at);
+        view.particle(Fx.PILLAR, at.clone().add(0, 0.1, 0), big ? 40 : 14, size / 5, 0.1, size / 5, 0.0, block);
+        view.debris(at.clone().add(0, 0.1, 0), block, big ? 40 : 16, size / 4);
+        if (big) {
+            plugin.fx().sound(at, "crush-impact");
+            view.particle(Fx.EXPLOSION, at.clone().add(0, 0.3, 0), 1, 0, 0, 0, 0);
+            view.particle(Fx.SPARK, at.clone().add(0, 0.2, 0), 20, size / 4, 0.1, size / 4, 0.1);
+        } else {
+            plugin.fx().sound(at, "heavy-thud");
+        }
+        int shards = big ? 6 : 3;
+        for (int k = 0; k < shards; k++) {
+            double angle = Math.toRadians(360.0 * k / shards + Math.floorMod(target.getEntityId(), 60));
+            double reach = (big ? 1.6 : 1.0) * (0.8 + 0.4 * ((k * 7) % 5) / 4.0);
+            Vector out = new Vector(Math.cos(angle), 0, Math.sin(angle));
+            double piece = (big ? 0.32 : 0.24) * (0.8 + 0.1 * (k % 3));
+            Location start = at.clone().add(out.clone().multiply(0.3));
+            Location top = at.clone().add(out.clone().multiply(reach * 0.55)).add(0, (big ? 1.4 : 0.8) + 0.2 * (k % 2), 0);
+            Location land = at.clone().add(out.clone().multiply(reach)).add(0, 0.05, 0);
+            int spin = 70 + 40 * (k % 3);
+            int yaw = k * 50;
+            plugin.visuals().block(block, start).size(piece).tumble(0, yaw, 0).send(0)
+                    .glide(1, top, 5)
+                    .animate(1, 5, e -> e.tumble(spin, yaw + spin, spin / 2.0))
+                    .glide(6, land, 6)
+                    .animate(6, 6, e -> e.tumble(spin * 2, yaw + spin * 2, spin))
+                    .vanish(16, 6);
+        }
     }
 
     private static BlockData groundBlock(Location ground) {

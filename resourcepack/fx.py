@@ -1,5 +1,5 @@
-"""The abilities' effect textures and models (slashes, sigils, sugar traps, rings, craters...),
-painted in code like the weapons. The plugin shows them with display entities
+"""The abilities' effect textures and models (the Katana's glint and cuts, the Sugar Trap's goo,
+the ground a Crush breaks, the Reaper's spectral scythe), painted in code like the weapons. The plugin shows them with display entities
 (legendary:fx/<name>) and animates them.
 
 Kinds of model:
@@ -14,7 +14,7 @@ import random
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models'))
-from paint import clamp, fbm, hexrgb, mix, noise, smooth  # noqa: E402
+from paint import bezier, clamp, fbm, hexrgb, line_pos, mix, noise, seg_dist, smooth  # noqa: E402
 
 TAU = math.pi * 2
 
@@ -148,185 +148,450 @@ def _polar(u, v):
     return math.hypot(u, v), math.atan2(v, u)
 
 
+# ---- shading -----------------------------------------------------------------------------------------
+
+# Light for the shaded effects lying on the ground (goo, broken ground): from high in the north
+# (the top of the texture); the plugin only turns them a little, so it stays from about there.
+_LIGHT = (0.0, -0.5, 0.866)
+_HALF = (0.0, -0.259, 0.966)
+# ...and for upright ones (seen side on): from above and to the left, in front.
+_LIGHT_UP = (-0.45, -0.6, 0.66)
+_HALF_UP = (-0.25, -0.33, 0.91)
+
+
+def _normal(height, u, v, eps, strength):
+    """The surface normal of a height field at (u, v)."""
+    h = height(u, v)
+    dx = (height(u + eps, v) - h) / eps * strength
+    dy = (height(u, v + eps) - h) / eps * strength
+    n = math.sqrt(dx * dx + dy * dy + 1)
+    return h, (-dx / n, -dy / n, 1 / n)
+
+
+def _dot(a, b):
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+
+def _norm3(x, y, z):
+    n = math.sqrt(x * x + y * y + z * z) or 1.0
+    return x / n, y / n, z / n
+
+
+def _smax(a, b, k):
+    """A smooth maximum: shapes that meet flow into each other like liquid."""
+    h = clamp(0.5 + 0.5 * (a - b) / k)
+    return b + (a - b) * h + k * h * (1 - h)
+
+
 # ---- Katana -------------------------------------------------------------------------------------------
 
 
-def crimson_slash(u, v):
-    """A crescent bulging towards the bottom (the way it faces), white-hot on its leading edge."""
-    co, ro = (0.0, -0.32), 0.98
-    ci, ri = (0.0, -0.72), 1.02
-    do = ro - math.hypot(u - co[0], v - co[1])
-    di = math.hypot(u - ci[0], v - ci[1]) - ri
-    tips = smooth(0.98, 0.55, abs(u))
-    if do >= 0 and di >= 0:
-        w = max(do + di, 1e-6)
-        q = do / w                                       # 0 on the leading edge, 1 inside
-        c = _ramp(q, [(0, '#ffffff'), (0.12, '#ffd2da'), (0.35, '#ff2a4a'), (1, '#5a0010')])
-        return c + ((1 - 0.55 * q) * tips,)
-    halo = _glow(max(-do, 0) + max(-di, 0), 0.05) * tips * 0.6
-    return hexrgb('#ff3355') + (halo,)
+def katana_glint(u, v):
+    """The blade catching the light as it is drawn: a fine bright line with a four-pointed star at
+    its heart, white in the core and fringed crimson."""
+    r = math.hypot(u, v)
+    taper = clamp(1 - (abs(u) / 0.98) ** 1.5)
+    line = _glow(v, 0.004 + 0.02 * taper ** 2) * taper
+    reach = clamp(1 - (abs(v) / 0.62) ** 1.3)
+    spike = _glow(u, 0.004 + 0.016 * reach ** 2) * reach
+    diag = 0.0
+    for s in (1, -1):
+        along = (u + s * v) / math.sqrt(2)
+        across = (u - s * v) / math.sqrt(2)
+        k = clamp(1 - (abs(along) / 0.3) ** 1.2)
+        diag = max(diag, 0.7 * _glow(across, 0.003 + 0.01 * k) * k)
+    core = _glow(r, 0.05)
+    white = clamp(line + spike + diag + core)
+    fringe = 0.55 * _glow(v, 0.03 + 0.07 * taper) * taper + 0.45 * _glow(r, 0.2)
+    c = _ramp(white, [(0, '#b0071f'), (0.3, '#ff2b4e'), (0.65, '#ffc6d0'), (1, '#ffffff')])
+    return c + (clamp(white + fringe),)
 
 
-def crimson_cut(u, v):
-    """An X of two slashes crossing."""
-    best = 0.0
-    for sign in (1, -1):
-        # distance to the diagonal, and how far along it
-        along = (u + sign * v) / math.sqrt(2)
-        across = (u - sign * v) / math.sqrt(2)
-        width = 0.07 * clamp(1 - (along / 0.95) ** 2)
-        if width > 0:
-            best = max(best, _glow(across, width + 1e-3))
-    halo = best ** 0.5 * 0.4
-    c = mix(hexrgb('#d8102e'), hexrgb('#ffffff'), best ** 2)
-    return c + (max(best, halo),)
-
-
-def draw_sigil(u, v):
-    """The half-drawn blade: one sweeping brush stroke round (thick and thin, with the gap where
-    the brush lifted), eight small blades pointing in, and a thin inner ring."""
-    r, a = _polar(u, v)
-    # the brush stroke: it starts thick, thins out, and stops short of where it began
-    turn = ((a + 2.2) % TAU) / TAU                       # 0..1 round the stroke
-    width = 0.028 + 0.05 * (1 - turn) ** 1.4
-    fade = smooth(0.0, 0.03, turn) * smooth(0.97, 0.88, turn)
-    bristles = 0.75 + 0.25 * fbm(turn * 40, r * 30, 11)
-    stroke = smooth(width, width * 0.55, abs(r - 0.84 - 0.02 * math.sin(a * 3))) * fade * bristles
-    inner = 0.75 * _glow(r - 0.6, 0.012)
-    blades = 0.0
-    for k in range(8):
-        ang = k * TAU / 8
-        x = u * math.cos(ang) + v * math.sin(ang)        # along the blade (pointing in)
-        y = -u * math.sin(ang) + v * math.cos(ang)
-        if 0.64 < x < 0.78:
-            half = 0.03 * (x - 0.64) / 0.14
-            blades = max(blades, smooth(half + 0.006, half, abs(y)))
-    core = _glow(r - 0.84, 0.012) * fade
-    c = mix(hexrgb('#b80c26'), hexrgb('#ff8094'), clamp(core + 0.4 * blades))
-    fill = 0.07 * smooth(0.84, 0.2, r)
-    return c + (clamp(stroke + inner + blades + fill),)
+def katana_cut(u, v):
+    """One razor cut: a hair-fine, white-hot edge along a shallow arc, needle-sharp at both ends,
+    and a crimson smear streaking off behind it. It is shown stretched wide and thin."""
+    d = 1.95 - math.hypot(u, v + 1.72)                  # > 0 behind the edge, < 0 in front of it
+    s = (u + 0.97) / 1.94                                # 0..1 along the cut
+    if not 0.0 < s < 1.0:
+        return (0.0, 0.0, 0.0, 0.0)
+    body = math.sin(math.pi * s ** 0.8) ** 1.4           # thickest a little past the middle
+    core = _glow(d, 0.006 + 0.016 * math.sin(math.pi * s) ** 0.7) * smooth(0.0, 0.05, s) * smooth(1.0, 0.95, s)
+    deep = 0.42 * body
+    smear, q = 0.0, 1.0
+    if 0.0 <= d < deep:
+        q = d / deep
+        streaks = 0.45 + 0.55 * fbm(s * 2.2 + 3.0, q * 10.0, 51)
+        fray = smooth(0.0, 0.25, s) * smooth(1.0, 0.7, s)        # the smear breaks up at the ends
+        smear = (1 - q) ** 1.4 * body * streaks * (0.55 + 0.45 * fray)
+    front = 0.6 * _glow(d, 0.03) * body if d < 0 else 0.0
+    c = _ramp(q, [(0, '#ffe8ec'), (0.1, '#ff5a73'), (0.3, '#ff1f45'), (0.65, '#c4062a'), (1, '#7a0018')])
+    if d < 0:
+        c = hexrgb('#ff3a5a')
+    c = mix(c, (1.0, 1.0, 1.0), clamp(core * 1.2))
+    return c + (clamp(max(core, smear, front)),)
 
 
 # ---- Candy Cane ----------------------------------------------------------------------------------------
 
 
-def candy_burst(u, v):
-    r, a = _polar(u, v)
-    rays = 12
-    sector = (a / TAU * rays) % 1.0
-    ray = abs(sector - 0.5) * 2                          # 0 at the middle of a ray
-    width = 0.55 * (1 - r) + 0.08
-    on = smooth(1 - width, 1 - width * 0.4, 1 - ray)
-    stripe = ((r * 9) % 1.0) < 0.5
-    idx = int(math.floor(a / TAU * rays)) % 3
-    col = hexrgb(['#ff2d55', '#ffffff', '#ff7ac3'][idx]) if stripe else hexrgb('#ffffff')
-    fade = smooth(0.98, 0.6, r) * smooth(0.12, 0.25, r)
-    core = _glow(r, 0.16)
-    sparkle = (0.5 + 0.5 * math.cos(a * 4)) ** 12 * _glow(r - 0.3, 0.2)
-    alpha = clamp(on * fade + core + sparkle * 0.6)
-    return mix(col, (1, 1, 1), clamp(core + sparkle)) + (alpha,)
+def _puddle_edge(a):
+    """How far the puddle reaches at an angle: a lumpy, lopsided outline."""
+    return (0.64 + 0.07 * math.sin(2 * a + 0.6) + 0.05 * math.sin(3 * a + 2.1) + 0.03 * math.sin(5 * a + 0.3)
+            + 0.08 * (fbm(math.cos(a) * 1.7 + 3.0, math.sin(a) * 1.7 + 3.0, 41) - 0.5))
 
 
-def sugar_trap(u, v):
-    """A peppermint lying on the ground: red swirls curving round a white candy, a clear glossy
-    rim, a soft pink glow round it and sugar sparkling on top."""
+_EDGE = [_puddle_edge(k / 720 * TAU) for k in range(721)]
+
+
+def _edge_at(a):
+    f = (a % TAU) / TAU * 720
+    k = int(f)
+    return _EDGE[k] + (_EDGE[k + 1] - _EDGE[k]) * (f - k)
+
+
+def _splash():
+    """Where the goo splashed out from the puddle: arms reaching out, each ending in a drop, and a
+    few loose drops beyond."""
+    rnd = random.Random(17)
+    arms = []
+    for k in range(6):
+        a = k / 6 * TAU + rnd.uniform(-0.35, 0.35)
+        e = _edge_at(a)
+        reach = rnd.uniform(0.1, 0.2)
+        bend = rnd.uniform(-0.2, 0.2)
+        p0 = (math.cos(a) * (e - 0.06), math.sin(a) * (e - 0.06))
+        p1 = (math.cos(a + bend) * (e + reach), math.sin(a + bend) * (e + reach))
+        arms.append((p0, p1, rnd.uniform(0.035, 0.05), rnd.uniform(0.04, 0.055)))
+    drops = []
+    for k in range(5):
+        a = rnd.uniform(0, TAU)
+        e = min(0.93, _edge_at(a) + rnd.uniform(0.12, 0.24))
+        drops.append((math.cos(a) * e, math.sin(a) * e, rnd.uniform(0.022, 0.04)))
+    return arms, drops
+
+
+_ARMS, _DROPS = _splash()
+
+
+def _scatter(seed, count, keep, size):
+    """Points spread over the puddle (not too near its edge): (x, y, size, angle, which)."""
+    rnd = random.Random(seed)
+    out = []
+    while len(out) < count:
+        x, y = rnd.uniform(-0.75, 0.75), rnd.uniform(-0.75, 0.75)
+        if math.hypot(x, y) < _edge_at(math.atan2(y, x)) - keep and all(
+                math.hypot(x - p[0], y - p[1]) > 0.12 for p in out):
+            out.append((x, y, rnd.uniform(*size), rnd.uniform(0, TAU), rnd.randrange(3)))
+    return out
+
+
+_BUBBLES = _scatter(23, 8, 0.14, (0.035, 0.07))
+_SPRINKLES = _scatter(29, 13, 0.1, (0.04, 0.055))
+_SPRINKLE_R = 0.021
+_SPRINKLE = ['#fffaf7', '#e3122f', '#ffc2d8']
+
+
+def _goo(u, v):
+    """How deep the goo is at a point (> 0 inside it), and what is on top: ('goo' | 'bubble' |
+    'sprinkle', colour)."""
     r, a = _polar(u, v)
-    if r > 1.0:
+    f = _edge_at(a) - r
+    for p0, p1, w0, w1 in _ARMS:
+        dx, dy = p1[0] - p0[0], p1[1] - p0[1]
+        t = clamp(((u - p0[0]) * dx + (v - p0[1]) * dy) / (dx * dx + dy * dy))
+        w = w0 + (w1 - w0) * t - 0.018 * math.sin(math.pi * t)            # a waist before the drop
+        f = _smax(f, w - math.hypot(u - p0[0] - t * dx, v - p0[1] - t * dy), 0.05)
+    for x, y, rad in _DROPS:
+        f = max(f, rad - math.hypot(u - x, v - y))
+    return f
+
+
+def _goo_height(u, v):
+    f = _goo(u, v)
+    if f <= 0:
+        return f * 0.4
+    h = 0.06 * (1 - math.exp(-f / 0.035)) + 0.012 * fbm(u * 3 + 7, v * 3 + 7, 43) * smooth(0.0, 0.1, f)
+    for x, y, rad, _, _ in _BUBBLES:
+        d = math.hypot(u - x, v - y)
+        if d < rad:
+            h += 0.9 * rad * math.sqrt(1 - (d / rad) ** 2)
+    for x, y, size, ang, _ in _SPRINKLES:
+        along = (u - x) * math.cos(ang) + (v - y) * math.sin(ang)
+        across = -(u - x) * math.sin(ang) + (v - y) * math.cos(ang)
+        d = math.hypot(max(abs(along) - size, 0.0), across)
+        if d < _SPRINKLE_R:
+            h += 0.02 * math.sqrt(1 - (d / _SPRINKLE_R) ** 2)
+    return h
+
+
+def _sprinkle_at(u, v):
+    for x, y, size, ang, which in _SPRINKLES:
+        along = (u - x) * math.cos(ang) + (v - y) * math.sin(ang)
+        across = -(u - x) * math.sin(ang) + (v - y) * math.cos(ang)
+        if math.hypot(max(abs(along) - size, 0.0), across) < _SPRINKLE_R:
+            return _SPRINKLE[which]
+    return None
+
+
+def _bubble_at(u, v):
+    for x, y, rad, _, _ in _BUBBLES:
+        d = math.hypot(u - x, v - y)
+        if d < rad * 1.25:
+            return d / rad
+    return None
+
+
+def _glossy(base, n, gloss=90, sheen=0.9, light=_LIGHT, half=_HALF):
+    """Wet, glossy candy: lit from above, a sharp white highlight and a soft lighter rim."""
+    ndl = max(0.0, _dot(n, light))
+    c = tuple(ch * (0.72 + 0.36 * ndl) for ch in base)
+    rim = (1 - n[2]) ** 1.5
+    c = mix(c, hexrgb('#ffd3e6'), clamp(rim * 0.9))
+    spec = max(0.0, _dot(n, half)) ** gloss * sheen + 0.18 * max(0.0, _dot(n, half)) ** 12
+    return mix(c, (1.0, 1.0, 1.0), clamp(spec))
+
+
+def candy_puddle(u, v):
+    """The Sugar Trap: a puddle of sticky pink candy goo splashed on the ground, glossy and wet,
+    with bubbles in it, splashes reaching out to drops round its edge, and sprinkles on top."""
+    f = _goo(u, v)
+    if f < -0.01:
         return (0.0, 0.0, 0.0, 0.0)
-    rho = r / 0.74
-    swirl = ((a + rho * 1.7) / TAU * 8) % 1.0
-    red = smooth(0.05, 0.0, abs(swirl - 0.5) - 0.2) * smooth(0.12, 0.22, rho) * smooth(0.98, 0.9, rho)
-    c = mix(hexrgb('#fff6f4'), hexrgb('#e0142f'), red)
-    c = mix(c, hexrgb('#ffd8e6'), 0.5 * smooth(0.86, 1.0, rho))
-    c = mix(c, (1.0, 1.0, 1.0), 0.6 * _glow(math.hypot(u + 0.25, v + 0.25), 0.12))     # the shine
-    if noise(u * 40, v * 40, 12) > 0.86 and rho < 0.95:
-        c = mix(c, (1.0, 1.0, 1.0), 0.7)
-    candy = smooth(1.0, 0.97, rho)
-    glow = _glow(r - 0.8, 0.09) * 0.75
-    if candy > 0:
-        return c + (candy,)
-    return hexrgb('#ff5aa5') + (glow,)
+    h, n = _normal(_goo_height, u, v, 0.006, 1.0)
+    depth = 1 - math.exp(-max(f, 0.0) / 0.14)
+    base = mix(hexrgb('#ff8cc3'), hexrgb('#e2307f'), depth)
+    base = mix(base, hexrgb('#b8145c'), 0.45 * _glow(f, 0.014))          # the darker rim of the goo
+    warp = 1.6 * fbm(u * 1.4 + 5, v * 1.4 + 5, 45)
+    swirl = fbm(u * 2.4 + warp, v * 2.4 - warp, 46)                    # paler candy marbled through it
+    base = mix(base, hexrgb('#ffbfdc'), 0.4 * smooth(0.52, 0.66, swirl) * smooth(0.0, 0.08, f))
+    bubble = _bubble_at(u, v)
+    if bubble is not None and bubble < 1.0:
+        base = mix(base, hexrgb('#ffa6d0'), 0.6 * (1 - bubble))
+    sprinkle = _sprinkle_at(u, v)
+    if sprinkle:
+        base = hexrgb(sprinkle)
+    c = _glossy(base, n, 110 if sprinkle else 90)
+    alpha = smooth(-0.01, 0.006, f) * (0.88 + 0.12 * depth)
+    return c + (alpha,)
+
+
+# a fat glob, a smaller lump pulling away from it on a neck of goo, and drops strung out behind
+_GLOB = [((0.08, 0.14), 0.5), ((-0.36, -0.42), 0.2), ((-0.6, -0.7), 0.085), ((-0.78, -0.9), 0.05),
+         ((0.55, -0.45), 0.06), ((0.66, 0.66), 0.045)]
+_NECK = ((0.08, 0.14), (-0.36, -0.42), 0.13)
+
+
+def _dome(d, rad):
+    return math.sqrt(max(rad * rad - d * d, 0.0))
+
+
+def _glob_shape(u, v):
+    """How far inside the glob's outline a point is (> 0 inside)."""
+    u, v = u + 0.035 * math.sin(3.1 * v + 1), v + 0.035 * math.sin(2.7 * u + 2)      # a little wobble
+    f = max(rad - math.hypot(u - x, v - y) for (x, y), rad in _GLOB)
+    (x0, y0), (x1, y1), w = _NECK
+    return max(f, w - seg_dist(u, v, (x0, y0), (x1, y1)))
+
+
+def _glob_normal(u, v):
+    """The glob's surface: each part is a rounded drop (the neck a rounded tube), and their normals
+    blend by how high each stands, so the parts flow into each other without a crease."""
+    u, v = u + 0.035 * math.sin(3.1 * v + 1), v + 0.035 * math.sin(2.7 * u + 2)
+    parts = [(x, y, rad) for (x, y), rad in _GLOB]
+    (x0, y0), (x1, y1), w = _NECK
+    dx, dy = x1 - x0, y1 - y0
+    t = clamp(((u - x0) * dx + (v - y0) * dy) / (dx * dx + dy * dy))
+    parts.append((x0 + t * dx, y0 + t * dy, w))
+    nx = ny = nz = 0.0
+    for x, y, rad in parts:
+        h = _dome(math.hypot(u - x, v - y), rad * 1.04)
+        if h <= 0:
+            continue
+        k = h ** 6
+        nx, ny, nz = nx + k * (u - x) / rad, ny + k * (v - y) / rad, nz + k * h / rad
+    return _norm3(nx, ny, nz) if nz > 0 else (0.0, 0.0, 1.0)
+
+
+def candy_goo(u, v):
+    """A glob of the goo, flung: a fat wobbling blob with a lump pulling away from it and drops
+    strung out behind, glossy like the puddle it splats into."""
+    f = _glob_shape(u, v)
+    if f < -0.01:
+        return (0.0, 0.0, 0.0, 0.0)
+    n = _glob_normal(u, v)
+    depth = smooth(0.0, 0.35, f)
+    base = mix(hexrgb('#ff8cc3'), hexrgb('#e2307f'), depth)
+    base = mix(base, hexrgb('#b8145c'), 0.4 * _glow(f, 0.02))
+    c = _glossy(base, n, 40, 1.0, _LIGHT_UP, _HALF_UP)
+    return c + (smooth(-0.01, 0.008, f),)
+
+
+_BITS = [((-0.75 + 0.5 * (k % 4) + random.Random(k).uniform(-0.08, 0.08),
+           -0.75 + 0.5 * (k // 4) + random.Random(k + 50).uniform(-0.08, 0.08)),
+          random.Random(k + 90).uniform(0.15, 0.23)) for k in range(16)]
+
+
+def _bits(u, v):
+    h = 0.0
+    for (x, y), rad in _BITS:
+        h = max(h, _dome(math.hypot(u - x, v - y), rad))
+    return h
+
+
+def candy_goo_bits(u, v):
+    """What the goo's particles show (each one a random quarter of this): little glossy blobs of
+    pink goo."""
+    f = _bits(u, v)
+    if f <= 0.0:
+        return (0.0, 0.0, 0.0, 0.0)
+    h, n = _normal(_bits, u, v, 0.01, 1.0)
+    base = mix(hexrgb('#ff8cc3'), hexrgb('#e2307f'), smooth(0.0, 0.18, f))
+    return _glossy(base, n, 30, 1.0, _LIGHT_UP, _HALF_UP) + (smooth(0.0, 0.04, f),)
 
 
 # ---- Crush ---------------------------------------------------------------------------------------------
 
 
-def crush_ring(u, v):
-    """Charged up: a heavy azure ring split into eight plates, bronze studs between them, and a
-    faint ring of light inside."""
-    r, a = _polar(u, v)
-    plate = ((a / TAU) * 8) % 1.0
-    gap = smooth(0.03, 0.06, min(plate, 1 - plate))
-    ring = smooth(0.06, 0.035, abs(r - 0.82)) * gap
-    core = _glow(r - 0.82, 0.012) * gap
-    studs = 0.0
-    for k in range(8):
-        ang = k * TAU / 8
-        studs = max(studs, _glow(math.hypot(u - 0.82 * math.cos(ang), v - 0.82 * math.sin(ang)), 0.035))
-    inner = 0.6 * _glow(r - 0.62, 0.014)
-    ticks = 0.0
-    if 0.66 < r < 0.74:
-        ticks = smooth(0.1, 0.0, abs(((a / TAU) * 32) % 1.0 - 0.5) * 2 - 0.85)
-    c = mix(hexrgb('#1a6fd0'), hexrgb('#bfeaff'), clamp(core + 0.5 * inner))
-    c = mix(c, hexrgb('#e8b878'), studs)
-    glow = 0.25 * _glow(r - 0.82, 0.1)
-    return c + (clamp(ring * 0.85 + core + studs + inner + 0.8 * ticks + glow),)
+def _plates():
+    """Where the broken ground's plates are: rings of them round the hollow, bigger further out."""
+    rnd = random.Random(31)
+    out = []
+    for ring, count, radius in ((0, 6, 0.27), (1, 10, 0.5), (2, 14, 0.74), (3, 18, 0.98)):
+        for k in range(count):
+            a = (k + rnd.uniform(-0.3, 0.3)) / count * TAU + ring * 0.4
+            rr = radius + rnd.uniform(-0.05, 0.05)
+            # each plate is tipped: down towards the hollow, and a little either way
+            tilt = (0.75 - min(rr, 0.75)) * 0.9
+            out.append((math.cos(a) * rr, math.sin(a) * rr, -math.cos(a) * tilt + rnd.uniform(-0.25, 0.25),
+                        -math.sin(a) * tilt + rnd.uniform(-0.25, 0.25)))
+    return out
+
+
+_PLATES = _plates()
+
+
+def _crater_edge(a):
+    return 0.8 + 0.07 * math.sin(3 * a + 1.3) + 0.1 * (fbm(math.cos(a) * 2 + 9, math.sin(a) * 2 + 9, 61) - 0.5)
+
+
+_RIM = [_crater_edge(k / 720 * TAU) for k in range(721)]
 
 
 def crush_crater(u, v):
-    """The ground where they landed: broken into a ring of plates round a dark hollow, cracks
-    branching out from it glowing azure near the middle, and a ring of dust."""
+    """Where a Crush lands: the ground itself broken into tipped plates, sunk round a dark hollow
+    where azure light still burns, cracks splitting out between the plates and on past them, and
+    grit and dust thrown out in streaks. It darkens and lightens the real ground under it rather
+    than covering it."""
     r, a = _polar(u, v)
-    cracks = 0.0
+    edge = _RIM[int((a % TAU) / TAU * 720)]
+    # the two nearest plate centres: their bisector is the crack between them
+    best = second = 9.0
+    plate = None
+    for p in _PLATES:
+        d = (u - p[0]) ** 2 + (v - p[1]) ** 2
+        if d < best:
+            best, second, plate = d, best, p
+        elif d < second:
+            second = d
+    best, second = math.sqrt(best), math.sqrt(second)
+    gap = (second - best) / 2
+    inner = smooth(edge, edge * 0.8, r)                       # 1 in the broken ground, 0 beyond it
+    width = (0.006 + 0.022 * max(0.0, 1 - r) ** 1.5) * inner
+    crack = smooth(width + 0.004, width * 0.4, gap) * inner
+    # cracks running on out past the plates
     rnd = random.Random(21)
-    for k in range(11):
-        base = k / 11 * TAU + rnd.uniform(-0.25, 0.25)
-        bend = rnd.uniform(-0.5, 0.5)
-        reach = rnd.uniform(0.72, 0.95)
-        wob = 0.035 * math.sin(r * 8 + k) + 0.02 * math.sin(r * 21 + k * 2) + bend * r * 0.25
+    for k in range(9):
+        base = k / 9 * TAU + rnd.uniform(-0.3, 0.3)
+        reach = edge + rnd.uniform(0.08, 0.2)
+        wob = 0.04 * math.sin(r * 9 + k) + 0.025 * math.sin(r * 23 + k * 2)
         da = math.atan2(math.sin(a - base - wob), math.cos(a - base - wob))
-        dist = abs(da) * r
-        width = 0.02 * (1 - r / reach) + 0.004
-        if r < reach:
-            cracks = max(cracks, smooth(width, width * 0.3, dist))
-        # a branch half way out
-        if 0.4 < r < reach * 0.9:
-            db = math.atan2(math.sin(a - base - wob - 0.7 * (r - 0.4)), math.cos(a - base - wob - 0.7 * (r - 0.4)))
-            cracks = max(cracks, smooth(width * 0.8, width * 0.25, abs(db) * r) * smooth(0.4, 0.5, r))
-    rim = smooth(0.016, 0.004, abs(r - 0.3 - 0.025 * math.sin(a * 9))) * (math.sin(a * 6 + 1) > -0.4)
-    cracks = max(cracks, rim)
-    hollow = 0.55 * smooth(0.3, 0.15, r)
-    energy = smooth(0.7, 0.0, r)
-    c = mix(hexrgb('#141a24'), hexrgb('#2f9bff'), energy * 0.95)
-    c = mix(c, hexrgb('#d6f4ff'), energy ** 3)
-    dust = _glow(r - 0.88, 0.07) * 0.4 * (0.6 + 0.4 * fbm(u * 6, v * 6, 22))
-    if cracks > max(dust, hollow):
-        return c + (clamp(cracks * (0.75 + 0.25 * energy)),)
-    if hollow > dust:
-        return hexrgb('#06080c') + (hollow,)
-    return hexrgb('#8a8a96') + (dust,)
+        if edge * 0.7 < r < reach:
+            w = 0.006 * (1 - (r - edge * 0.7) / (reach - edge * 0.7)) + 0.002
+            crack = max(crack, smooth(w + 0.003, w * 0.3, abs(da) * r))
+    # the plate's light: tipped plates are darker or lighter, and the side of a plate that is
+    # lifted catches a bright edge
+    n = _norm3(plate[2], plate[3], 1.0)
+    light = (_dot(n, _LIGHT) - 0.93) * 3.0 * inner
+    lip = 0.0
+    if crack < 0.5 and gap < 0.03 and inner > 0:
+        to = _norm3(u - plate[0], v - plate[1], 0.0)
+        lip = smooth(0.03, 0.008, gap) * max(0.0, -(to[0] * _LIGHT[0] + to[1] * _LIGHT[1])) * 1.6 * inner
+    sink = 0.5 * smooth(0.6, 0.12, r)                          # the crater's bowl, deeper inwards
+    hollow = smooth(0.17, 0.12, r + 0.06 * (fbm(math.cos(a) * 2 + 3, math.sin(a) * 2 + 3, 65) - 0.5))
+    energy = smooth(0.62, 0.05, r)
+    if hollow > 0.01:
+        c = mix(hexrgb('#05070c'), hexrgb('#46b8ff'), _glow(r, 0.07) * 0.9)
+        c = mix(c, hexrgb('#e4f7ff'), _glow(r, 0.03))
+        return c + (clamp(0.8 * hollow + 0.2 + _glow(r, 0.08)),)
+    if crack > 0.05:
+        c = mix(hexrgb('#06080d'), hexrgb('#2f9bff'), clamp(energy * 1.3))
+        c = mix(c, hexrgb('#d6f4ff'), energy ** 2 * crack)
+        return c + (clamp(crack * (0.8 + 0.2 * energy)),)
+    # dust and grit thrown out in streaks past the edge
+    streak = fbm(a * 7.0, r * 1.2, 63) * smooth(edge * 0.75, edge, r) * smooth(1.0, edge, r)
+    grit = (noise(u * 46, v * 46, 64) > 0.8) * smooth(1.0, 0.7, r) * smooth(0.45, 0.6, r) * 0.6
+    if lip > 0.05:
+        return hexrgb('#e8ecf2') + (clamp(lip * 0.55),)
+    shade = clamp(-light) * 0.5 + sink * inner
+    if light > 0.03 and inner > 0.5:
+        return hexrgb('#f0f2f6') + (clamp(light * 0.12),)
+    dust = clamp(streak - 0.42) * 1.2
+    if grit > 0 and grit > shade:
+        return hexrgb('#2a2d33') + (grit,)
+    if dust > shade:
+        return hexrgb('#9a9aa2') + (dust * 0.6,)
+    return hexrgb('#0a0b0f') + (shade,)
 
 
 # ---- Reaper --------------------------------------------------------------------------------------------
 
+_SNATH = bezier((0.22, 0.95), (0.12, 0.42), (0.13, -0.18), (0.18, -0.66), 40)
+_SCYTHE = bezier((0.2, -0.68), (-0.2, -0.98), (-0.74, -0.88), (-0.96, -0.22), 48)
 
-def soul_ring(u, v):
-    """Souls gather: a ring of spectral green fire with wisps rising off it, a thin ring inside,
-    and small soul lights circling."""
-    r, a = _polar(u, v)
-    lick = 0.06 * fbm(a * 3.2 + 5, 2.0, 13) + 0.03 * math.sin(a * 11)
-    flame = smooth(0.07, 0.02, abs(r - 0.8 - lick * 0.5)) + 0.6 * smooth(0.12, 0.0, r - 0.8 - lick) * (r > 0.8)
-    flame *= 0.7 + 0.3 * fbm(a * 6, r * 8, 14)
-    core = _glow(r - 0.8, 0.014)
-    inner = 0.65 * _glow(r - 0.58, 0.012)
-    lights = 0.0
-    for k in range(6):
-        ang = k * TAU / 6 + 0.3
-        lights = max(lights, _glow(math.hypot(u - 0.68 * math.cos(ang), v - 0.68 * math.sin(ang)), 0.03))
-    c = _ramp(clamp(core + lights + 0.3 * inner), [(0, '#0a7a58'), (0.5, '#3dffc0'), (1, '#f0fff9')])
-    c = mix(c, hexrgb('#6d3fb0'), 0.35 * smooth(0.85, 1.0, r))
-    fill = 0.06 * smooth(0.8, 0.1, r)
-    return c + (clamp(flame + core + inner + lights + fill),)
+
+def reap_scythe(u, v):
+    """A spectral scythe: a long ghostly blade sweeping from a dark shaft, its cutting edge white,
+    the rest burning soul-green into violet, and ghost-smoke streaming off its back."""
+    # the blade: wide at its heel by the shaft, curving down to a fine point; the cutting edge is
+    # on the inside of its curve, the back flickers like spectral flame
+    d, t = line_pos(_SCYTHE, u, v)
+    k = min(len(_SCYTHE) - 2, int(t * (len(_SCYTHE) - 1)))
+    (x1, y1), (x2, y2) = _SCYTHE[k], _SCYTHE[k + 1]
+    side = (x2 - x1) * (v - y1) - (y2 - y1) * (u - x1)          # > 0 on the inside (the edge)
+    width = 0.28 * (1 - t) ** 0.8 + 0.01
+    edge_w = width * 0.42
+    back_w = width * 0.58 * (0.82 + 0.36 * fbm(t * 9 + 4, 1.5, 71))
+    q = None                                                   # 0 at the edge .. 1 at the back
+    if t < 0.999:
+        if side > 0 and d < edge_w:
+            q = 0.4 - 0.4 * d / edge_w
+        elif side <= 0 and d < back_w:
+            q = 0.4 + 0.6 * d / back_w
+    if q is not None:
+        c = _ramp(q, [(0, '#ffffff'), (0.07, '#d8fff2'), (0.25, '#3dffc0'), (0.5, '#13a184'), (0.75, '#4a2488'),
+                      (1, '#2a0f4a')])
+        c = mix(c, hexrgb('#b9ffe9'), 0.35 * _glow(q - 0.42, 0.03) * (1 - t))     # a bright line on the flat
+        return c + (clamp(1.0 - 0.35 * q ** 2),)
+    # the shaft: dark, with soul-light on its edges and two bindings near the top
+    ds, ts = line_pos(_SNATH, u, v)
+    if ds < 0.045:
+        c = mix(hexrgb('#1b0f2c'), hexrgb('#5dffcf'), smooth(0.02, 0.044, ds))
+        if 0.66 < ts < 0.7 or 0.84 < ts < 0.88:
+            c = hexrgb('#8a6ad0')
+        return c + (smooth(0.05, 0.036, ds),)
+    # the nib: a short grip sticking out of the shaft
+    nib = seg_dist(u, v, (0.14, 0.24), (0.36, 0.17))
+    if nib < 0.03:
+        return mix(hexrgb('#1b0f2c'), hexrgb('#5dffcf'), smooth(0.014, 0.03, nib)) + (smooth(0.034, 0.024, nib),)
+    # ghost-smoke streaming off the back of the blade, and a soul glow round it all
+    trail = 0.0
+    if side < 0 and t < 0.95:
+        out = d - back_w
+        wisp = fbm(t * 6 + 1, out * 6 - t * 3, 73)
+        trail = smooth(0.4, 0.0, out) * clamp(wisp * 1.8 - 0.55) * (1 - t) ** 0.5 * 0.85
+    halo = 0.55 * _glow(d - width * 0.45, 0.06) * (1 - 0.5 * t) + 0.3 * _glow(ds, 0.06)
+    c = mix(hexrgb('#3dffc0'), hexrgb('#6a32b4'), clamp(trail * 2.0))
+    return c + (clamp(max(halo, trail)),)
 
 
 def reap_slash(u, v):
@@ -355,29 +620,28 @@ def reap_slash(u, v):
 
 EFFECTS = {
     # name: (painter, size, kind)
-    'crimson_slash': (crimson_slash, 128, 'flat'),
-    'crimson_cut': (crimson_cut, 128, 'upright'),
-    'draw_sigil': (draw_sigil, 256, 'flat'),
-    'candy_burst': (candy_burst, 128, 'flat'),
-    'sugar_trap': (sugar_trap, 128, 'flat'),
-    'crush_ring': (crush_ring, 256, 'flat'),
+    'katana_glint': (katana_glint, 128, 'upright'),
+    'katana_cut': (katana_cut, 256, 'upright'),
+    'candy_goo': (candy_goo, 128, 'upright'),
+    'candy_puddle': (candy_puddle, 128, 'flat'),
     'crush_crater': (crush_crater, 256, 'flat'),
-    'soul_ring': (soul_ring, 256, 'flat'),
+    'reap_scythe': (reap_scythe, 128, 'upright'),
     'reap_slash': (reap_slash, 128, 'upright'),
 }
 
+# Textures only particles use: an effect's particles (the goo flying off the Sugar Trap is the
+# vanilla item particle of candy_goo) show a random quarter of its model's particle texture.
+PARTICLES = {
+    'candy_goo': ('candy_goo_bits', candy_goo_bits, 64),
+}
 
-# How each effect is made easier to see (Legendary 1.4.1): (thicker by, glow strength, glow width
-# in texels, solidness). Thin lines get thicker; everything gets a glow of its own colour.
+
+# How each effect is made easier to see in daylight and from afar: (thicker by, glow strength,
+# glow width in texels, solidness). Shaded ones (the goo, the broken ground) are left as painted.
 BOLD = {
-    'crimson_slash': (0, 0.55, 4, 1.5),
-    'crimson_cut': (2, 0.7, 4, 1.7),
-    'draw_sigil': (1, 0.6, 5, 1.6),
-    'candy_burst': (2, 0.6, 4, 1.6),
-    'sugar_trap': (0, 0.4, 3, 1.3),
-    'crush_ring': (1, 0.55, 5, 1.6),
-    'crush_crater': (1, 0.5, 5, 1.6),
-    'soul_ring': (1, 0.6, 5, 1.6),
+    'katana_glint': (0, 0.6, 4, 1.4),
+    'katana_cut': (1, 0.5, 5, 1.4),
+    'reap_scythe': (0, 0.45, 3, 1.3),
     'reap_slash': (0, 0.6, 4, 1.5),
 }
 
@@ -401,6 +665,7 @@ def model(name):
     # Item models only find textures in the item (or block) folders: they are stitched into the
     # block atlas, and a texture anywhere else shows as the purple and black missing texture.
     texture_id = f'legendary:item/fx/{name}'
+    particle = f'legendary:item/fx/{PARTICLES[name][0]}' if name in PARTICLES else texture_id
     full = [0, 0, 16, 16]
     if kind == 'flat':
         elements = [{'from': [0, 8, 0], 'to': [16, 8, 16], 'shade': False, 'light_emission': 15,
@@ -408,7 +673,12 @@ def model(name):
     else:
         elements = [{'from': [0, 0, 8], 'to': [16, 16, 8], 'shade': False, 'light_emission': 15,
                      'faces': {'south': _face(full), 'north': _face(full, flip=True)}}]
-    return {'textures': {'0': texture_id, 'particle': texture_id}, 'elements': elements}
+    return {'textures': {'0': texture_id, 'particle': particle}, 'elements': elements}
+
+
+def particle_textures():
+    """{texture name: RGBA rows} of the particle-only textures."""
+    return {tex: _paint(size, painter) for tex, painter, size in PARTICLES.values()}
 
 
 def item(name):

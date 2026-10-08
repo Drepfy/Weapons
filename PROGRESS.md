@@ -343,6 +343,37 @@ and Flight never flagged. Cause, found by making the tests behave like Paper:
 - Tests: Legendary 52 (every ability and passive, conversions, the retired Starforged, the 2.0
   config upgrade). Compiled against Paper 1.21.11.
 
+## Legendary 3.1.0: every weapon looks and sounds like itself
+
+- No more rings or circles: each weapon has its own visual language, its own particles,
+  movement and sounds, recognisable from the effect alone.
+  - Katana: a glint with a four-pointed flare along the blade on Shift + F, petals and a
+    crimson light while Draw waits, two razor cuts crossing through the target a moment apart
+    (sweep, crimson sparks, blood), blood dripping while they bleed.
+  - Candy Cane: globs of glossy pink goo flung out in arcs that splat into sticky goo puddles
+    on the ground (they wobble and bubble, dry up when the trap runs out); stepping in one
+    bursts it in pink goo that clings to their feet. The goo particles are item particles of
+    an item with the goo's own model, so they show the goo texture.
+  - Crush: azure sparks at the hand while it waits; the slam breaks the ground where they land
+    (a broken-ground decal, chunks of the real block thrown up as tumbling block displays,
+    dust pillar, the mace's heavy smash). Visuals gained `block()` (block displays) and
+    `tumble()`.
+  - Reaper: souls streaming into the blade, a soul flame over every player low enough to reap
+    that only the reaper sees (`Fx.to(player)`), and a spectral scythe that circles the victim,
+    follows them as they move, and cuts, their soul spiralling up.
+- Glint: the real vanilla enchantment glint (`enchantment_glint_override`), on by default for
+  every weapon even when the setting is missing.
+- Sounds: each weapon has its own vanilla sounds (`sugar-trap-splat`, `sticky-sweet`,
+  `crush-hit` and `heavy-thud` are new). Config version 8 swaps sounds still at their 3.0
+  defaults for the new ones and keeps any you changed.
+- Pack: new effects `katana_glint`, `katana_cut`, `candy_goo` (with the particle-only texture
+  `candy_goo_bits`), `candy_puddle`, `crush_crater` (redone as broken ground) and
+  `reap_scythe`; the draw sigil, crimson slash and cut, candy burst, sugar trap, crush ring
+  and soul ring are gone. The goo and the broken ground are shaded from height fields.
+- Tests: Legendary 54 (goo splatting into puddles, each weapon's own effects and their
+  clean-up, the scythe following its victim, the 3.0 config upgrade). Compiled against Paper
+  1.21.11.
+
 ## Remaining / next steps
 
 - Validate on a live server with a hacked client on an alt (see the README

@@ -982,7 +982,29 @@ class LegendaryTest {
         alex.teleport(trapSpot(3));
         tick(2);
         assertFalse(alex.hasPotionEffect(PotionEffectType.POISON), "gone after 8 seconds");
-        assertEquals(0, plugin.visuals().count());
+        tick(20);
+        assertEquals(0, plugin.visuals().count(), "the puddles have dried up");
+    }
+
+    @Test
+    void sugarTrapsAreGooFlungOutThatSplatsIntoPuddles() {
+        PlayerMock steve = player("Steve", 0, 0);
+        give(steve, WeaponType.CANDY_CANE);
+        sneakUseKey(steve);
+        List<String> flying = models();
+        assertEquals(5, flying.size(), "five blobs of goo in the air");
+        if (!flying.contains("null")) {
+            assertTrue(flying.stream().allMatch("legendary:fx/candy_goo"::equals), String.valueOf(flying));
+        }
+        tick(20);
+        List<String> landed = models();
+        assertEquals(5, landed.size(), "five puddles on the ground");
+        if (!landed.contains("null")) {
+            assertTrue(landed.stream().allMatch("legendary:fx/candy_puddle"::equals), String.valueOf(landed));
+        }
+        for (ItemDisplay puddle : world.getEntitiesByClass(ItemDisplay.class)) {
+            assertEquals(64.0, puddle.getLocation().getY(), 0.05, "lying on the ground");
+        }
     }
 
     @Test
@@ -1369,22 +1391,50 @@ class LegendaryTest {
         assertEquals(1.0, bars.get(Ability.CRUSH).getProgress(), 1.0E-9);
     }
 
-    @Test
-    void abilitiesShowTheirEffectsAndCleanThemUp() {
-        PlayerMock steve = player("Steve", 0, 0);
-        give(steve, WeaponType.REAPER);
-        sneakUseKey(steve);
+    /** The item models of the effects on show. */
+    private List<String> models() {
         List<String> models = new ArrayList<>();
         for (ItemDisplay display : world.getEntitiesByClass(ItemDisplay.class)) {
             assertFalse(display.isPersistent(), "never saved with the world");
             ItemMeta meta = display.getItemStack().getItemMeta();
             models.add(String.valueOf(modern(meta::getItemModel)));
         }
-        assertEquals(1, models.size(), "the ring of souls: " + models);
-        if (!models.contains("null")) {
-            assertEquals(List.of("legendary:fx/soul_ring"), models);
+        return models;
+    }
+
+    @Test
+    void everyWeaponShowsItsOwnEffectsAndCleansThemUp() {
+        PlayerMock steve = player("Steve", 0, 0);
+        give(steve, WeaponType.KATANA);
+        sneakUseKey(steve);
+        List<String> drawing = models();
+        assertEquals(1, drawing.size(), "drawing the Katana: a glint of steel, no ring: " + drawing);
+        if (!drawing.contains("null")) {
+            assertEquals(List.of("legendary:fx/katana_glint"), drawing);
         }
-        tick(8 * 20 + 20);
+        tick(20);
+        assertEquals(0, plugin.visuals().count(), "the glint is gone in a moment");
+
+        PlayerMock bob = player("Bob", 0, 0);
+        PlayerMock alex = player("Alex", 0, 2);
+        alex.setHealth(10.0);
+        give(bob, WeaponType.REAPER);
+        sneakUseKey(bob);
+        assertEquals(List.of(), models(), "calling the souls: no ring round the reaper");
+        melee(bob, alex, SWORD);
+        tick(3);
+        List<ItemDisplay> scythe = world.getEntitiesByClass(ItemDisplay.class).stream().toList();
+        assertEquals(1, scythe.size(), "the reap: a scythe round the victim");
+        if (!models().contains("null")) {
+            assertEquals(List.of("legendary:fx/reap_scythe"), models());
+        }
+        Location near = alex.getLocation().add(0, alex.getHeight() / 2, 0);
+        assertTrue(scythe.get(0).getLocation().distance(near) < 1.6, "circling the victim, not the reaper");
+        alex.teleport(new Location(world, 4.5, 64, 6.5));
+        tick(2);
+        Location moved = alex.getLocation().add(0, alex.getHeight() / 2, 0);
+        assertTrue(scythe.get(0).getLocation().distance(moved) < 1.6, "it follows the victim");
+        tick(60);
         assertEquals(0, plugin.visuals().count(), "all gone again");
         assertTrue(world.getEntitiesByClass(ItemDisplay.class).isEmpty());
     }
@@ -1450,6 +1500,26 @@ class LegendaryTest {
     }
 
     @Test
+    void aConfigFrom30GetsEachWeaponsOwnSoundsButKeepsItsOwn() {
+        org.bukkit.configuration.file.FileConfiguration config = plugin.getConfig();
+        config.set("config-version", 7);
+        config.set("sounds.draw", List.of("item.armor.equip_chain 1 0.6"));          // the 3.0 default
+        config.set("sounds.reap", List.of("block.bell.use 1 1"));                    // their own
+        config.set("sounds.crush-hit", null);
+        config.set("weapons.katana.name", "&cMy Katana");
+        plugin.saveConfig();
+
+        assertEquals(List.of(), plugin.reload(), "nothing left to warn about");
+        org.bukkit.configuration.file.YamlConfiguration saved = savedConfig();
+        org.bukkit.configuration.file.YamlConfiguration fresh = bundledConfig();
+        assertEquals(io.github.drepfy.legendary.config.ConfigUpgrade.VERSION, saved.getInt("config-version"));
+        assertEquals(fresh.getStringList("sounds.draw"), saved.getStringList("sounds.draw"), "the old default is updated");
+        assertEquals(List.of("block.bell.use 1 1"), saved.getStringList("sounds.reap"), "their own sound is kept");
+        assertEquals(fresh.getStringList("sounds.crush-hit"), saved.getStringList("sounds.crush-hit"), "new sounds added");
+        assertEquals("&cMy Katana", saved.getString("weapons.katana.name"), "the weapons are left alone");
+    }
+
+    @Test
     void aConfigFrom20GetsTheFourNewWeapons() {
         org.bukkit.configuration.file.FileConfiguration config = plugin.getConfig();
         config.set("config-version", 6);
@@ -1471,7 +1541,7 @@ class LegendaryTest {
         assertEquals(List.of(), plugin.reload(), "nothing left to warn about");
         org.bukkit.configuration.file.YamlConfiguration saved = savedConfig();
         org.bukkit.configuration.file.YamlConfiguration fresh = bundledConfig();
-        assertEquals(7, saved.getInt("config-version"));
+        assertEquals(io.github.drepfy.legendary.config.ConfigUpgrade.VERSION, saved.getInt("config-version"));
         assertFalse(saved.isSet("display.action-bar"));
         assertFalse(saved.isSet("hit-mobs"), "the weapons only affect players now");
         assertTrue(saved.getBoolean("full-strength-hits"), "the new setting is written in");

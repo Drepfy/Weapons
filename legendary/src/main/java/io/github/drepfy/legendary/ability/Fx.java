@@ -9,6 +9,7 @@ import org.bukkit.SoundCategory;
 import org.bukkit.World;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Player;
+import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +28,16 @@ public final class Fx {
     public static final Particle EXPLOSION = Compat.particle("EXPLOSION", "EXPLOSION_LARGE");
     public static final Particle BLOCK = Compat.particle("BLOCK", "BLOCK_CRACK");
     public static final Particle SOUL = Compat.particle("SOUL");
-    public static final Particle CLOUD = Compat.particle("CLOUD");
+    public static final Particle SCULK_SOUL = Compat.particle("SCULK_SOUL");
+    public static final Particle SOUL_FLAME = Compat.particle("SOUL_FIRE_FLAME");
+    public static final Particle SMOKE = Compat.particle("SMOKE", "SMOKE_NORMAL");
+    public static final Particle PETAL = Compat.particle("CHERRY_LEAVES");
+    public static final Particle DRIP = Compat.particle("FALLING_DUST");
+    public static final Particle ITEM = Compat.particle("ITEM", "ITEM_CRACK");
+    public static final Particle SPARK = Compat.particle("ELECTRIC_SPARK");
+    public static final Particle PILLAR = Compat.particle("DUST_PILLAR");
+    public static final Particle SWEEP = Compat.particle("SWEEP_ATTACK");
+    public static final Particle SHINE = Compat.particle("ENCHANTED_HIT", "CRIT_MAGIC");
 
     private final Supplier<Settings> settings;
 
@@ -68,6 +78,11 @@ public final class Fx {
                 // Sounds are only for show.
             }
         }
+    }
+
+    /** Particles only one player sees (what a weapon tells its own holder). */
+    public View to(Player player) {
+        return new View(List.of(player));
     }
 
     /** A sound only this player hears. */
@@ -125,6 +140,14 @@ public final class Fx {
                     // Particles are only for show.
                 }
             }
+        }
+
+        /**
+         * One particle sent flying along {@code direction} at {@code speed} (Minecraft's
+         * "count 0" form: the offset becomes the particle's velocity).
+         */
+        public void fly(Particle particle, Location at, Vector direction, double speed, Object data) {
+            particle(particle, at, 0, direction.getX(), direction.getY(), direction.getZ(), speed, data);
         }
 
         public void dust(Location at, Color color, float size, int count, double spread) {

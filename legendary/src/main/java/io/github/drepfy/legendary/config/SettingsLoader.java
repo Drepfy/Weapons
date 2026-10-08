@@ -119,7 +119,8 @@ public final class SettingsLoader {
             warnings.add(base + "tooltip-style: \"" + tooltipStyle + "\" should look like namespace:name (ignored)");
             tooltipStyle = "";
         }
-        boolean glint = in.bool(base + "glint");
+        // The real vanilla enchantment glint, on unless turned off (also for a weapon with no glint setting).
+        boolean glint = in.bool(base + "glint", true);
         org.bukkit.boss.BarColor barColor = in.choice(base + "boss-bar.color", org.bukkit.boss.BarColor.class);
         String barText = in.string(base + "boss-bar.text");
         boolean unbreakable = in.bool(base + "unbreakable");
@@ -203,8 +204,13 @@ public final class SettingsLoader {
         }
 
         boolean bool(String path) {
+            return bool(path, false);
+        }
+
+        /** fallback: the value when neither config.yml nor the defaults have it. */
+        boolean bool(String path, boolean fallback) {
             Object value = root.get(path);
-            boolean def = defaults.getBoolean(path);
+            boolean def = defaults.isSet(path) ? defaults.getBoolean(path) : fallback;
             if (value == null) {
                 return def;
             }

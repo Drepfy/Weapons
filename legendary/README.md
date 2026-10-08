@@ -41,15 +41,18 @@ these, as for any hit.
 
 The swords (Katana, Candy Cane, Reaper) have **Sharpness VII, Fire Aspect II, Looting III and
 Sweeping Edge III**; Crush (the axe) has **Sharpness VII, Efficiency V and Fortune III**. All
-four are unbreakable netherite that always shimmer, with a custom name and short lore: the
+four are unbreakable netherite that always shimmer with the real vanilla enchantment glint
+(the `enchantment_glint_override` item component, not a copy of it), with a custom name and short lore: the
 passive, the ability with its key and cooldown, and the real attack damage: **15 Attack
 Damage** for the swords and **17.5** for the axe (the vanilla tooltip leaves Sharpness out, so
 the lore's `{attack}` line shows the real numbers instead).
 
 With the server resource pack each has its own 3D model and its own tooltip frame in its
-colours, and every ability has its own glowing 3D effect (shown with display entities, never
-saved with the world; no block is ever changed). Sounds are few: one vanilla sound when an
-ability is used and one when it lands, nothing on ordinary hits.
+colours, and **every weapon has its own look**: its own effects, particles, movement and
+sounds, so you can tell which weapon it was from the effect alone (see *What each weapon looks
+like* below). No rings or circles shared between them. The effects are display entities, never
+saved with the world; no block is ever changed. Sounds are all vanilla sounds, and nothing
+plays on ordinary hits.
 
 Hearts below: 1 heart = 2 health.
 
@@ -57,8 +60,7 @@ Hearts below: 1 heart = 2 health.
 
 - **Bleed** (passive): every hit on a player makes them bleed for **4 seconds**, losing **half
   a heart every second**. Hitting them again starts the 4 seconds over; it **never stacks**.
-- **Draw** (Shift + F, **25s**): for 4 seconds the blade is half drawn (a crimson sigil follows
-  you). Your next full-strength hit on a player cuts deep for extra damage based on **the
+- **Draw** (Shift + F, **25s**): for 4 seconds the blade is half drawn. Your next full-strength hit on a player cuts deep for extra damage based on **the
   health they have left**: 30% of it, at least 1 and at most 3.5 hearts (3 hearts on a player
   at full health, 1.8 on one at 6 hearts). Used up only when it lands.
 
@@ -70,8 +72,9 @@ still healthy.
 - **Sticky Sweet** (passive): each hit has a **25%** chance to give **Slowness I for 1.5
   seconds**. The chance is the same on every hit (it does not build up), and the same player
   cannot be slowed by it again for 3 seconds, so it can never keep someone slowed.
-- **Sugar Trap** (Shift + F, **25s**): up to **5 sugar traps** pop out round you (2.5 blocks
-  away, only where there is ground and no wall in between) and wait for **8 seconds**. An enemy
+- **Sugar Trap** (Shift + F, **25s**): up to **5 sugar traps** are flung out round you (2.5
+  blocks away, only where there is ground and no wall in between) as globs of goo that splat
+  into sticky pink puddles, and wait for **8 seconds**. An enemy
   who walks over one gets **Poison I for 4 seconds, Nausea for 4 seconds and Slowness I for 1
   second**, and that trap is gone. **Your own traps never catch you.** With no room for any
   trap, nothing is used.
@@ -102,6 +105,31 @@ the ground.
   it runs out. It is ordinary damage: it never kills outright, and totems still save.
 
 *Its job:* closing out a fight that is already going your way.
+
+### What each weapon looks like
+
+Each weapon has its own visual language; none of them shares an effect, a particle style or a
+movement with another.
+
+- **Katana: sharp and fast.** Shift + F: a white glint with a four-pointed flare flashes
+  along the blade with the sound of steel being drawn; while Draw waits, cherry petals drift
+  down round you and a crimson light stays at your hand. The strike: two razor-thin cuts
+  (white-hot edge, crimson smear) cross through the target a moment apart, with a sweep,
+  crimson sparks and blood. Bleed: blood drips from them.
+- **Candy Cane: sticky and sweet.** Shift + F: glossy globs of pink goo are flung out in arcs
+  and splat on the ground as **puddles of sticky pink candy goo** (bubbles, sprinkles, splashes
+  round the edge) that wobble and bubble gently, and dry up when the trap runs out. Stepping in
+  one bursts it in a spray of pink goo, and goo clings to their feet while they are slowed.
+  Sticky Sweet: a small splash of goo. The goo particles use the goo's own texture.
+- **Crush: heavy and physical.** Shift + F: azure sparks crackle round your hand while it
+  waits. The slam (where they land, not round you): the ground breaks under them into cracked
+  plates round a hollow still glowing azure, chunks of the real block they land on are thrown
+  up and tumble back down, dust bursts up, and it lands with the mace's heavy smash. Heavy's
+  knock-down is a smaller version with a thud.
+- **Reaper: dark and spectral.** Shift + F: souls stream in from all round into your blade, and
+  dark smoke curls from it while Reap waits; every player low enough to reap has a soul flame
+  over their head **that only you can see**. The reap: a spectral scythe circles the victim
+  (following them as they move), cuts through them, and their soul spirals up out of them.
 
 **What the weapons never do:** no gambling or luck-based abilities, no combos or stacks that
 build up from hitting the same player again and again, no turning off or copying another
@@ -181,6 +209,11 @@ message. A wrong value falls back to its default and the console says what to fi
 pack required (`require-resource-pack=true` in `server.properties`) or set `tooltip-style: ""`
 for each weapon.
 
+**Updating from 3.0:** on the first start of 3.1 each weapon gets its own sounds: every sound
+still set to its 3.0 default is changed to the new one, the new sounds (`sugar-trap-splat`,
+`sticky-sweet`, `crush-hit`, `heavy-thud`) are added, and any sound you had changed yourself is
+kept. Nothing else changes.
+
 **Updating from 2.0 or older:** on the first start of 3.0:
 
 - **The old weapons become the new ones**: the Kurogane becomes the **Katana**, the Sugarcrash
@@ -218,7 +251,7 @@ cd legendary
 mvn -B package   # runs the tests, writes target/Legendary-<version>.jar
 ```
 
-`mvn test` runs 52 tests on a simulated server:
+`mvn test` runs 54 tests on a simulated server:
 - **Every ability and passive:** Bleed's damage over time, starting over and never stacking;
   Draw's share of the target's health, its limits, waiting for a full-strength hit and running
   out; Sticky Sweet's slow and its immunity; Sugar Traps catching an enemy once, never their
@@ -232,8 +265,12 @@ mvn -B package   # runs the tests, writes target/Legendary-<version>.jar
 - **Protection:** protected players are never hurt, slowed or trapped; creative players, mobs
   and PvP-off are left alone; bleeding to death breaks nothing.
 - **Look:** enchantments, the shimmer, item model, tooltip style, the attack damage lines, the
-  boss bars (waiting, recharging, ready bars, staying while the weapon is carried), and the 3D
-  effects being cleaned up.
+  boss bars (waiting, recharging, ready bars, staying while the weapon is carried), and each
+  weapon's own effects: goo flung out that splats into puddles on the ground, the Katana's
+  glint, the Reaper's scythe circling its victim and following them, and every effect being
+  cleaned up afterwards.
+- **Updating a 3.0 config:** sounds still at their 3.0 defaults get each weapon's new sounds,
+  your own changed sounds are kept.
 - **True damage:** Protection made up for so the damage is exact.
 - **Sounds:** every sound is a real vanilla sound.
 - **Storage, duplicates and ownership:** every container type, bundles, frames, stands, hoppers

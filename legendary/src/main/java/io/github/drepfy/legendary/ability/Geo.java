@@ -4,6 +4,7 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
 
 /** Directions, line of sight and finding the ground, using only block types (works on every server). */
@@ -47,6 +48,14 @@ final class Geo {
             }
         }
         return true;
+    }
+
+    /** Where a player's weapon hand is: a little in front and to the right, at chest height. */
+    static Location hand(Player player) {
+        Location at = player.getLocation();
+        Vector forward = flat(at);
+        Vector right = new Vector(-forward.getZ(), 0, forward.getX());
+        return at.add(0, 1.15, 0).add(right.multiply(0.38)).add(forward.multiply(0.35));
     }
 
     /** The middle of an entity's body. */
